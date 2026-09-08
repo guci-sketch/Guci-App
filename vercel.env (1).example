@@ -1,0 +1,31 @@
+# ==========================================
+# ENVIRONMENT VARIABLES VERCEL
+# ==========================================
+
+# ------------------------------------------
+# 1. DATABASE & AUTHENTICATION (BACKEND)
+# ------------------------------------------
+# URL koneksi Database PostgreSQL dari Supabase (Transaction/Session Mode).
+# Format: postgresql://postgres.[ID_PROYEK]:[PASSWORD]@...
+DATABASE_URL=""
+
+# Secret JWT (Buat string acak 32+ karakter)
+JWT_SECRET=""
+
+# ------------------------------------------
+# 2. SUPABASE STORAGE UNTUK UPLOAD FOTO (BACKEND)
+# ------------------------------------------
+# Mengapa bukan Anon Key? Karena aplikasi ini memproses foto di Backend (Vercel Serverless) 
+# bukan di browser/frontend. Oleh karena itu yang dibutuhkan adalah SERVICE_ROLE_KEY.
+SUPABASE_URL="https://[ID_PROYEK].supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="eyJh..."
+
+# (Opsional) Nama bucket untuk menyimpan foto. Default: evidence-photos
+SUPABASE_STORAGE_BUCKET="evidence-photos"
+
+# ------------------------------------------
+# 3. SETTING FRONTEND (VITE)
+# ------------------------------------------
+# Karena menggunakan arsitektur Monolith, kosongkan atau biarkan VITE_API_URL="/api"
+# Frontend otomatis akan memanggil endpoint Serverless di domain yang sama.
+VITE_API_URL="/api"
