@@ -20,6 +20,46 @@ export type RiskLevel = 'NORMAL' | 'LOW_RISK' | 'REVIEW' | 'HIGH_RISK' | 'CRITIC
 
 export type PhotoType = 'CHECK_IN' | 'PROGRESS' | 'CHECK_OUT';
 
+export type PhotoTag = 'BEFORE' | 'AFTER' | null;
+
+/** Pest control service taxonomy. */
+export type ServiceType =
+  | 'GENERAL_PEST_CONTROL'
+  | 'TERMITE_CONTROL'
+  | 'FUMIGATION'
+  | 'RODENT_CONTROL'
+  | 'MOSQUITO_CONTROL'
+  | 'BIRD_CONTROL'
+  | 'BED_BUG_CONTROL'
+  | 'DISINFECTION';
+
+export type ApplicationMethod =
+  | 'SPRAYING'
+  | 'BAITING'
+  | 'DRILLING'
+  | 'TRENCHING'
+  | 'FOGGING'
+  | 'MISTING'
+  | 'DUSTING'
+  | 'GEL_INJECTION';
+
+export type ContractType = 'ONE_TIME' | 'RECURRING';
+
+export interface TreatmentRecord {
+  applicationMethod: ApplicationMethod;
+  chemicalName: string;
+  activeIngredient?: string | null;
+  dosage: string;
+  treatmentAreaSqm?: number | null;
+  drillingPointsCount?: number | null;
+  fumigantType?: string | null;
+  gasConcentrationPpm?: number | null;
+  sealingStartedAt?: string | null;
+  aerationCompletedAt?: string | null;
+  safetyNotes?: string | null;
+  technicianNotes?: string | null;
+}
+
 export interface Project {
   id: string;
   projectName: string;
@@ -30,6 +70,12 @@ export interface Project {
   radius: number;
   workDate: string;
   workType: string;
+  serviceType: ServiceType;
+  pestTarget?: string | null;
+  buildingAreaSqm?: number | null;
+  contractType: ContractType;
+  warrantyMonths: number;
+  nextServiceDate?: string | null;
   scheduledStartTime: string;
   notes?: string | null;
   createdBy: string;
@@ -41,6 +87,7 @@ export interface Project {
 export interface DocumentationPhoto {
   id: string;
   photoType: PhotoType;
+  photoTag?: PhotoTag;
   latitude: number;
   longitude: number;
   accuracy: number;
@@ -59,7 +106,9 @@ export interface RiskEvent {
     | 'SHORT_DURATION'
     | 'NO_PROGRESS_PHOTO'
     | 'INSUFFICIENT_PHOTOS'
-    | 'LOCATION_DRIFT';
+    | 'LOCATION_DRIFT'
+    | 'MISSING_TREATMENT_RECORD'
+    | 'FUMIGATION_SAFETY_INCOMPLETE';
   points: number;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   title: string;
@@ -79,6 +128,12 @@ export interface WorkReport {
   projectLongitude: number;
   projectRadius: number;
   scheduledStartTime: string;
+  serviceType: ServiceType;
+  pestTarget?: string | null;
+  buildingAreaSqm?: number | null;
+  contractType: ContractType;
+  warrantyMonths: number;
+  nextServiceDate?: string | null;
 
   executorId: string;
   executorName: string;
@@ -105,6 +160,7 @@ export interface WorkReport {
   riskScore: number;
   riskLevel: RiskLevel;
   riskEvents: RiskEvent[];
+  treatmentRecord: TreatmentRecord | null;
 
   reviewedBy?: string | null;
   reviewedAt?: string | null;
@@ -131,8 +187,9 @@ export interface WorkReportListItem {
   checkInDistance: number | null;
   checkOutDistance: number | null;
   createdAt: string;
-  project: { id: string; name: string; clientName: string; address: string };
+  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; pestTarget: string | null };
   executor: { id: string; name: string };
+  treatmentSummary: { applicationMethod: ApplicationMethod; chemicalName: string; dosage: string } | null;
 }
 
 export interface AuditLogEntry {
@@ -183,6 +240,8 @@ export interface RiskConfig {
   noProgressPhotoPoints: number;
   locationDriftThresholdMeters: number;
   locationDriftPoints: number;
+  missingTreatmentRecordPoints: number;
+  fumigationMissingAerationPoints: number;
   reviewThreshold: number;
   highRiskThreshold: number;
   criticalThreshold: number;
@@ -198,6 +257,7 @@ export interface ReportFilters {
   projectId: string; // 'ALL' or project id
   riskLevel: string; // 'ALL' or RiskLevel
   status: string; // 'ALL' or WorkReportStatus
+  serviceType: string; // 'ALL' or ServiceType
   search: string;
 }
 
@@ -206,5 +266,6 @@ export const DEFAULT_FILTERS: ReportFilters = {
   projectId: 'ALL',
   riskLevel: 'ALL',
   status: 'ALL',
+  serviceType: 'ALL',
   search: '',
 };

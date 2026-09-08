@@ -10,9 +10,10 @@ import { LocationMap } from '../maps/LocationMap';
 import { PhotoViewerModal } from '../common/PhotoViewerModal';
 import { AuthedImage } from '../common/AuthedImage';
 import { RISK_LEVEL_OPTIONS, STATUS_OPTIONS } from '../../utils/riskMeta';
+import { SERVICE_TYPE_OPTIONS, getServiceTypeMeta, APPLICATION_METHOD_LABELS } from '../../utils/serviceMeta';
 import {
   ShieldAlert, Search, Download, Clock, MapPin, UserCheck, CheckCircle2, AlertTriangle, Eye,
-  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users,
+  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical,
 } from 'lucide-react';
 
 type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config';
@@ -345,6 +346,12 @@ export const AdminDashboard: React.FC = () => {
                           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Jenis Layanan</label>
+                        <select value={filters.serviceType} onChange={e => setFilters(prev => ({ ...prev, serviceType: e.target.value }))} className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white">
+                          {SERVICE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -357,6 +364,7 @@ export const AdminDashboard: React.FC = () => {
                         <th className="px-4 py-3">Tanggal</th>
                         <th className="px-4 py-3">Pelaksana</th>
                         <th className="px-4 py-3">Proyek</th>
+                        <th className="px-4 py-3">Layanan</th>
                         <th className="px-4 py-3">Check-In</th>
                         <th className="px-4 py-3">Check-Out</th>
                         <th className="px-4 py-3">Durasi</th>
@@ -367,10 +375,12 @@ export const AdminDashboard: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {visibleReports.length === 0 ? (
-                        <tr><td colSpan={9} className="text-center py-10 text-slate-400">Tidak ada laporan yang sesuai dengan kriteria filter.</td></tr>
+                        <tr><td colSpan={10} className="text-center py-10 text-slate-400">Tidak ada laporan yang sesuai dengan kriteria filter.</td></tr>
                       ) : (
                         visibleReports.map(report => {
                           const durationMin = report.durationSeconds ? Math.round(report.durationSeconds / 60) : 0;
+                          const svcMeta = getServiceTypeMeta(report.project.serviceType);
+                          const SvcIcon = svcMeta.icon;
                           return (
                             <tr key={report.id} className={`hover:bg-slate-50/80 transition-colors ${report.riskScore >= 40 ? 'bg-red-50/20' : ''}`}>
                               <td className="px-4 py-3 font-mono font-medium text-slate-600 whitespace-nowrap">{new Date(report.createdAt).toLocaleDateString('id-ID')}</td>
@@ -378,6 +388,14 @@ export const AdminDashboard: React.FC = () => {
                               <td className="px-4 py-3 max-w-xs">
                                 <span className="font-bold text-slate-900 truncate block">{report.project.name}</span>
                                 <span className="text-[11px] text-slate-500 truncate block">{report.project.clientName}</span>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${svcMeta.badgeClass}`}>
+                                  <SvcIcon size={11} /> {svcMeta.shortLabel}
+                                </span>
+                                {report.treatmentSummary && (
+                                  <span className="block text-[10px] text-slate-500 mt-0.5">{report.treatmentSummary.chemicalName}</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 font-mono whitespace-nowrap">
                                 {report.checkInAt ? (
@@ -426,6 +444,8 @@ export const AdminDashboard: React.FC = () => {
                   ) : (
                     visibleReports.map(report => {
                       const durationMin = report.durationSeconds ? Math.round(report.durationSeconds / 60) : 0;
+                      const svcMeta = getServiceTypeMeta(report.project.serviceType);
+                      const SvcIcon = svcMeta.icon;
                       return (
                         <div key={report.id} className={`bg-white p-4 rounded-xl border shadow-sm space-y-2.5 ${report.riskScore >= 40 ? 'border-red-300 bg-red-50/10' : 'border-slate-200'}`}>
                           <div className="flex items-center justify-between">
@@ -433,6 +453,9 @@ export const AdminDashboard: React.FC = () => {
                             <span className="text-xs font-mono text-slate-400">{new Date(report.createdAt).toLocaleDateString('id-ID')}</span>
                           </div>
                           <div>
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${svcMeta.badgeClass}`}>
+                              <SvcIcon size={11} /> {svcMeta.shortLabel}
+                            </span>
                             <h4 className="font-bold text-sm text-slate-900">{report.executor.name}</h4>
                             <p className="text-xs text-slate-600 font-semibold mt-0.5">{report.project.name}</p>
                           </div>
@@ -463,28 +486,43 @@ export const AdminDashboard: React.FC = () => {
 
             {activeTab === 'projects' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects.map(proj => (
-                  <div key={proj.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-bold text-base text-slate-900">{proj.projectName}</h3>
-                        <p className="text-xs text-slate-500 font-medium">{proj.clientName}</p>
+                {projects.map(proj => {
+                  const svcMeta = getServiceTypeMeta(proj.serviceType);
+                  const SvcIcon = svcMeta.icon;
+                  return (
+                    <div key={proj.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${svcMeta.badgeClass}`}>
+                            <SvcIcon size={11} /> {svcMeta.label}
+                          </span>
+                          <h3 className="font-bold text-base text-slate-900">{proj.projectName}</h3>
+                          <p className="text-xs text-slate-500 font-medium">{proj.clientName}</p>
+                        </div>
+                        {proj.lockedAt ? (
+                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">🔒 Terkunci</span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Terbuka</span>
+                        )}
                       </div>
-                      {proj.lockedAt ? (
-                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">🔒 Terkunci</span>
-                      ) : (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Terbuka</span>
+                      <p className="text-xs text-slate-600 flex items-start gap-1.5"><MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" /><span>{proj.address}</span></p>
+                      {proj.pestTarget && <p className="text-xs text-slate-500">Sasaran: <span className="font-semibold text-slate-700">{proj.pestTarget}</span></p>}
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs grid grid-cols-2 gap-2">
+                        <div><span className="text-slate-400 block text-[10px]">TANGGAL</span><span className="font-semibold text-slate-700">{proj.workDate}</span></div>
+                        <div><span className="text-slate-400 block text-[10px]">RADIUS</span><span className="font-semibold text-slate-700">{proj.radius} meter</span></div>
+                        <div><span className="text-slate-400 block text-[10px]">LUAS AREA</span><span className="font-semibold text-slate-700">{proj.buildingAreaSqm ? `${proj.buildingAreaSqm} m²` : '-'}</span></div>
+                        <div><span className="text-slate-400 block text-[10px]">DIBUAT OLEH</span><span className="font-semibold text-slate-700">{proj.createdByName || '-'}</span></div>
+                        <div><span className="text-slate-400 block text-[10px]">KONTRAK</span><span className="font-semibold text-slate-700">{proj.contractType === 'RECURRING' ? 'Berkala' : 'Sekali Layanan'}</span></div>
+                        <div><span className="text-slate-400 block text-[10px]">GARANSI</span><span className="font-semibold text-slate-700">{proj.warrantyMonths > 0 ? `${proj.warrantyMonths} bulan` : '-'}</span></div>
+                      </div>
+                      {proj.contractType === 'RECURRING' && proj.nextServiceDate && (
+                        <p className="text-[11px] text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200/60">
+                          Layanan berikutnya: {new Date(proj.nextServiceDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
                       )}
                     </div>
-                    <p className="text-xs text-slate-600 flex items-start gap-1.5"><MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" /><span>{proj.address}</span></p>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs grid grid-cols-2 gap-2">
-                      <div><span className="text-slate-400 block text-[10px]">TANGGAL</span><span className="font-semibold text-slate-700">{proj.workDate}</span></div>
-                      <div><span className="text-slate-400 block text-[10px]">RADIUS</span><span className="font-semibold text-slate-700">{proj.radius} meter</span></div>
-                      <div><span className="text-slate-400 block text-[10px]">JENIS PEKERJAAN</span><span className="font-semibold text-slate-700">{proj.workType}</span></div>
-                      <div><span className="text-slate-400 block text-[10px]">DIBUAT OLEH</span><span className="font-semibold text-slate-700">{proj.createdByName || '-'}</span></div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -572,9 +610,16 @@ export const AdminDashboard: React.FC = () => {
                 <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
                     <div><span className="text-slate-400 block text-[10px]">KLIEN</span><span className="font-bold text-slate-800">{selectedReport.clientName}</span></div>
+                    <div><span className="text-slate-400 block text-[10px]">LAYANAN</span><span className="font-bold text-slate-800">{getServiceTypeMeta(selectedReport.serviceType).label}</span></div>
                     <div><span className="text-slate-400 block text-[10px]">STATUS</span><span className="font-bold text-slate-800">{selectedReport.status}</span></div>
-                    <div><span className="text-slate-400 block text-[10px]">JADWAL</span><span className="font-bold text-slate-800">{selectedReport.scheduledStartTime} WIB</span></div>
                     <div><span className="text-slate-400 block text-[10px]">TOTAL DURASI</span><span className="font-bold text-slate-800">{selectedReport.durationSeconds ? `${Math.round(selectedReport.durationSeconds / 60)} menit` : '-'}</span></div>
+                    {selectedReport.pestTarget && (
+                      <div className="col-span-2"><span className="text-slate-400 block text-[10px]">SASARAN HAMA</span><span className="font-bold text-slate-800">{selectedReport.pestTarget}</span></div>
+                    )}
+                    {selectedReport.warrantyMonths > 0 && (
+                      <div><span className="text-slate-400 block text-[10px]">GARANSI</span><span className="font-bold text-slate-800">{selectedReport.warrantyMonths} bulan</span></div>
+                    )}
+                    <div><span className="text-slate-400 block text-[10px]">JADWAL</span><span className="font-bold text-slate-800">{selectedReport.scheduledStartTime} WIB</span></div>
                   </div>
 
                   <div>
@@ -629,6 +674,57 @@ export const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><FlaskConical size={15} className="text-emerald-600" /> Data Perlakuan (Treatment)</h4>
+                    {!selectedReport.treatmentRecord ? (
+                      <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-amber-800 text-xs flex items-center gap-2">
+                        <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                        <span>Belum ada data bahan, dosis, atau metode aplikasi yang tercatat untuk pekerjaan ini.</span>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs space-y-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div><span className="text-slate-400 block text-[10px]">METODE</span><span className="font-bold text-slate-800">{APPLICATION_METHOD_LABELS[selectedReport.treatmentRecord.applicationMethod]}</span></div>
+                          <div><span className="text-slate-400 block text-[10px]">BAHAN/PRODUK</span><span className="font-bold text-slate-800">{selectedReport.treatmentRecord.chemicalName}</span></div>
+                          <div><span className="text-slate-400 block text-[10px]">BAHAN AKTIF</span><span className="font-bold text-slate-800">{selectedReport.treatmentRecord.activeIngredient || '-'}</span></div>
+                          <div><span className="text-slate-400 block text-[10px]">DOSIS</span><span className="font-bold text-slate-800">{selectedReport.treatmentRecord.dosage}</span></div>
+                          {selectedReport.treatmentRecord.treatmentAreaSqm != null && (
+                            <div><span className="text-slate-400 block text-[10px]">LUAS DIRAWAT</span><span className="font-bold text-slate-800">{selectedReport.treatmentRecord.treatmentAreaSqm} m²</span></div>
+                          )}
+                          {selectedReport.treatmentRecord.drillingPointsCount != null && (
+                            <div><span className="text-slate-400 block text-[10px]">TITIK BOR/INJEKSI</span><span className="font-bold text-slate-800">{selectedReport.treatmentRecord.drillingPointsCount} titik</span></div>
+                          )}
+                        </div>
+
+                        {selectedReport.serviceType === 'FUMIGATION' && (
+                          <div className={`rounded-lg p-3 border ${selectedReport.treatmentRecord.aerationCompletedAt ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <ShieldAlert size={14} className={selectedReport.treatmentRecord.aerationCompletedAt ? 'text-emerald-700' : 'text-rose-700'} />
+                              <span className={`text-[11px] font-bold uppercase ${selectedReport.treatmentRecord.aerationCompletedAt ? 'text-emerald-800' : 'text-rose-800'}`}>Data Keselamatan Fumigasi</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div><span className="text-slate-400 block text-[10px]">FUMIGANT</span><span className="font-semibold text-slate-800">{selectedReport.treatmentRecord.fumigantType || '-'}</span></div>
+                              <div><span className="text-slate-400 block text-[10px]">KONSENTRASI</span><span className="font-semibold text-slate-800">{selectedReport.treatmentRecord.gasConcentrationPpm != null ? `${selectedReport.treatmentRecord.gasConcentrationPpm} ppm` : '-'}</span></div>
+                              <div><span className="text-slate-400 block text-[10px]">MULAI SEALING</span><span className="font-semibold text-slate-800">{selectedReport.treatmentRecord.sealingStartedAt ? new Date(selectedReport.treatmentRecord.sealingStartedAt).toLocaleString('id-ID') : '-'}</span></div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px]">SELESAI AERASI</span>
+                                {selectedReport.treatmentRecord.aerationCompletedAt ? (
+                                  <span className="font-semibold text-emerald-700">{new Date(selectedReport.treatmentRecord.aerationCompletedAt).toLocaleString('id-ID')}</span>
+                                ) : (
+                                  <span className="font-bold text-rose-700">Belum tercatat ⚠</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedReport.treatmentRecord.technicianNotes && (
+                          <p className="text-slate-600 italic">&quot;{selectedReport.treatmentRecord.technicianNotes}&quot;</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
                     <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><Eye size={15} className="text-emerald-600" /> Galeri Bukti Foto ({selectedReport.photos.length})</h4>
                     {selectedReport.photos.length === 0 ? (
                       <p className="text-xs text-slate-400">Belum ada foto.</p>
@@ -638,7 +734,7 @@ export const AdminDashboard: React.FC = () => {
                           <div key={photo.id} onClick={() => setViewingPhoto(photo)} className="group relative rounded-xl overflow-hidden border border-slate-200 shadow-sm cursor-pointer hover:border-emerald-500 transition-all aspect-video bg-black">
                             <AuthedImage path={photo.url} alt="evidence" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-white pointer-events-none">
-                              <span className="text-[10px] font-bold block uppercase tracking-wide">{photo.photoType.replace('_', ' ')}</span>
+                              <span className="text-[10px] font-bold block uppercase tracking-wide">{photo.photoTag ? (photo.photoTag === 'BEFORE' ? 'Kondisi Awal' : 'Hasil Perlakuan') : photo.photoType.replace('_', ' ')}</span>
                               <span className="text-[9px] text-slate-300 font-mono block">{new Date(photo.capturedAt).toLocaleTimeString('id-ID')} WIB</span>
                             </div>
                           </div>
@@ -789,6 +885,8 @@ const RiskConfigPanel: React.FC<{ config: RiskConfig | null; onSave: (partial: P
         {field('noProgressPhotoPoints', 'Poin tanpa foto progres', 'poin')}
         {field('locationDriftThresholdMeters', 'Batas pergeseran lokasi', 'meter')}
         {field('locationDriftPoints', 'Poin pergeseran lokasi', 'poin')}
+        {field('missingTreatmentRecordPoints', 'Poin data treatment kosong', 'poin')}
+        {field('fumigationMissingAerationPoints', 'Poin fumigasi tanpa data aerasi', 'poin')}
         {field('lowRiskThreshold', 'Ambang Risiko Rendah', 'skor')}
         {field('reviewThreshold', 'Ambang Perlu Ditinjau', 'skor')}
         {field('highRiskThreshold', 'Ambang Risiko Tinggi', 'skor')}

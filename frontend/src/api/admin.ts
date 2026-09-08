@@ -11,6 +11,7 @@ function filtersToQuery(f: Partial<ReportFilters>) {
     projectId: f.projectId,
     riskLevel: f.riskLevel,
     status: f.status,
+    serviceType: f.serviceType,
     search: f.search,
   };
 }

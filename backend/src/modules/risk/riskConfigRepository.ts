@@ -16,6 +16,8 @@ interface RiskConfigRow {
   no_progress_photo_points: number;
   location_drift_threshold_meters: number;
   location_drift_points: number;
+  missing_treatment_record_points: number;
+  fumigation_missing_aeration_points: number;
   review_threshold: number;
   high_risk_threshold: number;
   critical_threshold: number;
@@ -37,6 +39,8 @@ function rowToConfig(row: RiskConfigRow): RiskConfig {
     noProgressPhotoPoints: row.no_progress_photo_points,
     locationDriftThresholdMeters: row.location_drift_threshold_meters,
     locationDriftPoints: row.location_drift_points,
+    missingTreatmentRecordPoints: row.missing_treatment_record_points,
+    fumigationMissingAerationPoints: row.fumigation_missing_aeration_points,
     reviewThreshold: row.review_threshold,
     highRiskThreshold: row.high_risk_threshold,
     criticalThreshold: row.critical_threshold,
@@ -72,11 +76,13 @@ export async function updateRiskConfig(
       no_progress_photo_points = $11,
       location_drift_threshold_meters = $12,
       location_drift_points = $13,
-      review_threshold = $14,
-      high_risk_threshold = $15,
-      critical_threshold = $16,
-      low_risk_threshold = $17,
-      updated_by = $18,
+      missing_treatment_record_points = $14,
+      fumigation_missing_aeration_points = $15,
+      review_threshold = $16,
+      high_risk_threshold = $17,
+      critical_threshold = $18,
+      low_risk_threshold = $19,
+      updated_by = $20,
       updated_at = now()
      where id = 1
      returning *`,
@@ -94,6 +100,8 @@ export async function updateRiskConfig(
       merged.noProgressPhotoPoints,
       merged.locationDriftThresholdMeters,
       merged.locationDriftPoints,
+      merged.missingTreatmentRecordPoints,
+      merged.fumigationMissingAerationPoints,
       merged.reviewThreshold,
       merged.highRiskThreshold,
       merged.criticalThreshold,

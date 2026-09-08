@@ -11,7 +11,22 @@ import { errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+  // Supports a comma-separated list so a staging domain and the Vercel
+  // preview-deployment URL can both be allowed alongside production, e.g.
+  // CORS_ORIGIN="https://fieldwork.app,https://fieldwork-web.vercel.app"
+  const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+        else callback(new Error(`Origin ${origin} tidak diizinkan oleh CORS.`));
+      },
+    })
+  );
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'fieldwork-api' }));

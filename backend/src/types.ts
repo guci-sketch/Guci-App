@@ -6,6 +6,46 @@ export type RiskLevel = 'NORMAL' | 'LOW_RISK' | 'REVIEW' | 'HIGH_RISK' | 'CRITIC
 
 export type PhotoType = 'CHECK_IN' | 'PROGRESS' | 'CHECK_OUT';
 
+export type PhotoTag = 'BEFORE' | 'AFTER' | null;
+
+/** Pest control service taxonomy — see schema.sql for the Indonesian gloss on each. */
+export type ServiceType =
+  | 'GENERAL_PEST_CONTROL'
+  | 'TERMITE_CONTROL'
+  | 'FUMIGATION'
+  | 'RODENT_CONTROL'
+  | 'MOSQUITO_CONTROL'
+  | 'BIRD_CONTROL'
+  | 'BED_BUG_CONTROL'
+  | 'DISINFECTION';
+
+export type ApplicationMethod =
+  | 'SPRAYING'
+  | 'BAITING'
+  | 'DRILLING'
+  | 'TRENCHING'
+  | 'FOGGING'
+  | 'MISTING'
+  | 'DUSTING'
+  | 'GEL_INJECTION';
+
+export type ContractType = 'ONE_TIME' | 'RECURRING';
+
+export interface TreatmentRecord {
+  applicationMethod: ApplicationMethod;
+  chemicalName: string;
+  activeIngredient?: string | null;
+  dosage: string;
+  treatmentAreaSqm?: number | null;
+  drillingPointsCount?: number | null;
+  fumigantType?: string | null;
+  gasConcentrationPpm?: number | null;
+  sealingStartedAt?: string | null;
+  aerationCompletedAt?: string | null;
+  safetyNotes?: string | null;
+  technicianNotes?: string | null;
+}
+
 export interface RiskConfig {
   lateCheckinThresholdMinutes: number;
   lateCheckinPoints: number;
@@ -20,6 +60,8 @@ export interface RiskConfig {
   noProgressPhotoPoints: number;
   locationDriftThresholdMeters: number;
   locationDriftPoints: number;
+  missingTreatmentRecordPoints: number;
+  fumigationMissingAerationPoints: number;
   reviewThreshold: number;
   highRiskThreshold: number;
   criticalThreshold: number;
@@ -33,7 +75,9 @@ export interface RiskEvent {
     | 'SHORT_DURATION'
     | 'NO_PROGRESS_PHOTO'
     | 'INSUFFICIENT_PHOTOS'
-    | 'LOCATION_DRIFT';
+    | 'LOCATION_DRIFT'
+    | 'MISSING_TREATMENT_RECORD'
+    | 'FUMIGATION_SAFETY_INCOMPLETE';
   points: number;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   title: string;
@@ -54,6 +98,8 @@ export interface RiskEvaluationInput {
   checkOutDistance?: number | null;
   projectRadius: number;
   photos: { photoType: PhotoType }[];
+  serviceType: ServiceType;
+  treatmentRecord?: TreatmentRecord | null;
 }
 
 export interface RiskEvaluationResult {

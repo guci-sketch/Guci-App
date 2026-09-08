@@ -5,6 +5,7 @@ export async function getReportOrThrow(id: string) {
   const rows = await query(
     `select wr.*, p.project_name, p.client_name, p.address as project_address, p.latitude as project_latitude,
       p.longitude as project_longitude, p.radius as project_radius, p.scheduled_start_time,
+      p.service_type, p.pest_target, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
       u.name as executor_name, u.email as executor_email
      from work_reports wr
      join projects p on p.id = wr.project_id
@@ -23,6 +24,24 @@ export function assertOwnerOrAdmin(user: { role: string; id: string }, report: a
   }
 }
 
+function mapTreatmentRecord(t: any) {
+  if (!t) return null;
+  return {
+    applicationMethod: t.application_method,
+    chemicalName: t.chemical_name,
+    activeIngredient: t.active_ingredient,
+    dosage: t.dosage,
+    treatmentAreaSqm: t.treatment_area_sqm !== null ? Number(t.treatment_area_sqm) : null,
+    drillingPointsCount: t.drilling_points_count,
+    fumigantType: t.fumigant_type,
+    gasConcentrationPpm: t.gas_concentration_ppm !== null ? Number(t.gas_concentration_ppm) : null,
+    sealingStartedAt: t.sealing_started_at,
+    aerationCompletedAt: t.aeration_completed_at,
+    safetyNotes: t.safety_notes,
+    technicianNotes: t.technician_notes,
+  };
+}
+
 export async function mapReportFull(report: any) {
   const photos = await query(
     'select * from documentation_photos where work_report_id = $1 order by captured_at asc',
@@ -32,6 +51,8 @@ export async function mapReportFull(report: any) {
     'select * from risk_events where work_report_id = $1 order by created_at asc',
     [report.id]
   );
+  const treatmentRows = await query('select * from treatment_records where work_report_id = $1', [report.id]);
+
   return {
     id: report.id,
     projectId: report.project_id,
@@ -42,6 +63,12 @@ export async function mapReportFull(report: any) {
     projectLongitude: Number(report.project_longitude),
     projectRadius: report.project_radius,
     scheduledStartTime: report.scheduled_start_time,
+    serviceType: report.service_type,
+    pestTarget: report.pest_target,
+    buildingAreaSqm: report.building_area_sqm !== null ? Number(report.building_area_sqm) : null,
+    contractType: report.contract_type,
+    warrantyMonths: report.warranty_months,
+    nextServiceDate: report.next_service_date,
     executorId: report.executor_id,
     executorName: report.executor_name,
     executorEmail: report.executor_email,
@@ -67,9 +94,11 @@ export async function mapReportFull(report: any) {
     notes: report.notes,
     createdAt: report.created_at,
     updatedAt: report.updated_at,
+    treatmentRecord: mapTreatmentRecord(treatmentRows[0]),
     photos: photos.map(p => ({
       id: p.id,
       photoType: p.photo_type,
+      photoTag: p.photo_tag,
       latitude: Number(p.latitude),
       longitude: Number(p.longitude),
       accuracy: p.accuracy,

@@ -9,6 +9,17 @@ import { isValidCoordinate } from '../../utils/geo.js';
 export const projectRouter = Router();
 projectRouter.use(requireAuth);
 
+const SERVICE_TYPES = [
+  'GENERAL_PEST_CONTROL',
+  'TERMITE_CONTROL',
+  'FUMIGATION',
+  'RODENT_CONTROL',
+  'MOSQUITO_CONTROL',
+  'BIRD_CONTROL',
+  'BED_BUG_CONTROL',
+  'DISINFECTION',
+] as const;
+
 const createProjectSchema = z.object({
   projectName: z.string().min(3, 'Nama proyek minimal 3 karakter.'),
   clientName: z.string().optional().default(''),
@@ -18,6 +29,12 @@ const createProjectSchema = z.object({
   radius: z.number().int().min(20).max(2000).default(100),
   workDate: z.string().min(1, 'Tanggal kerja wajib diisi.'),
   workType: z.string().optional().default(''),
+  serviceType: z.enum(SERVICE_TYPES).default('GENERAL_PEST_CONTROL'),
+  pestTarget: z.string().optional(),
+  buildingAreaSqm: z.number().min(0).optional(),
+  contractType: z.enum(['ONE_TIME', 'RECURRING']).default('ONE_TIME'),
+  warrantyMonths: z.number().int().min(0).max(120).default(0),
+  nextServiceDate: z.string().optional(),
   scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).default('08:00'),
   notes: z.string().optional(),
 });
@@ -33,6 +50,12 @@ function mapProject(row: any) {
     radius: row.radius,
     workDate: row.work_date,
     workType: row.work_type,
+    serviceType: row.service_type,
+    pestTarget: row.pest_target,
+    buildingAreaSqm: row.building_area_sqm !== null ? Number(row.building_area_sqm) : null,
+    contractType: row.contract_type,
+    warrantyMonths: row.warranty_months,
+    nextServiceDate: row.next_service_date,
     scheduledStartTime: row.scheduled_start_time,
     notes: row.notes,
     createdBy: row.created_by,
@@ -55,11 +78,22 @@ projectRouter.post(
     if (!isValidCoordinate(d.latitude, d.longitude)) {
       throw new HttpError(400, 'Koordinat lokasi tidak valid.');
     }
+    if (d.contractType === 'RECURRING' && !d.nextServiceDate) {
+      throw new HttpError(400, 'Kontrak berkala memerlukan tanggal layanan berikutnya.');
+    }
 
     const rows = await query(
-      `insert into projects (project_name, client_name, address, latitude, longitude, radius, work_date, work_type, scheduled_start_time, notes, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
-      [d.projectName.trim(), d.clientName?.trim() || '', d.address.trim(), d.latitude, d.longitude, d.radius, d.workDate, d.workType?.trim() || '', d.scheduledStartTime, d.notes?.trim() || null, req.user!.id]
+      `insert into projects (
+        project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
+        service_type, pest_target, building_area_sqm, contract_type, warranty_months, next_service_date,
+        scheduled_start_time, notes, created_by
+      )
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning *`,
+      [
+        d.projectName.trim(), d.clientName?.trim() || '', d.address.trim(), d.latitude, d.longitude, d.radius, d.workDate, d.workType?.trim() || '',
+        d.serviceType, d.pestTarget?.trim() || null, d.buildingAreaSqm ?? null, d.contractType, d.warrantyMonths, d.nextServiceDate || null,
+        d.scheduledStartTime, d.notes?.trim() || null, req.user!.id,
+      ]
     );
     const project = rows[0];
 
@@ -69,7 +103,7 @@ projectRouter.post(
       [project.id, req.user!.id]
     );
 
-    await logAction(req.user!, 'CREATE_PROJECT', 'project', project.id, `Membuat proyek "${project.project_name}" (radius ${project.radius}m).`);
+    await logAction(req.user!, 'CREATE_PROJECT', 'project', project.id, `Membuat proyek "${project.project_name}" (${project.service_type}, radius ${project.radius}m).`);
 
     res.status(201).json({ project: mapProject({ ...project, created_by_name: req.user!.name }), workReportId: report[0].id });
   })

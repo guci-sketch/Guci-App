@@ -19,6 +19,7 @@ const filterSchema = z.object({
   projectId: z.string().optional(),
   riskLevel: z.string().optional(),
   status: z.string().optional(),
+  serviceType: z.string().optional(),
   search: z.string().optional(),
 });
 
@@ -64,6 +65,10 @@ function buildReportFilter(q: z.infer<typeof filterSchema>) {
     clauses.push(`wr.status = $${i++}`);
     params.push(q.status);
   }
+  if (q.serviceType && q.serviceType !== 'ALL') {
+    clauses.push(`p.service_type = $${i++}`);
+    params.push(q.serviceType);
+  }
   if (q.search && q.search.trim()) {
     clauses.push(`(p.project_name ilike $${i} or u.name ilike $${i})`);
     params.push(`%${q.search.trim()}%`);
@@ -77,11 +82,13 @@ const REPORT_LIST_SQL = `
   select wr.id, wr.status, wr.check_in_at, wr.check_out_at, wr.duration_seconds,
          wr.risk_score, wr.risk_level, wr.check_in_distance, wr.check_out_distance,
          wr.check_in_valid, wr.check_out_valid, wr.created_at,
-         p.id as project_id, p.project_name, p.client_name, p.address,
-         u.id as executor_id, u.name as executor_name
+         p.id as project_id, p.project_name, p.client_name, p.address, p.service_type, p.pest_target,
+         u.id as executor_id, u.name as executor_name,
+         tr.application_method, tr.chemical_name, tr.dosage
   from work_reports wr
   join projects p on p.id = wr.project_id
   join users u on u.id = wr.executor_id
+  left join treatment_records tr on tr.work_report_id = wr.id
 `;
 
 function mapListRow(r: any) {
@@ -98,8 +105,9 @@ function mapListRow(r: any) {
     checkInDistance: r.check_in_distance,
     checkOutDistance: r.check_out_distance,
     createdAt: r.created_at,
-    project: { id: r.project_id, name: r.project_name, clientName: r.client_name, address: r.address },
+    project: { id: r.project_id, name: r.project_name, clientName: r.client_name, address: r.address, serviceType: r.service_type, pestTarget: r.pest_target },
     executor: { id: r.executor_id, name: r.executor_name },
+    treatmentSummary: r.chemical_name ? { applicationMethod: r.application_method, chemicalName: r.chemical_name, dosage: r.dosage } : null,
   };
 }
 
@@ -191,8 +199,10 @@ adminRouter.get(
       projects: rows.map(r => ({
         id: r.id, projectName: r.project_name, clientName: r.client_name, address: r.address,
         latitude: Number(r.latitude), longitude: Number(r.longitude), radius: r.radius,
-        workDate: r.work_date, workType: r.work_type, createdByName: r.created_by_name,
-        createdAt: r.created_at, lockedAt: r.locked_at,
+        workDate: r.work_date, workType: r.work_type, serviceType: r.service_type, pestTarget: r.pest_target,
+        buildingAreaSqm: r.building_area_sqm !== null ? Number(r.building_area_sqm) : null,
+        contractType: r.contract_type, warrantyMonths: r.warranty_months, nextServiceDate: r.next_service_date,
+        createdByName: r.created_by_name, createdAt: r.created_at, lockedAt: r.locked_at,
       })),
     });
   })
@@ -232,6 +242,8 @@ const riskConfigUpdateSchema = z.object({
   noProgressPhotoPoints: z.number().int().min(0).optional(),
   locationDriftThresholdMeters: z.number().int().min(0).optional(),
   locationDriftPoints: z.number().int().min(0).optional(),
+  missingTreatmentRecordPoints: z.number().int().min(0).optional(),
+  fumigationMissingAerationPoints: z.number().int().min(0).optional(),
   reviewThreshold: z.number().int().min(0).max(200).optional(),
   highRiskThreshold: z.number().int().min(0).max(200).optional(),
   criticalThreshold: z.number().int().min(0).max(200).optional(),
@@ -257,13 +269,14 @@ adminRouter.get(
     const { where, params } = buildReportFilter(parsed.data);
     const rows = await query(`${REPORT_LIST_SQL} ${where} order by wr.created_at desc limit 5000`, params);
 
-    const header = ['Tanggal', 'Pelaksana', 'Proyek', 'Status', 'Check-in', 'Check-out', 'Durasi (menit)', 'Risk Score', 'Risk Level', 'Jarak Check-in (m)', 'Jarak Check-out (m)'];
+    const header = ['Tanggal', 'Pelaksana', 'Proyek', 'Jenis Layanan', 'Status', 'Check-in', 'Check-out', 'Durasi (menit)', 'Risk Score', 'Risk Level', 'Jarak Check-in (m)', 'Jarak Check-out (m)', 'Metode Aplikasi', 'Bahan/Produk', 'Dosis'];
     const lines = [header.join(',')];
     for (const r of rows) {
       const row = [
         r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : '',
         r.executor_name,
         r.project_name,
+        r.service_type,
         r.status,
         r.check_in_at ? new Date(r.check_in_at).toISOString() : '',
         r.check_out_at ? new Date(r.check_out_at).toISOString() : '',
@@ -272,6 +285,9 @@ adminRouter.get(
         r.risk_level,
         r.check_in_distance ?? '',
         r.check_out_distance ?? '',
+        r.application_method ?? '',
+        r.chemical_name ?? '',
+        r.dosage ?? '',
       ].map(v => `"${String(v).replace(/"/g, '""')}"`);
       lines.push(row.join(','));
     }

@@ -1,5 +1,5 @@
 import { api } from './client';
-import { Project } from '../types';
+import { ContractType, Project, ServiceType } from '../types';
 
 export interface CreateProjectInput {
   projectName: string;
@@ -10,6 +10,12 @@ export interface CreateProjectInput {
   radius?: number;
   workDate: string;
   workType?: string;
+  serviceType: ServiceType;
+  pestTarget?: string;
+  buildingAreaSqm?: number;
+  contractType: ContractType;
+  warrantyMonths: number;
+  nextServiceDate?: string;
   scheduledStartTime?: string;
   notes?: string;
 }

@@ -63,7 +63,9 @@ export function formatCoordinates(lat: number, lng: number): string {
 }
 
 /**
- * Default preset locations in Jakarta / Tangerang area for testing and prototyping
+ * Preset client premises in Jakarta / Tangerang area — quick-fill locations
+ * for common pest control job sites, so a technician doesn't have to type
+ * a full address for a returning client.
  */
 export const PRESET_PROJECT_LOCATIONS = [
   {
@@ -74,21 +76,21 @@ export const PRESET_PROJECT_LOCATIONS = [
     radius: 100,
   },
   {
-    name: 'Tower Telekomunikasi TB Simatupang',
+    name: 'Menara Perkantoran TB Simatupang',
     address: 'Jl. TB Simatupang No. 18, Cilandak, Jakarta Selatan',
     latitude: -6.294520,
     longitude: 106.801230,
     radius: 100,
   },
   {
-    name: 'Renovasi Gedung BUMN Thamrin',
+    name: 'Gedung Perkantoran Thamrin',
     address: 'Jl. M.H. Thamrin No. 8, Menteng, Jakarta Pusat',
     latitude: -6.186540,
     longitude: 106.823480,
     radius: 150,
   },
   {
-    name: 'Gardu Induk PLN Gandul',
+    name: 'Kompleks Ruko Gandul',
     address: 'Jl. Raya Gandul No. 45, Cinere, Kota Depok',
     latitude: -6.331200,
     longitude: 106.789100,

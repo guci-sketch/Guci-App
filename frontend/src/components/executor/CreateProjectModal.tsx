@@ -1,29 +1,40 @@
 import React, { useState } from 'react';
-import { X, MapPin, Calendar, Building, FileText, CheckCircle2, Crosshair, Sparkles, Clock, Loader2 } from 'lucide-react';
+import { X, MapPin, Calendar, Building, FileText, CheckCircle2, Crosshair, Sparkles, Clock, Loader2, Ruler, Bug, ShieldCheck, Repeat } from 'lucide-react';
 import { PRESET_PROJECT_LOCATIONS } from '../../utils/geo';
+import { SERVICE_TYPE_META } from '../../utils/serviceMeta';
+import { ContractType, ServiceType } from '../../types';
+import { CreateProjectInput } from '../../api/projects';
 
 interface CreateProjectModalProps {
   onClose: () => void;
-  onSubmit: (data: {
-    projectName: string;
-    clientName: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    radius: number;
-    workDate: string;
-    workType: string;
-    scheduledStartTime: string;
-    notes?: string;
-  }) => Promise<void>;
+  onSubmit: (data: CreateProjectInput) => Promise<void>;
 }
+
+const SERVICE_TYPES = Object.keys(SERVICE_TYPE_META) as ServiceType[];
+
+const DEFAULT_WORK_TYPE_BY_SERVICE: Record<ServiceType, string> = {
+  GENERAL_PEST_CONTROL: 'Pest Control Umum Bulanan',
+  TERMITE_CONTROL: 'Anti Rayap Pasca Konstruksi',
+  FUMIGATION: 'Fumigasi Gudang / Kontainer',
+  RODENT_CONTROL: 'Pengendalian Tikus Rutin',
+  MOSQUITO_CONTROL: 'Fogging Area',
+  BIRD_CONTROL: 'Pengendalian Burung',
+  BED_BUG_CONTROL: 'Perlakuan Kutu Busuk',
+  DISINFECTION: 'Disinfeksi Area',
+};
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onSubmit }) => {
   const [projectName, setProjectName] = useState('');
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
   const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
-  const [workType, setWorkType] = useState('Inspeksi & Pemeliharaan Rutin');
+  const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
+  const [workType, setWorkType] = useState(DEFAULT_WORK_TYPE_BY_SERVICE.GENERAL_PEST_CONTROL);
+  const [pestTarget, setPestTarget] = useState('');
+  const [buildingAreaSqm, setBuildingAreaSqm] = useState<string>('');
+  const [contractType, setContractType] = useState<ContractType>('ONE_TIME');
+  const [warrantyMonths, setWarrantyMonths] = useState<number>(0);
+  const [nextServiceDate, setNextServiceDate] = useState('');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [radius, setRadius] = useState<number>(100);
@@ -37,6 +48,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [gpsSuccessMessage, setGpsSuccessMessage] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const handleSelectServiceType = (type: ServiceType) => {
+    setServiceType(type);
+    setWorkType(DEFAULT_WORK_TYPE_BY_SERVICE[type]);
+    if (type === 'TERMITE_CONTROL' && warrantyMonths === 0) setWarrantyMonths(12);
+  };
 
   const handleFetchCurrentGps = () => {
     setIsGettingGps(true);
@@ -78,6 +95,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     if (!projectName.trim()) newErrors.projectName = 'Nama proyek wajib diisi';
     if (!address.trim()) newErrors.address = 'Alamat proyek wajib diisi';
     if (!workDate) newErrors.workDate = 'Tanggal pelaksanaan wajib diisi';
+    if (contractType === 'RECURRING' && !nextServiceDate) newErrors.nextServiceDate = 'Kontrak berkala perlu tanggal layanan berikutnya';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -89,13 +107,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     try {
       await onSubmit({
         projectName,
-        clientName: clientName || 'Klien Proyek Lapangan',
+        clientName: clientName || 'Klien Layanan Lapangan',
         address,
         latitude,
         longitude,
         radius,
         workDate,
         workType,
+        serviceType,
+        pestTarget: pestTarget || undefined,
+        buildingAreaSqm: buildingAreaSqm ? Number(buildingAreaSqm) : undefined,
+        contractType,
+        warrantyMonths,
+        nextServiceDate: contractType === 'RECURRING' ? nextServiceDate : undefined,
         scheduledStartTime,
         notes,
       });
@@ -104,6 +128,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       setIsSubmitting(false);
     }
   };
+
+  const isFumigation = serviceType === 'FUMIGATION';
+  const isTermite = serviceType === 'TERMITE_CONTROL';
 
   return (
     <div
@@ -119,9 +146,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Buat Pekerjaan Proyek Baru</h2>
+            <h2 className="text-lg font-bold text-slate-900">Buat Penugasan Layanan Baru</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Input data penugasan lapangan sebelum melakukan check-in
+              Input data lokasi klien &amp; jenis layanan sebelum check-in
             </p>
           </div>
           <button
@@ -134,36 +161,50 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Quick Presets */}
-          <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-sky-900 flex items-center gap-1">
-                <Sparkles size={14} className="text-sky-600" /> Pilih Contoh Lokasi Cepat:
-              </span>
+          {/* Service Type Selector */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Jenis Layanan *
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {SERVICE_TYPES.map(type => {
+                const meta = SERVICE_TYPE_META[type];
+                const Icon = meta.icon;
+                const active = serviceType === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleSelectServiceType(type)}
+                    className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                      active ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span className="text-[10px] font-bold leading-tight">{meta.shortLabel}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {PRESET_PROJECT_LOCATIONS.map((preset, idx) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => handleApplyPreset(idx)}
-                  className="text-[11px] px-2.5 py-1 bg-white hover:bg-sky-100/60 text-slate-700 border border-sky-200 rounded-lg transition-colors font-medium text-left"
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
+            <p className="text-[11px] text-slate-500 mt-1.5">{SERVICE_TYPE_META[serviceType].description}</p>
           </div>
+
+          {isFumigation && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 text-xs text-rose-800">
+              <ShieldCheck size={16} className="shrink-0 mt-0.5 text-rose-600" />
+              <span>Fumigasi melibatkan gas beracun. Data sealing &amp; waktu aerasi wajib diisi lengkap di formulir treatment sebelum check-out, atau laporan otomatis ditandai risiko keselamatan.</span>
+            </div>
+          )}
 
           {/* Project Name */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Nama Proyek *
+              Nama Proyek / Lokasi Klien *
             </label>
             <input
               id="input-project-name"
               type="text"
-              placeholder="Contoh: RS Hermina BSD - Gedung Barat"
+              placeholder="Contoh: RS Hermina BSD - Gedung Rawat Inap"
               value={projectName}
               onChange={e => {
                 setProjectName(e.target.value);
@@ -194,20 +235,111 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 />
               </div>
             </div>
-
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Jenis Pekerjaan
+                Deskripsi Pekerjaan
               </label>
               <input
                 id="input-work-type"
                 type="text"
-                placeholder="Maintenance / Inspeksi / Instalasi"
+                placeholder="Anti Rayap / Fumigasi / Pest Control"
                 value={workType}
                 onChange={e => setWorkType(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
               />
             </div>
+          </div>
+
+          {/* Pest target & building area */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Jenis Hama Sasaran
+              </label>
+              <div className="relative">
+                <Bug size={16} className="absolute left-3 top-3 text-slate-400" />
+                <input
+                  id="input-pest-target"
+                  type="text"
+                  placeholder="Rayap Tanah, Kecoa, Tikus Got, dst."
+                  value={pestTarget}
+                  onChange={e => setPestTarget(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Luas Area / Bangunan (m²)
+              </label>
+              <div className="relative">
+                <Ruler size={16} className="absolute left-3 top-3 text-slate-400" />
+                <input
+                  id="input-building-area"
+                  type="number"
+                  min={0}
+                  placeholder="150"
+                  value={buildingAreaSqm}
+                  onChange={e => setBuildingAreaSqm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Contract type, warranty, next service */}
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Repeat size={14} className="text-emerald-600" /> Tipe Kontrak &amp; Garansi
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setContractType('ONE_TIME')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${contractType === 'ONE_TIME' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                Sekali Layanan
+              </button>
+              <button
+                type="button"
+                onClick={() => setContractType('RECURRING')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${contractType === 'RECURRING' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+              >
+                Kontrak Berkala
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Garansi (bulan)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={60}
+                  value={warrantyMonths}
+                  onChange={e => setWarrantyMonths(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-mono"
+                />
+              </div>
+              {contractType === 'RECURRING' && (
+                <div>
+                  <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Layanan Berikutnya *</span>
+                  <input
+                    type="date"
+                    value={nextServiceDate}
+                    onChange={e => setNextServiceDate(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                  />
+                </div>
+              )}
+            </div>
+            {errors.nextServiceDate && <p className="text-xs text-red-600 font-medium">{errors.nextServiceDate}</p>}
+            {isTermite && warrantyMonths > 0 && (
+              <p className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60">
+                Sertifikat garansi {warrantyMonths} bulan akan berlaku sejak tanggal check-out pekerjaan ini selesai.
+              </p>
+            )}
           </div>
 
           {/* Work Date & Scheduled Start Time */}
@@ -265,11 +397,32 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             )}
           </div>
 
+          {/* Quick Presets */}
+          <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-sky-900 flex items-center gap-1">
+                <Sparkles size={14} className="text-sky-600" /> Lokasi Klien Tersimpan:
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PRESET_PROJECT_LOCATIONS.map((preset, idx) => (
+                <button
+                  key={preset.name}
+                  type="button"
+                  onClick={() => handleApplyPreset(idx)}
+                  className="text-[11px] px-2.5 py-1 bg-white hover:bg-sky-100/60 text-slate-700 border border-sky-200 rounded-lg transition-colors font-medium text-left"
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* GPS Location & Radius Section */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin size={15} className="text-emerald-600" /> Titik Pusat Geofence Proyek
+                <MapPin size={15} className="text-emerald-600" /> Titik Pusat Geofence Lokasi
               </span>
               <button
                 id="btn-get-device-gps"
@@ -352,7 +505,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               <textarea
                 id="input-notes"
                 rows={2}
-                placeholder="Instruksi safety, area khusus, atau izin masuk..."
+                placeholder="Instruksi safety, akses masuk, riwayat infestasi sebelumnya..."
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
@@ -383,7 +536,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2"
             >
               {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-              Buat &amp; Jadwalkan Proyek
+              Buat &amp; Jadwalkan Penugasan
             </button>
           </div>
         </form>

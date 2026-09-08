@@ -1,5 +1,5 @@
 import { api } from './client';
-import { WorkReport } from '../types';
+import { ApplicationMethod, PhotoTag, TreatmentRecord, WorkReport } from '../types';
 
 export interface EvidencePayload {
   photoBlob: Blob;
@@ -7,6 +7,7 @@ export interface EvidencePayload {
   longitude: number;
   accuracy: number;
   notes?: string;
+  photoTag?: PhotoTag;
 }
 
 function buildEvidenceForm(evidence: EvidencePayload): FormData {
@@ -16,6 +17,7 @@ function buildEvidenceForm(evidence: EvidencePayload): FormData {
   form.append('longitude', String(evidence.longitude));
   form.append('accuracy', String(evidence.accuracy));
   if (evidence.notes) form.append('notes', evidence.notes);
+  if (evidence.photoTag) form.append('photoTag', evidence.photoTag);
   return form;
 }
 
@@ -43,3 +45,26 @@ export async function checkOut(reportId: string, evidence: EvidencePayload) {
   const res = await api.postForm<{ workReport: WorkReport }>(`/work-reports/${reportId}/check-out`, buildEvidenceForm(evidence));
   return res.workReport;
 }
+
+export interface TreatmentInput {
+  applicationMethod: ApplicationMethod;
+  chemicalName: string;
+  activeIngredient?: string;
+  dosage: string;
+  treatmentAreaSqm?: number;
+  drillingPointsCount?: number;
+  fumigantType?: string;
+  gasConcentrationPpm?: number;
+  sealingStartedAt?: string;
+  aerationCompletedAt?: string;
+  safetyNotes?: string;
+  technicianNotes?: string;
+}
+
+/** Records what was actually applied (chemical, dosage, method) — separate from photo evidence. */
+export async function submitTreatment(reportId: string, input: TreatmentInput) {
+  const res = await api.put<{ workReport: WorkReport }>(`/work-reports/${reportId}/treatment`, input);
+  return res.workReport;
+}
+
+export type { TreatmentRecord };

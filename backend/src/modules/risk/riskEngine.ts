@@ -23,6 +23,8 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
   noProgressPhotoPoints: 15,
   locationDriftThresholdMeters: 300,
   locationDriftPoints: 15,
+  missingTreatmentRecordPoints: 20,
+  fumigationMissingAerationPoints: 40,
   reviewThreshold: 40,
   highRiskThreshold: 60,
   criticalThreshold: 80,
@@ -156,6 +158,41 @@ export function evaluateWorkReportRisk(
         description: `Posisi bergeser ${drift}m antara check-in dan check-out.`,
         expectedValue: `≤ ${config.locationDriftThresholdMeters} m`,
         actualValue: `${drift} m`,
+      });
+    }
+  }
+
+  // 6. Pest-control-specific: a completed job with no treatment record means
+  // nobody documented what chemical, dosage, or method was actually used —
+  // a serious gap for a company that has to answer for pesticide use.
+  if (report.checkOutAt) {
+    if (!report.treatmentRecord) {
+      score += config.missingTreatmentRecordPoints;
+      events.push({
+        eventType: 'MISSING_TREATMENT_RECORD',
+        points: config.missingTreatmentRecordPoints,
+        severity: 'HIGH',
+        title: 'Data perlakuan (treatment) belum diisi',
+        description: 'Pekerjaan selesai tanpa catatan bahan kimia, dosis, atau metode aplikasi yang digunakan.',
+        expectedValue: 'Formulir treatment terisi',
+        actualValue: 'Kosong',
+      });
+    } else if (
+      report.serviceType === 'FUMIGATION' &&
+      !report.treatmentRecord.aerationCompletedAt
+    ) {
+      // Fumigation without a recorded aeration/ventilation time is a safety
+      // compliance gap, not just a paperwork one — the area may have been
+      // reopened before the gas cleared. This is weighted heavily on purpose.
+      score += config.fumigationMissingAerationPoints;
+      events.push({
+        eventType: 'FUMIGATION_SAFETY_INCOMPLETE',
+        points: config.fumigationMissingAerationPoints,
+        severity: 'CRITICAL',
+        title: 'Data aerasi fumigasi belum tercatat',
+        description: 'Waktu selesai aerasi/ventilasi tidak tercatat — tidak dapat dipastikan area aman untuk diakses kembali.',
+        expectedValue: 'Waktu aerasi tercatat',
+        actualValue: 'Kosong',
       });
     }
   }

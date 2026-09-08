@@ -18,6 +18,33 @@ create type risk_level as enum (
 
 create type photo_type as enum ('CHECK_IN', 'PROGRESS', 'CHECK_OUT');
 
+-- Pest control service taxonomy (adapted from the generic "work_type" free
+-- text field so the risk engine, filters, and treatment form can reason
+-- about what kind of job this actually is).
+create type service_type as enum (
+  'GENERAL_PEST_CONTROL',  -- Pest Control Umum (kecoa, semut, laba-laba, dst.)
+  'TERMITE_CONTROL',       -- Anti Rayap (baiting / soil treatment / drilling)
+  'FUMIGATION',            -- Fumigasi (kontainer, gudang, komoditas ekspor)
+  'RODENT_CONTROL',        -- Pengendalian Tikus
+  'MOSQUITO_CONTROL',      -- Fogging / Pengendalian Nyamuk
+  'BIRD_CONTROL',          -- Pengendalian Burung
+  'BED_BUG_CONTROL',       -- Kutu Busuk
+  'DISINFECTION'           -- Disinfeksi Area
+);
+
+create type application_method as enum (
+  'SPRAYING',        -- Penyemprotan (residual/contact spray)
+  'BAITING',         -- Sistem Umpan (bait station)
+  'DRILLING',        -- Pengeboran & Injeksi (anti rayap beton/lantai)
+  'TRENCHING',       -- Parit Kimia (soil treatment keliling bangunan)
+  'FOGGING',         -- Pengasapan (ULV / thermal fogging)
+  'MISTING',         -- Pengabutan
+  'DUSTING',         -- Penaburan Bubuk
+  'GEL_INJECTION'    -- Gel Umpan Titik Injeksi
+);
+
+create type contract_type as enum ('ONE_TIME', 'RECURRING');
+
 create table users (
   id uuid primary key default gen_random_uuid(),
   name varchar(120) not null,
@@ -40,7 +67,13 @@ create table projects (
   longitude double precision not null,
   radius integer not null default 100 check (radius > 0),
   work_date date not null,
-  work_type varchar(120) not null default '',
+  work_type varchar(120) not null default '', -- free-text job description, e.g. "Fumigasi Kontainer Ekspor 40ft"
+  service_type service_type not null default 'GENERAL_PEST_CONTROL',
+  pest_target varchar(160), -- jenis hama sasaran, e.g. "Rayap Tanah (Subterranean Termite)"
+  building_area_sqm numeric(10, 2), -- luas area/bangunan yang ditangani
+  contract_type contract_type not null default 'ONE_TIME',
+  warranty_months integer not null default 0, -- 0 = tanpa garansi
+  next_service_date date, -- untuk kontrak berkala (recurring)
   scheduled_start_time time not null default '08:00',
   notes text,
   created_by uuid not null references users(id),
@@ -88,11 +121,38 @@ create table work_reports (
   unique (project_id)
 );
 
+create table treatment_records (
+  id uuid primary key default gen_random_uuid(),
+  work_report_id uuid not null references work_reports(id) on delete cascade unique,
+
+  application_method application_method not null,
+  chemical_name varchar(160) not null,      -- nama dagang produk, e.g. "Termidor SC"
+  active_ingredient varchar(160),            -- bahan aktif, e.g. "Fipronil 2.5%"
+  dosage varchar(120) not null,              -- e.g. "5 liter larutan / titik", "1:100 konsentrasi"
+  treatment_area_sqm numeric(10, 2),         -- luas area yang benar-benar dirawat
+
+  -- Anti rayap (termite control)
+  drilling_points_count integer,             -- jumlah titik bor/injeksi
+
+  -- Fumigasi — data ini krusial untuk kepatuhan keselamatan (racun gas)
+  fumigant_type varchar(120),                -- e.g. "Phosphine (PH3)", "Methyl Bromide"
+  gas_concentration_ppm numeric(10, 2),
+  sealing_started_at timestamptz,            -- mulai penyegelan/tenting
+  aeration_completed_at timestamptz,         -- selesai aerasi — wajib sebelum area boleh diakses ulang
+
+  safety_notes text,
+  technician_notes text,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table documentation_photos (
   id uuid primary key default gen_random_uuid(),
   work_report_id uuid not null references work_reports(id) on delete cascade,
 
   photo_type photo_type not null,
+  photo_tag varchar(20), -- optional: 'BEFORE' or 'AFTER' for PROGRESS photos (bukti kondisi sebelum/sesudah perlakuan)
   storage_path text not null,
   thumbnail_path text,
 
@@ -142,6 +202,8 @@ create table risk_config (
   no_progress_photo_points integer not null default 15,
   location_drift_threshold_meters integer not null default 300,
   location_drift_points integer not null default 15,
+  missing_treatment_record_points integer not null default 20,
+  fumigation_missing_aeration_points integer not null default 40,
   review_threshold integer not null default 40,
   high_risk_threshold integer not null default 60,
   critical_threshold integer not null default 80,
@@ -174,6 +236,8 @@ create index idx_work_reports_risk_level on work_reports(risk_level);
 create index idx_photos_work_report on documentation_photos(work_report_id);
 create index idx_risk_events_work_report on risk_events(work_report_id);
 create index idx_audit_logs_created_at on audit_logs(created_at desc);
+create index idx_projects_service_type on projects(service_type);
+create index idx_treatment_records_work_report on treatment_records(work_report_id);
 
 -- Enforce PRD Section 9 (project lock) at the database level, not just in the client.
 create or replace function fn_prevent_locked_project_edit()
@@ -208,4 +272,8 @@ $$ language plpgsql;
 
 create trigger trg_work_report_touch
 before update on work_reports
+for each row execute function fn_touch_work_report();
+
+create trigger trg_treatment_record_touch
+before update on treatment_records
 for each row execute function fn_touch_work_report();

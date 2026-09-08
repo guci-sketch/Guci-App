@@ -10,7 +10,25 @@ if (!connectionString) {
   );
 }
 
-export const pool = new Pool({ connectionString });
+// Supabase (and most managed Postgres providers) require TLS and present a
+// certificate chain that Node's default trust store doesn't always have —
+// rejectUnauthorized: false is the standard workaround the `pg` driver docs
+// recommend for this. Local Postgres has no TLS at all, so this only
+// activates for a remote host, or when explicitly forced via DB_SSL=true.
+const requiresSsl =
+  process.env.DB_SSL === 'true' ||
+  /supabase\.(co|com)/.test(connectionString) ||
+  (!/localhost|127\.0\.0\.1/.test(connectionString) && process.env.DB_SSL !== 'false');
+
+export const pool = new Pool({
+  connectionString,
+  ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
+  // Serverless functions spin up fresh per-invocation; keep the pool small
+  // so a burst of concurrent Vercel invocations doesn't exhaust Supabase's
+  // connection limit. Use Supabase's "Transaction" pooler connection string
+  // (port 6543) for DATABASE_URL in production — see README.
+  max: process.env.VERCEL ? 1 : 10,
+});
 
 pool.on('error', err => {
   // A background/idle client error should not crash the whole process.

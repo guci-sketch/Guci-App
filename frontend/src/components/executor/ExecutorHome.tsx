@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { WorkReport, Project, DocumentationPhoto, PhotoType } from '../../types';
+import { WorkReport, Project, DocumentationPhoto, PhotoType, PhotoTag } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut } from '../../api/workReports';
+import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut, submitTreatment, TreatmentInput } from '../../api/workReports';
 import { createProject, fetchMyProjects, CreateProjectInput } from '../../api/projects';
 import { ApiError } from '../../api/client';
 import { getQueueLength, enqueue, syncQueue } from '../../utils/offlineQueue';
 import { CameraCaptureModal } from '../camera/CameraCaptureModal';
 import { CreateProjectModal } from './CreateProjectModal';
+import { TreatmentFormModal } from './TreatmentFormModal';
 import { PhotoViewerModal } from '../common/PhotoViewerModal';
 import { AuthedImage } from '../common/AuthedImage';
 import { RiskBadge } from '../common/RiskBadge';
+import { getServiceTypeMeta } from '../../utils/serviceMeta';
 import { formatDistance } from '../../utils/geo';
 import {
   Plus, Camera, CheckCircle2, Clock, MapPin, Briefcase, History, User as UserIcon,
-  Home, Check, Lock, Eye, LogOut, ChevronRight, Building, WifiOff, RefreshCw, AlertCircle,
+  Home, Check, Lock, Eye, LogOut, ChevronRight, Building, WifiOff, RefreshCw, AlertCircle, ImagePlus, ShieldCheck,
 } from 'lucide-react';
 
 export const ExecutorHome: React.FC = () => {
@@ -27,7 +29,8 @@ export const ExecutorHome: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [showCreateProject, setShowCreateProject] = useState(false);
-  const [activeCameraAction, setActiveCameraAction] = useState<{ type: PhotoType; report: WorkReport } | null>(null);
+  const [activeCameraAction, setActiveCameraAction] = useState<{ type: PhotoType; report: WorkReport; photoTag?: PhotoTag } | null>(null);
+  const [treatmentFormReport, setTreatmentFormReport] = useState<WorkReport | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState<DocumentationPhoto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successFeedback, setSuccessFeedback] = useState<{ title: string; subtitle: string; stats?: string } | null>(null);
@@ -77,9 +80,9 @@ export const ExecutorHome: React.FC = () => {
 
   const handleCaptureComplete = async (capturedData: { photoBlob: Blob; latitude: number; longitude: number; accuracy: number }) => {
     if (!activeCameraAction) return;
-    const { type, report } = activeCameraAction;
+    const { type, report, photoTag } = activeCameraAction;
     setActionError(null);
-    const evidence = { photoBlob: capturedData.photoBlob, latitude: capturedData.latitude, longitude: capturedData.longitude, accuracy: capturedData.accuracy };
+    const evidence = { photoBlob: capturedData.photoBlob, latitude: capturedData.latitude, longitude: capturedData.longitude, accuracy: capturedData.accuracy, photoTag };
 
     try {
       if (type === 'CHECK_IN') {
@@ -117,6 +120,14 @@ export const ExecutorHome: React.FC = () => {
         setActionError(err instanceof ApiError ? err.message : 'Gagal menyimpan. Coba lagi.');
       }
     }
+  };
+
+  const handleTreatmentSubmit = async (input: TreatmentInput) => {
+    if (!treatmentFormReport) return;
+    const updated = await submitTreatment(treatmentFormReport.id, input);
+    setTreatmentFormReport(null);
+    setActiveCameraAction({ type: 'CHECK_OUT', report: updated });
+    await loadData();
   };
 
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
@@ -229,6 +240,18 @@ export const ExecutorHome: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  {(() => {
+                    const meta = getServiceTypeMeta(ongoingJob.serviceType);
+                    const Icon = meta.icon;
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700">
+                        <Icon size={12} /> {meta.shortLabel}
+                      </span>
+                    );
+                  })()}
+                  {ongoingJob.pestTarget && <span className="text-[11px] text-zinc-400">• {ongoingJob.pestTarget}</span>}
+                </div>
                 <h3 className="text-base font-bold text-white tracking-tight">{ongoingJob.projectName}</h3>
                 <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1">
                   <Building size={13} className="text-zinc-500" /> {ongoingJob.clientName}
@@ -250,21 +273,24 @@ export const ExecutorHome: React.FC = () => {
                       <button key={photo.id} type="button" onClick={() => setViewingPhoto(photo)} className="relative w-16 h-16 rounded overflow-hidden border border-zinc-700 shrink-0 group hover:border-emerald-400 transition-colors">
                         <AuthedImage path={photo.url} alt="evidence" className="w-full h-full object-cover" />
                         <span className="absolute bottom-0 inset-x-0 bg-zinc-950/80 text-[9px] font-medium text-white text-center py-0.5 uppercase">
-                          {photo.photoType === 'CHECK_IN' ? 'Cin' : photo.photoType === 'PROGRESS' ? 'Prog' : 'Cout'}
+                          {photo.photoTag ? (photo.photoTag === 'BEFORE' ? 'Awal' : 'Hasil') : photo.photoType === 'CHECK_IN' ? 'Cin' : photo.photoType === 'PROGRESS' ? 'Prog' : 'Cout'}
                         </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  <button onClick={() => setActiveCameraAction({ type: 'PROGRESS', report: ongoingJob })} className="h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 border border-zinc-700 transition-colors">
-                    <Camera size={16} /> + Foto Progres
+                <div className="grid grid-cols-2 gap-2 mt-5">
+                  <button onClick={() => setActiveCameraAction({ type: 'PROGRESS', report: ongoingJob, photoTag: 'BEFORE' })} className="h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 border border-zinc-700 transition-colors">
+                    <ImagePlus size={15} /> Foto Kondisi Awal
                   </button>
-                  <button onClick={() => setActiveCameraAction({ type: 'CHECK_OUT', report: ongoingJob })} className="h-11 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-zinc-950 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors">
-                    <LogOut size={16} /> Selesai &amp; Check-Out
+                  <button onClick={() => setActiveCameraAction({ type: 'PROGRESS', report: ongoingJob, photoTag: 'AFTER' })} className="h-11 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 border border-zinc-700 transition-colors">
+                    <ImagePlus size={15} /> Foto Hasil Perlakuan
                   </button>
                 </div>
+                <button onClick={() => setTreatmentFormReport(ongoingJob)} className="w-full mt-2 h-11 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-zinc-950 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors">
+                  <LogOut size={16} /> Isi Treatment &amp; Check-Out
+                </button>
               </div>
             )}
 
@@ -277,6 +303,18 @@ export const ExecutorHome: React.FC = () => {
                   <span className="text-xs text-zinc-500 font-medium">Jadwal: {readyJob.scheduledStartTime} WIB</span>
                 </div>
 
+                <div className="flex items-center gap-1.5 mb-1">
+                  {(() => {
+                    const meta = getServiceTypeMeta(readyJob.serviceType);
+                    const Icon = meta.icon;
+                    return (
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${meta.badgeClass}`}>
+                        <Icon size={12} /> {meta.shortLabel}
+                      </span>
+                    );
+                  })()}
+                  {readyJob.pestTarget && <span className="text-[11px] text-zinc-500">• {readyJob.pestTarget}</span>}
+                </div>
                 <h3 className="text-base font-bold text-zinc-900">{readyJob.projectName}</h3>
                 <p className="text-xs text-zinc-600 mt-0.5">{readyJob.clientName}</p>
                 <p className="text-xs text-zinc-500 mt-1 flex items-center gap-1">
@@ -288,6 +326,12 @@ export const ExecutorHome: React.FC = () => {
                     <span>Radius Geofence:</span>
                     <span className="font-semibold text-zinc-800">{readyJob.projectRadius} meter</span>
                   </div>
+                  {readyJob.buildingAreaSqm ? (
+                    <div className="flex justify-between text-zinc-600">
+                      <span>Luas Area:</span>
+                      <span className="font-semibold text-zinc-800">{readyJob.buildingAreaSqm} m²</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between text-zinc-600">
                     <span>Verifikasi:</span>
                     <span className="font-semibold text-zinc-800">Kamera Langsung &amp; GPS Spasial</span>
@@ -334,8 +378,7 @@ export const ExecutorHome: React.FC = () => {
                           <span className="text-[11px] font-medium text-slate-400">{new Date(rep.createdAt).toLocaleDateString('id-ID')}</span>
                         </div>
                         <h4 className="text-sm font-bold text-slate-900 truncate">{rep.projectName}</h4>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                          <span>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">                          <span>
                             {rep.checkInAt ? new Date(rep.checkInAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'} →{' '}
                             {rep.checkOutAt ? new Date(rep.checkOutAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
                           </span>
@@ -373,10 +416,15 @@ export const ExecutorHome: React.FC = () => {
             {projects.map(proj => {
               const report = reports.find(r => r.projectId === proj.id);
               const isLocked = !!proj.lockedAt;
+              const meta = getServiceTypeMeta(proj.serviceType);
+              const Icon = meta.icon;
               return (
                 <div key={proj.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${meta.badgeClass}`}>
+                        <Icon size={11} /> {meta.shortLabel}
+                      </span>
                       <h3 className="font-bold text-sm text-slate-900">{proj.projectName}</h3>
                       <p className="text-xs text-slate-500">{proj.clientName}</p>
                     </div>
@@ -391,8 +439,13 @@ export const ExecutorHome: React.FC = () => {
                   <p className="text-xs text-slate-600">{proj.address}</p>
                   <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
                     <span>Radius: {proj.radius}m</span>
-                    <span>Tipe: {proj.workType}</span>
+                    <span>{proj.contractType === 'RECURRING' ? `Berkala${proj.nextServiceDate ? ` • Berikutnya ${new Date(proj.nextServiceDate).toLocaleDateString('id-ID')}` : ''}` : 'Sekali Layanan'}</span>
                   </div>
+                  {proj.warrantyMonths > 0 && (
+                    <div className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200/60 flex items-center gap-1">
+                      <ShieldCheck size={12} /> Garansi {proj.warrantyMonths} bulan
+                    </div>
+                  )}
                   {report && report.status === 'READY' && (
                     <button
                       onClick={() => { setActiveTab('home'); setActiveCameraAction({ type: 'CHECK_IN', report }); }}
@@ -509,6 +562,16 @@ export const ExecutorHome: React.FC = () => {
           executorName={user.name}
           onCaptureComplete={handleCaptureComplete}
           onClose={() => setActiveCameraAction(null)}
+        />
+      )}
+
+      {treatmentFormReport && (
+        <TreatmentFormModal
+          serviceType={treatmentFormReport.serviceType}
+          existing={treatmentFormReport.treatmentRecord}
+          onSubmit={handleTreatmentSubmit}
+          onSkip={() => { setActiveCameraAction({ type: 'CHECK_OUT', report: treatmentFormReport }); setTreatmentFormReport(null); }}
+          onClose={() => setTreatmentFormReport(null)}
         />
       )}
 
