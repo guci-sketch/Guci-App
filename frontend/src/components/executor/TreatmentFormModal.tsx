@@ -13,13 +13,9 @@ interface TreatmentFormModalProps {
 }
 
 const DEFAULT_METHOD_BY_SERVICE: Partial<Record<ServiceType, ApplicationMethod>> = {
-  GENERAL_PEST_CONTROL: 'SPRAYING',
+  PEST_CONTROL: 'SPRAYING',
   TERMITE_CONTROL: 'DRILLING',
   FUMIGATION: 'FOGGING',
-  RODENT_CONTROL: 'BAITING',
-  MOSQUITO_CONTROL: 'FOGGING',
-  BED_BUG_CONTROL: 'SPRAYING',
-  DISINFECTION: 'SPRAYING',
 };
 
 function toLocalInputValue(iso?: string | null): string {
@@ -90,21 +86,21 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-800" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--accent)]/60 p-4 sm:p-6 " onClick={onClose}>
+      <div className="relative w-full max-w-lg bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
               <FlaskConical size={18} className="text-emerald-600" /> Formulir Perlakuan (Treatment)
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Catat bahan, dosis, dan metode yang benar-benar digunakan di lapangan.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">Catat bahan, dosis, dan metode yang benar-benar digunakan di lapangan.</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
           {isFumigation && (
             <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 text-xs text-rose-800">
               <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-600" />
@@ -113,11 +109,11 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Metode Aplikasi *</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Metode Aplikasi *</label>
             <select
               value={applicationMethod}
               onChange={e => setApplicationMethod(e.target.value as ApplicationMethod)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm bg-white"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
             >
               {APPLICATION_METHOD_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -127,49 +123,49 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Nama Bahan / Produk *</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Nama Bahan / Produk *</label>
               <input
                 type="text"
                 placeholder="Termidor SC, Phostoxin, dsb."
                 value={chemicalName}
                 onChange={e => setChemicalName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Bahan Aktif</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Bahan Aktif</label>
               <input
                 type="text"
                 placeholder="Fipronil 2.5%"
                 value={activeIngredient}
                 onChange={e => setActiveIngredient(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Dosis / Konsentrasi *</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Dosis / Konsentrasi *</label>
               <input
                 type="text"
                 placeholder="1:200 diencerkan dengan air"
                 value={dosage}
                 onChange={e => setDosage(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Luas Area Dirawat (m²)</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Luas Area Dirawat (m²)</label>
               <div className="relative">
-                <Ruler size={16} className="absolute left-3 top-3 text-slate-400" />
+                <Ruler size={16} className="absolute left-3 top-3 text-[var(--text-muted)]" />
                 <input
                   type="number"
                   min={0}
                   placeholder="150"
                   value={treatmentAreaSqm}
                   onChange={e => setTreatmentAreaSqm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
                 />
               </div>
             </div>
@@ -177,26 +173,26 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
 
           {isTermite && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Jumlah Titik Bor / Injeksi</label>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Jumlah Titik Bor / Injeksi</label>
               <input
                 type="number"
                 min={0}
                 placeholder="42"
                 value={drillingPointsCount}
                 onChange={e => setDrillingPointsCount(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>
           )}
 
           {isFumigation && (
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-[var(--bg-tertiary)] p-3.5 rounded-xl border border-[var(--border-subtle)]/80 space-y-3">
+              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
                 <Info size={14} className="text-rose-600" /> Data Keselamatan Fumigasi
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">Jenis Fumigant</label>
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Jenis Fumigant</label>
                   <input
                     type="text"
                     placeholder="Phosphine (PH3)"
@@ -206,7 +202,7 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">Konsentrasi Gas (ppm)</label>
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Konsentrasi Gas (ppm)</label>
                   <input
                     type="number"
                     min={0}
@@ -217,7 +213,7 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">Mulai Penyegelan (Sealing)</label>
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Mulai Penyegelan (Sealing)</label>
                   <input
                     type="datetime-local"
                     value={sealingStartedAt}
@@ -236,7 +232,7 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Catatan Keselamatan</label>
+                <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Catatan Keselamatan</label>
                 <textarea
                   rows={2}
                   placeholder="Area disegel penuh, akses masuk diblokir dengan tanda peringatan..."
@@ -249,13 +245,13 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Catatan Teknisi (Opsional)</label>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Catatan Teknisi (Opsional)</label>
             <textarea
               rows={2}
               placeholder="Fokus area, temuan di lapangan, rekomendasi tindak lanjut..."
               value={technicianNotes}
               onChange={e => setTechnicianNotes(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
             />
           </div>
 
@@ -263,17 +259,17 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
             <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{error}</div>
           )}
 
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-[var(--border-subtle)]">
             {onSkip && !isFumigation ? (
-              <button type="button" onClick={onSkip} disabled={isSubmitting} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
+              <button type="button" onClick={onSkip} disabled={isSubmitting} className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
                 Isi nanti
               </button>
             ) : <span />}
             <div className="flex items-center gap-2">
-              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors disabled:opacity-50">
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold transition-colors disabled:opacity-50">
                 Batal
               </button>
-              <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2">
+              <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2">
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 Simpan &amp; Lanjut Check-Out
               </button>

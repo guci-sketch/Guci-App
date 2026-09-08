@@ -7,7 +7,9 @@
  * needed when that migration happens.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Hardcode to relative path since backend and frontend are served from the same origin.
+// Ignore VITE_API_URL if it points to localhost to avoid browser fetch errors.
+const API_URL = '/api';
 const TOKEN_KEY = 'fieldwork_token_v1';
 
 export class ApiError extends Error {

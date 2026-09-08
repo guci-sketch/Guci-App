@@ -31,8 +31,8 @@ const Shell: React.FC = () => {
 
   if (status === 'checking') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-100">
-        <span className="w-8 h-8 border-2 border-zinc-300 border-t-zinc-700 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <span className="w-8 h-8 border-2 border-[var(--border-subtle)] border-t-[var(--accent)] rounded-full animate-spin" />
       </div>
     );
   }
@@ -42,9 +42,9 @@ const Shell: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col font-sans">
       <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={handleSync} isSyncing={isSyncing} />
-      <div className="flex-1 bg-zinc-100">
+      <div className="flex-1">
         {user.role === 'ADMIN' ? <AdminDashboard /> : <ExecutorHome />}
       </div>
     </div>

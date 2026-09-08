@@ -12,15 +12,16 @@ interface CreateProjectModalProps {
 
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_META) as ServiceType[];
 
+const TARGET_PEST_OPTIONS: Record<ServiceType, string[]> = {
+  PEST_CONTROL: ['Tikus (Rattus spp.)', 'Kucing Liar (Felis catus)', 'Kecoa (Periplaneta americana)', 'Nyamuk', 'Semut', 'Lalat'],
+  TERMITE_CONTROL: ['Rayap Tanah (Coptotermes gestroi)', 'Rayap Kayu Kering (Cryptotermes spp.)', 'Rayap Kayu Basah (Glyptotermes spp.)'],
+  FUMIGATION: ['Kutu Beras (Sitophilus oryzae)', 'Kumbang Tepung (Tribolium castaneum)'],
+};
+
 const DEFAULT_WORK_TYPE_BY_SERVICE: Record<ServiceType, string> = {
-  GENERAL_PEST_CONTROL: 'Pest Control Umum Bulanan',
+  PEST_CONTROL: 'Pest Control Umum Bulanan',
   TERMITE_CONTROL: 'Anti Rayap Pasca Konstruksi',
   FUMIGATION: 'Fumigasi Gudang / Kontainer',
-  RODENT_CONTROL: 'Pengendalian Tikus Rutin',
-  MOSQUITO_CONTROL: 'Fogging Area',
-  BIRD_CONTROL: 'Pengendalian Burung',
-  BED_BUG_CONTROL: 'Perlakuan Kutu Busuk',
-  DISINFECTION: 'Disinfeksi Area',
 };
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onSubmit }) => {
@@ -28,13 +29,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
   const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
-  const [workType, setWorkType] = useState(DEFAULT_WORK_TYPE_BY_SERVICE.GENERAL_PEST_CONTROL);
-  const [pestTarget, setPestTarget] = useState('');
-  const [buildingAreaSqm, setBuildingAreaSqm] = useState<string>('');
-  const [contractType, setContractType] = useState<ContractType>('ONE_TIME');
-  const [warrantyMonths, setWarrantyMonths] = useState<number>(0);
-  const [nextServiceDate, setNextServiceDate] = useState('');
+  const [serviceType, setServiceType] = useState<ServiceType>('PEST_CONTROL');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [radius, setRadius] = useState<number>(100);
@@ -49,10 +44,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  const [targetPests, setTargetPests] = useState<string[]>([]);
+  const [otherPest, setOtherPest] = useState('');
+
   const handleSelectServiceType = (type: ServiceType) => {
     setServiceType(type);
-    setWorkType(DEFAULT_WORK_TYPE_BY_SERVICE[type]);
-    if (type === 'TERMITE_CONTROL' && warrantyMonths === 0) setWarrantyMonths(12);
+    setTargetPests([]);
+    setOtherPest('');
   };
 
   const handleFetchCurrentGps = () => {
@@ -95,7 +93,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     if (!projectName.trim()) newErrors.projectName = 'Nama proyek wajib diisi';
     if (!address.trim()) newErrors.address = 'Alamat proyek wajib diisi';
     if (!workDate) newErrors.workDate = 'Tanggal pelaksanaan wajib diisi';
-    if (contractType === 'RECURRING' && !nextServiceDate) newErrors.nextServiceDate = 'Kontrak berkala perlu tanggal layanan berikutnya';
+
+    const finalPests = [...targetPests];
+    if (otherPest.trim()) finalPests.push(otherPest.trim());
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -113,13 +113,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         longitude,
         radius,
         workDate,
-        workType,
         serviceType,
-        pestTarget: pestTarget || undefined,
-        buildingAreaSqm: buildingAreaSqm ? Number(buildingAreaSqm) : undefined,
-        contractType,
-        warrantyMonths,
-        nextServiceDate: contractType === 'RECURRING' ? nextServiceDate : undefined,
+        targetPests: finalPests,
+        contractType: 'ONE_TIME',
+        warrantyMonths: 0,
         scheduledStartTime,
         notes,
       });
@@ -128,42 +125,41 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       setIsSubmitting(false);
     }
   };
-
   const isFumigation = serviceType === 'FUMIGATION';
   const isTermite = serviceType === 'TERMITE_CONTROL';
 
   return (
     <div
       id="create-project-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--accent)]/60 p-4 sm:p-6 "
       onClick={onClose}
     >
       <div
         id="create-project-modal-card"
-        className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-800"
+        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Buat Penugasan Layanan Baru</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h2 className="text-base font-bold text-[var(--text-primary)]">Buat Penugasan Layanan Baru</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               Input data lokasi klien &amp; jenis layanan sebelum check-in
             </p>
           </div>
           <button
             id="btn-close-create-project"
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
           {/* Service Type Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
               Jenis Layanan *
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -177,7 +173,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                     type="button"
                     onClick={() => handleSelectServiceType(type)}
                     className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
-                      active ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      active ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' : 'bg-white border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                     }`}
                   >
                     <Icon size={18} />
@@ -186,7 +182,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 );
               })}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1.5">{SERVICE_TYPE_META[serviceType].description}</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">{SERVICE_TYPE_META[serviceType].description}</p>
           </div>
 
           {isFumigation && (
@@ -196,181 +192,104 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             </div>
           )}
 
-          {/* Project Name */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Nama Proyek / Lokasi Klien *
-            </label>
-            <input
-              id="input-project-name"
-              type="text"
-              placeholder="Contoh: RS Hermina BSD - Gedung Rawat Inap"
-              value={projectName}
-              onChange={e => {
-                setProjectName(e.target.value);
-                if (errors.projectName) setErrors(prev => ({ ...prev, projectName: '' }));
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm bg-white"
-            />
-            {errors.projectName && (
-              <p className="text-xs text-red-600 mt-1 font-medium">{errors.projectName}</p>
-            )}
-          </div>
-
-          {/* Client & Work Type Grid */}
+          {/* Project & Client Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Nama Klien / Instansi
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+                Nama Proyek *
+              </label>
+              <input
+                id="input-project-name"
+                type="text"
+                placeholder="Contoh: RS Hermina BSD"
+                value={projectName}
+                onChange={e => {
+                  setProjectName(e.target.value);
+                  if (errors.projectName) setErrors(prev => ({ ...prev, projectName: '' }));
+                }}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
+              />
+              {errors.projectName && (
+                <p className="text-xs text-red-600 mt-1 font-medium">{errors.projectName}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+                Pemilik / Pelanggan
               </label>
               <div className="relative">
-                <Building size={16} className="absolute left-3 top-3 text-slate-400" />
+                <Building size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
                 <input
                   id="input-client-name"
                   type="text"
-                  placeholder="PT Medika Lestari BSD"
+                  placeholder="PT Medika Lestari"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Deskripsi Pekerjaan
-              </label>
+          </div>
+          {/* Target Pests */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+              Jenis Hama Sasaran
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {TARGET_PEST_OPTIONS[serviceType].map(pest => (
+                <label key={pest} className="flex items-center gap-2 p-2 border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={targetPests.includes(pest)}
+                    onChange={(e) => {
+                      if (e.target.checked) setTargetPests(prev => [...prev, pest]);
+                      else setTargetPests(prev => prev.filter(p => p !== pest));
+                    }}
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-[var(--accent)]"
+                  />
+                  <span className="text-xs text-[var(--text-secondary)]">{pest}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-2">
               <input
-                id="input-work-type"
                 type="text"
-                placeholder="Anti Rayap / Fumigasi / Pest Control"
-                value={workType}
-                onChange={e => setWorkType(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                placeholder="Lainnya (ketik jenis hama lain...)"
+                value={otherPest}
+                onChange={e => setOtherPest(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>
           </div>
-
-          {/* Pest target & building area */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Jenis Hama Sasaran
-              </label>
-              <div className="relative">
-                <Bug size={16} className="absolute left-3 top-3 text-slate-400" />
-                <input
-                  id="input-pest-target"
-                  type="text"
-                  placeholder="Rayap Tanah, Kecoa, Tikus Got, dst."
-                  value={pestTarget}
-                  onChange={e => setPestTarget(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Luas Area / Bangunan (m²)
-              </label>
-              <div className="relative">
-                <Ruler size={16} className="absolute left-3 top-3 text-slate-400" />
-                <input
-                  id="input-building-area"
-                  type="number"
-                  min={0}
-                  placeholder="150"
-                  value={buildingAreaSqm}
-                  onChange={e => setBuildingAreaSqm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Contract type, warranty, next service */}
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <Repeat size={14} className="text-emerald-600" /> Tipe Kontrak &amp; Garansi
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setContractType('ONE_TIME')}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${contractType === 'ONE_TIME' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                Sekali Layanan
-              </button>
-              <button
-                type="button"
-                onClick={() => setContractType('RECURRING')}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${contractType === 'RECURRING' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-              >
-                Kontrak Berkala
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Garansi (bulan)</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  value={warrantyMonths}
-                  onChange={e => setWarrantyMonths(Number(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-mono"
-                />
-              </div>
-              {contractType === 'RECURRING' && (
-                <div>
-                  <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Layanan Berikutnya *</span>
-                  <input
-                    type="date"
-                    value={nextServiceDate}
-                    onChange={e => setNextServiceDate(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
-                  />
-                </div>
-              )}
-            </div>
-            {errors.nextServiceDate && <p className="text-xs text-red-600 font-medium">{errors.nextServiceDate}</p>}
-            {isTermite && warrantyMonths > 0 && (
-              <p className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60">
-                Sertifikat garansi {warrantyMonths} bulan akan berlaku sejak tanggal check-out pekerjaan ini selesai.
-              </p>
-            )}
-          </div>
-
           {/* Work Date & Scheduled Start Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                 Tanggal Pelaksanaan *
               </label>
               <div className="relative">
-                <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
+                <Calendar size={16} className="absolute left-3 top-3 text-[var(--text-muted)]" />
                 <input
                   id="input-work-date"
                   type="date"
                   value={workDate}
                   onChange={e => setWorkDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                 Jadwal Mulai
               </label>
               <div className="relative">
-                <Clock size={16} className="absolute left-3 top-3 text-slate-400" />
+                <Clock size={16} className="absolute left-3 top-2 text-[var(--text-muted)]" />
                 <input
                   id="input-scheduled-start"
                   type="time"
                   value={scheduledStartTime}
                   onChange={e => setScheduledStartTime(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
                 />
               </div>
             </div>
@@ -378,7 +297,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
           {/* Address */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
               Alamat Lengkap Lokasi *
             </label>
             <textarea
@@ -390,7 +309,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 setAddress(e.target.value);
                 if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
               }}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
             />
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
@@ -410,7 +329,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   key={preset.name}
                   type="button"
                   onClick={() => handleApplyPreset(idx)}
-                  className="text-[11px] px-2.5 py-1 bg-white hover:bg-sky-100/60 text-slate-700 border border-sky-200 rounded-lg transition-colors font-medium text-left"
+                  className="text-[11px] px-2.5 py-1 bg-white hover:bg-sky-100/60 text-[var(--text-secondary)] border border-sky-200 rounded-lg transition-colors font-medium text-left"
                 >
                   {preset.name}
                 </button>
@@ -419,9 +338,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           </div>
 
           {/* GPS Location & Radius Section */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
+          <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-subtle)]/80 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
                 <MapPin size={15} className="text-emerald-600" /> Titik Pusat Geofence Lokasi
               </span>
               <button
@@ -443,7 +362,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Latitude</span>
+                <span className="block text-[11px] font-medium text-[var(--text-muted)] mb-0.5">Latitude</span>
                 <input
                   id="input-lat"
                   type="number"
@@ -454,7 +373,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 />
               </div>
               <div>
-                <span className="block text-[11px] font-medium text-slate-500 mb-0.5">Longitude</span>
+                <span className="block text-[11px] font-medium text-[var(--text-muted)] mb-0.5">Longitude</span>
                 <input
                   id="input-lng"
                   type="number"
@@ -468,7 +387,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
             <div>
               <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-slate-700">Batas Toleransi Radius Validasi:</span>
+                <span className="font-semibold text-[var(--text-secondary)]">Batas Toleransi Radius Validasi:</span>
                 <span className="font-bold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   {radius} meter
                 </span>
@@ -482,14 +401,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                     className={`flex-1 py-1 text-xs rounded-lg border font-semibold transition-all ${
                       radius === r
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        : 'bg-white text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]'
                     }`}
                   >
                     {r}m
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1.5">
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
                 Check-in yang berjarak lebih dari {radius}m akan otomatis tercatat sebagai anomali resiko (+30 poin).
               </p>
             </div>
@@ -497,18 +416,18 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
               Catatan / Instruksi Kerja (Opsional)
             </label>
             <div className="relative">
-              <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
+              <FileText size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
               <textarea
                 id="input-notes"
                 rows={2}
                 placeholder="Instruksi safety, akses masuk, riwayat infestasi sebelumnya..."
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm resize-none"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
               />
             </div>
           </div>
@@ -519,13 +438,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               {submitError}
             </div>
           )}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border-subtle)]">
             <button
               id="btn-cancel-project"
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold transition-colors disabled:opacity-50"
             >
               Batal
             </button>
@@ -533,7 +452,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               id="btn-submit-project"
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2"
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2"
             >
               {isSubmitting && <Loader2 size={16} className="animate-spin" />}
               Buat &amp; Jadwalkan Penugasan

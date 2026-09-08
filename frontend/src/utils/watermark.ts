@@ -42,8 +42,15 @@ export function applyWatermarkToCanvas(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context not available');
 
-  const width = imageSource.videoWidth || 1280;
-  const height = imageSource.videoHeight || 720;
+  // [OPTIMASI RAM] Batasi resolusi max 1024px
+  let width = imageSource.videoWidth || 1280;
+  let height = imageSource.videoHeight || 720;
+  const MAX_DIM = 1024;
+  if (width > MAX_DIM || height > MAX_DIM) {
+    const ratio = width / height;
+    if (ratio > 1) { width = MAX_DIM; height = MAX_DIM / ratio; }
+    else { height = MAX_DIM; width = MAX_DIM * ratio; }
+  }
   canvas.width = width;
   canvas.height = height;
 
@@ -141,7 +148,7 @@ export function applyWatermarkToCanvas(
 }
 
 /** Converts a canvas to a JPEG Blob for multipart upload (avoids base64 inflation over the wire). */
-export function canvasToJpegBlob(canvas: HTMLCanvasElement, quality = 0.92): Promise<Blob> {
+export function canvasToJpegBlob(canvas: HTMLCanvasElement, quality = 0.8): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Gagal memproses foto.'))), 'image/jpeg', quality);
   });

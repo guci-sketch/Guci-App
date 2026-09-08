@@ -1,0 +1,19 @@
+{
+  "name": "fieldwork-root",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=fieldwork-api > /tmp/root-dev.log 2>&1",
+    "build": "npm run build --workspace=fieldwork-web && npm run build --workspace=fieldwork-api",
+    "start": "npm run start --workspace=fieldwork-api"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"
+  }
+}

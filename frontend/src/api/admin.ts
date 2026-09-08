@@ -83,3 +83,24 @@ export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+export interface PendingUser {
+  id: string;
+  name: string;
+  email: string;
+  nip: string | null;
+  created_at: string;
+}
+
+export async function fetchPendingUsers() {
+  const res = await api.get<{ pendingUsers: PendingUser[] }>('/admin/users/pending');
+  return res.pendingUsers;
+}
+
+export async function approveUser(id: string) {
+  await api.post(`/admin/users/${id}/approve`);
+}
+
+export async function rejectUser(id: string) {
+  await api.post(`/admin/users/${id}/reject`);
+}

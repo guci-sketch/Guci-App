@@ -25,9 +25,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Network-first: field data must never be served stale. This only
-        // caches the app shell so it can still boot offline; API calls
-        // always hit the network (or fail explicitly — see offlineQueue.ts).
         runtimeCaching: [
           {
             urlPattern: ({ url }) => !url.pathname.startsWith('/api'),
@@ -45,5 +42,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    hmr: false,
   },
 });

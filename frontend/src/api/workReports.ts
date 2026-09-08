@@ -8,6 +8,10 @@ export interface EvidencePayload {
   accuracy: number;
   notes?: string;
   photoTag?: PhotoTag;
+  customerName?: string;
+  customerPhone?: string;
+  customerFeedback?: string;
+  customerSignature?: string;
 }
 
 function buildEvidenceForm(evidence: EvidencePayload): FormData {
@@ -18,6 +22,10 @@ function buildEvidenceForm(evidence: EvidencePayload): FormData {
   form.append('accuracy', String(evidence.accuracy));
   if (evidence.notes) form.append('notes', evidence.notes);
   if (evidence.photoTag) form.append('photoTag', evidence.photoTag);
+  if (evidence.customerName) form.append('customerName', evidence.customerName);
+  if (evidence.customerPhone) form.append('customerPhone', evidence.customerPhone);
+  if (evidence.customerFeedback) form.append('customerFeedback', evidence.customerFeedback);
+  if (evidence.customerSignature) form.append('customerSignature', evidence.customerSignature);
   return form;
 }
 

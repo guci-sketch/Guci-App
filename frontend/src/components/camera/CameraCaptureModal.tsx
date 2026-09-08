@@ -204,7 +204,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   <Camera size={30} />
                 </div>
                 <p className="text-sm font-semibold text-slate-100 mb-1">Kamera Tidak Tersedia</p>
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">{camera.message}</p>
+                <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">{camera.message}</p>
                 <button
                   onClick={() => setFacingMode(f => f)}
                   className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded-lg"
@@ -222,7 +222,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
             {/* GPS HUD (PRD Section 44) */}
             <div className="absolute top-4 inset-x-4 z-20 pointer-events-none">
-              <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 shadow-lg flex flex-col gap-1.5">
+              <div className="bg-[var(--accent)]/85  border border-slate-700/80 rounded-xl p-3 shadow-lg flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-xs gap-2">
                   <span className="flex items-center gap-1.5 font-bold text-slate-200 min-w-0 truncate">
                     <MapPin size={14} className="text-sky-400 shrink-0" />
@@ -243,7 +243,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                     ))}
                 </div>
                 {gps.status === 'ready' && (
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-slate-800/80 pt-1">
                     <span>Radius Proyek: {projectRadius}m</span>
                     <span>Akurasi GPS: ±{Math.round(gps.accuracy)}m</span>
                   </div>
@@ -253,9 +253,9 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
             {gps.status === 'denied' && (
               <div className="absolute bottom-28 inset-x-4 z-20 flex justify-center">
-                <div className="bg-slate-900/95 border border-rose-500/40 rounded-xl p-4 max-w-sm text-center">
+                <div className="bg-[var(--accent)]/95 border border-rose-500/40 rounded-xl p-4 max-w-sm text-center">
                   <p className="text-xs text-rose-300 font-semibold mb-1">Lokasi belum tersedia</p>
-                  <p className="text-[11px] text-slate-400 mb-3">{gps.message}</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mb-3">{gps.message}</p>
                   <button onClick={requestGps} className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded-lg">
                     Coba Lagi
                   </button>
@@ -266,7 +266,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         ) : (
           <div className="relative w-full h-full flex items-center justify-center p-2 bg-black">
             <img src={capturedPreviewUrl} alt="Hasil Foto Watermark" className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
-            <div className="absolute top-4 left-4 bg-emerald-600/90 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+            <div className="absolute top-4 left-4 bg-emerald-600/90  text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
               <ShieldCheck size={14} /> Watermark Otomatis Tersemat
             </div>
           </div>
@@ -295,7 +295,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               >
                 <div className="w-full h-full rounded-full bg-white hover:bg-slate-200 transition-colors" />
               </button>
-              <span className="text-[11px] text-slate-400 mt-1 font-medium">
+              <span className="text-[11px] text-[var(--text-muted)] mt-1 font-medium">
                 {canCapture ? 'AMBIL FOTO' : 'MENUNGGU KAMERA & GPS'}
               </span>
             </div>

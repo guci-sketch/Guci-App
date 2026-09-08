@@ -33,14 +33,14 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ photo, onClo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-3 sm:p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-3 sm:p-6 "
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col max-h-[92vh] w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl text-slate-100"
+        className="relative flex flex-col max-h-[92vh] w-full max-w-4xl bg-[var(--accent)] border border-slate-700 rounded-xl overflow-hidden shadow-2xl text-slate-100"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/90">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-[var(--accent)]/90">
           <div className="flex items-center gap-2 min-w-0">
             <span
               className={`text-xs px-2.5 py-1 rounded font-bold uppercase shrink-0 ${
@@ -61,11 +61,11 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ photo, onClo
               onClick={handleDownload}
               disabled={downloading}
               title="Unduh Evidence"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50"
             >
               {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--accent-hover)] transition-colors">
               <X size={20} />
             </button>
           </div>
@@ -75,21 +75,21 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ photo, onClo
           <AuthedImage path={photo.url} alt="Dokumentasi Pekerjaan Lapangan" className="max-h-full max-w-full object-contain rounded shadow-lg" />
         </div>
 
-        <div className="p-4 bg-slate-900 border-t border-slate-800 text-xs sm:text-sm">
+        <div className="p-4 bg-[var(--accent)] border-t border-slate-800 text-xs sm:text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
-              <Calendar size={16} className="text-slate-400 shrink-0 mt-0.5" />
+              <Calendar size={16} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
               <div>
-                <span className="block text-slate-400 text-[11px] font-medium">WAKTU SERVER (WIB)</span>
+                <span className="block text-[var(--text-muted)] text-[11px] font-medium">WAKTU SERVER (WIB)</span>
                 <span className="font-semibold text-slate-200">{dateStr}</span>
-                <span className="block font-mono text-slate-400 text-xs">{timeStr}</span>
+                <span className="block font-mono text-[var(--text-muted)] text-xs">{timeStr}</span>
               </div>
             </div>
 
             <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
-              <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
+              <MapPin size={16} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
               <div>
-                <span className="block text-slate-400 text-[11px] font-medium">KOORDINAT & JARAK</span>
+                <span className="block text-[var(--text-muted)] text-[11px] font-medium">KOORDINAT & JARAK</span>
                 <span className="font-mono font-semibold text-slate-200">
                   {photo.latitude.toFixed(6)}, {photo.longitude.toFixed(6)}
                 </span>
@@ -103,22 +103,22 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ photo, onClo
                       <AlertTriangle size={12} className="mr-0.5" /> Di luar radius ({photo.distanceToProject}m)
                     </span>
                   )}
-                  <span className="text-slate-500 text-[11px]">• ±{Math.round(photo.accuracy)}m</span>
+                  <span className="text-[var(--text-muted)] text-[11px]">• ±{Math.round(photo.accuracy)}m</span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
-              <User size={16} className="text-slate-400 shrink-0 mt-0.5" />
+              <User size={16} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
               <div>
-                <span className="block text-slate-400 text-[11px] font-medium">PELAKSANA LAPANGAN</span>
+                <span className="block text-[var(--text-muted)] text-[11px] font-medium">PELAKSANA LAPANGAN</span>
                 <span className="font-semibold text-sky-400">{photo.metadata.executorName}</span>
-                <span className="block text-[10px] text-slate-500 font-mono mt-0.5">ID: {photo.id.substring(0, 16)}...</span>
+                <span className="block text-[10px] text-[var(--text-muted)] font-mono mt-0.5">ID: {photo.id.substring(0, 16)}...</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-800/80">
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-2 border-t border-slate-800/80">
             <span>Bukti dan metadata disimpan terpisah di server (PRD Section 15, 51) — watermark ini bukan satu-satunya sumber kebenaran.</span>
             <span className="font-mono text-emerald-400/90 font-semibold">SERVER-VERIFIED</span>
           </div>

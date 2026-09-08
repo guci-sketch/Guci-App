@@ -24,14 +24,9 @@ export type PhotoTag = 'BEFORE' | 'AFTER' | null;
 
 /** Pest control service taxonomy. */
 export type ServiceType =
-  | 'GENERAL_PEST_CONTROL'
+  | 'PEST_CONTROL'
   | 'TERMITE_CONTROL'
-  | 'FUMIGATION'
-  | 'RODENT_CONTROL'
-  | 'MOSQUITO_CONTROL'
-  | 'BIRD_CONTROL'
-  | 'BED_BUG_CONTROL'
-  | 'DISINFECTION';
+  | 'FUMIGATION';
 
 export type ApplicationMethod =
   | 'SPRAYING'
@@ -72,6 +67,7 @@ export interface Project {
   workType: string;
   serviceType: ServiceType;
   pestTarget?: string | null;
+  targetPests: string[];
   buildingAreaSqm?: number | null;
   contractType: ContractType;
   warrantyMonths: number;
@@ -130,6 +126,7 @@ export interface WorkReport {
   scheduledStartTime: string;
   serviceType: ServiceType;
   pestTarget?: string | null;
+  targetPests: string[];
   buildingAreaSqm?: number | null;
   contractType: ContractType;
   warrantyMonths: number;
@@ -166,6 +163,11 @@ export interface WorkReport {
   reviewedAt?: string | null;
   reviewNotes?: string | null;
 
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerFeedback?: string | null;
+  customerSignature?: string | null;
+
   notes?: string | null;
   photos: DocumentationPhoto[];
 
@@ -187,7 +189,7 @@ export interface WorkReportListItem {
   checkInDistance: number | null;
   checkOutDistance: number | null;
   createdAt: string;
-  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; pestTarget: string | null };
+  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; pestTarget: string | null; targetPests?: string[] };
   executor: { id: string; name: string };
   treatmentSummary: { applicationMethod: ApplicationMethod; chemicalName: string; dosage: string } | null;
 }

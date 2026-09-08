@@ -5,7 +5,7 @@ export async function getReportOrThrow(id: string) {
   const rows = await query(
     `select wr.*, p.project_name, p.client_name, p.address as project_address, p.latitude as project_latitude,
       p.longitude as project_longitude, p.radius as project_radius, p.scheduled_start_time,
-      p.service_type, p.pest_target, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
+      p.service_type, p.pest_target, p.target_pests, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
       u.name as executor_name, u.email as executor_email
      from work_reports wr
      join projects p on p.id = wr.project_id
@@ -42,7 +42,7 @@ function mapTreatmentRecord(t: any) {
   };
 }
 
-export async function mapReportFull(report: any) {
+export async function mapReportFull(report: any, role?: string) {
   const photos = await query(
     'select * from documentation_photos where work_report_id = $1 order by captured_at asc',
     [report.id]
@@ -65,6 +65,7 @@ export async function mapReportFull(report: any) {
     scheduledStartTime: report.scheduled_start_time,
     serviceType: report.service_type,
     pestTarget: report.pest_target,
+    targetPests: typeof report.target_pests === 'string' ? JSON.parse(report.target_pests) : (report.target_pests || []),
     buildingAreaSqm: report.building_area_sqm !== null ? Number(report.building_area_sqm) : null,
     contractType: report.contract_type,
     warrantyMonths: report.warranty_months,
@@ -91,6 +92,13 @@ export async function mapReportFull(report: any) {
     reviewedBy: report.reviewed_by,
     reviewedAt: report.reviewed_at,
     reviewNotes: report.review_notes,
+    
+    // Customer Review Fields
+    customerName: report.customer_name,
+    customerPhone: report.customer_phone,
+    customerFeedback: role === 'EXECUTOR' ? undefined : report.customer_feedback, // Hide from executor
+    customerSignature: report.customer_signature,
+
     notes: report.notes,
     createdAt: report.created_at,
     updatedAt: report.updated_at,

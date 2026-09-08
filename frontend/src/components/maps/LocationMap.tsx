@@ -169,7 +169,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
       <div ref={mapContainerRef} style={{ height, width: '100%' }} className="z-10" />
 
       {/* Floating Status Card Overlay */}
-      <div className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-sm border border-slate-200/80 rounded-lg p-2.5 shadow-md text-xs max-w-xs">
+      <div className="absolute top-3 left-3 z-20 bg-white/95  border border-slate-200/80 rounded-lg p-2.5 shadow-md text-xs max-w-xs">
         <div className="flex items-center gap-1.5 font-bold text-slate-800">
           <MapPin size={14} className="text-slate-600" />
           <span className="truncate">{projectName}</span>
@@ -195,7 +195,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 right-3 z-20 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-md px-2.5 py-1 text-[10px] text-slate-600 flex items-center gap-3 shadow-sm">
+      <div className="absolute bottom-3 right-3 z-20 bg-white/90  border border-slate-200 rounded-md px-2.5 py-1 text-[10px] text-slate-600 flex items-center gap-3 shadow-sm">
         <div className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-full bg-slate-800 inline-block" /> Proyek
         </div>

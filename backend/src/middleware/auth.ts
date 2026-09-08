@@ -19,7 +19,7 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-ai-studio';
 
 export function signToken(user: AuthUser): string {
   if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured');

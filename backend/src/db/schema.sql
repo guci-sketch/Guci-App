@@ -58,6 +58,15 @@ create table users (
   updated_at timestamptz not null default now()
 );
 
+create table user_locations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  latitude double precision not null,
+  longitude double precision not null,
+  accuracy double precision not null,
+  tracked_at timestamptz not null default now()
+);
+
 create table projects (
   id uuid primary key default gen_random_uuid(),
   project_name varchar(160) not null,
@@ -70,6 +79,7 @@ create table projects (
   work_type varchar(120) not null default '', -- free-text job description, e.g. "Fumigasi Kontainer Ekspor 40ft"
   service_type service_type not null default 'GENERAL_PEST_CONTROL',
   pest_target varchar(160), -- jenis hama sasaran, e.g. "Rayap Tanah (Subterranean Termite)"
+  target_pests jsonb not null default '[]'::jsonb, -- Array of pest targets, allowing multiple selections
   building_area_sqm numeric(10, 2), -- luas area/bangunan yang ditangani
   contract_type contract_type not null default 'ONE_TIME',
   warranty_months integer not null default 0, -- 0 = tanpa garansi
@@ -111,6 +121,11 @@ create table work_reports (
   reviewed_by uuid references users(id),
   reviewed_at timestamptz,
   review_notes text,
+  
+  customer_name varchar(160),
+  customer_phone varchar(30),
+  customer_feedback text,
+  customer_signature text,
 
   notes text,
 
@@ -238,6 +253,8 @@ create index idx_risk_events_work_report on risk_events(work_report_id);
 create index idx_audit_logs_created_at on audit_logs(created_at desc);
 create index idx_projects_service_type on projects(service_type);
 create index idx_treatment_records_work_report on treatment_records(work_report_id);
+create index idx_user_locations_user_id on user_locations(user_id);
+create index idx_user_locations_tracked_at on user_locations(tracked_at desc);
 
 -- Enforce PRD Section 9 (project lock) at the database level, not just in the client.
 create or replace function fn_prevent_locked_project_edit()

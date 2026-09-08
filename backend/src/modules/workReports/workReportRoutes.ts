@@ -33,12 +33,16 @@ const evidenceSchema = z.object({
   accuracy: z.coerce.number().min(0),
   notes: z.string().optional(),
   photoTag: z.enum(['BEFORE', 'AFTER']).optional(),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerFeedback: z.string().optional(),
+  customerSignature: z.string().optional(),
 });
 
 const REPORT_JOIN_SELECT = `
   wr.*, p.project_name, p.client_name, p.address as project_address, p.latitude as project_latitude,
   p.longitude as project_longitude, p.radius as project_radius, p.scheduled_start_time,
-  p.service_type, p.pest_target, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
+  p.service_type, p.pest_target, p.target_pests, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
   u.name as executor_name, u.email as executor_email
 `;
 
@@ -55,7 +59,7 @@ workReportRouter.get(
        order by wr.created_at desc`,
       [req.user!.id]
     );
-    res.json({ workReports: await Promise.all(rows.map(mapReportFull)) });
+    res.json({ workReports: await Promise.all(rows.map(r => mapReportFull(r, req.user!.role))) });
   })
 );
 
@@ -64,7 +68,7 @@ workReportRouter.get(
   asyncHandler(async (req, res) => {
     const report = await getReportOrThrow(req.params.id);
     assertOwnerOrAdmin(req.user!, report);
-    res.json({ workReport: await mapReportFull(report) });
+    res.json({ workReport: await mapReportFull(report, req.user!.role) });
   })
 );
 
@@ -72,7 +76,7 @@ workReportRouter.get(
 workReportRouter.post(
   '/:id/check-in',
   requireRole('EXECUTOR'),
-  upload.single('photo'),
+  upload.single('photo') as any,
   asyncHandler(async (req, res) => {
     const parsed = evidenceSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data lokasi tidak valid.');
@@ -124,7 +128,7 @@ workReportRouter.post(
     );
 
     const updated = await getReportOrThrow(report.id);
-    res.status(201).json({ workReport: await mapReportFull(updated), photoId: result });
+    res.status(201).json({ workReport: await mapReportFull(updated, req.user!.role), photoId: result });
   })
 );
 
@@ -135,7 +139,7 @@ workReportRouter.post(
 workReportRouter.post(
   '/:id/photos',
   requireRole('EXECUTOR'),
-  upload.single('photo'),
+  upload.single('photo') as any,
   asyncHandler(async (req, res) => {
     const parsed = evidenceSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data lokasi tidak valid.');
@@ -166,7 +170,7 @@ workReportRouter.post(
     await logAction(req.user!, 'CAPTURE_PROGRESS_PHOTO', 'work_report', report.id, `Dokumentasi progres${parsed.data.photoTag ? ` (${parsed.data.photoTag})` : ''} ditambahkan pada ${report.project_name}.`);
 
     const updated = await getReportOrThrow(report.id);
-    res.status(201).json({ workReport: await mapReportFull(updated) });
+    res.status(201).json({ workReport: await mapReportFull(updated, req.user!.role) });
   })
 );
 
@@ -235,7 +239,7 @@ workReportRouter.put(
     await logAction(req.user!, 'SUBMIT_TREATMENT', 'work_report', report.id, `Data perlakuan (${d.applicationMethod}) dicatat: ${d.chemicalName}, dosis ${d.dosage}.`);
 
     const updated = await getReportOrThrow(report.id);
-    res.json({ workReport: await mapReportFull(updated) });
+    res.json({ workReport: await mapReportFull(updated, req.user!.role) });
   })
 );
 
@@ -243,7 +247,7 @@ workReportRouter.put(
 workReportRouter.post(
   '/:id/check-out',
   requireRole('EXECUTOR'),
-  upload.single('photo'),
+  upload.single('photo') as any,
   asyncHandler(async (req, res) => {
     const parsed = evidenceSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data lokasi tidak valid.');
@@ -267,9 +271,11 @@ workReportRouter.post(
     await withTransaction(async client => {
       await client.query(
         `update work_reports set check_out_at = $1, check_out_latitude = $2, check_out_longitude = $3, check_out_accuracy = $4,
-          check_out_distance = $5, check_out_valid = $6, duration_seconds = $7, notes = coalesce($8, notes)
-         where id = $9`,
-        [serverNow.toISOString(), parsed.data.latitude, parsed.data.longitude, parsed.data.accuracy, geo.distance, geo.isWithin, durationSeconds, parsed.data.notes ?? null, report.id]
+          check_out_distance = $5, check_out_valid = $6, duration_seconds = $7, notes = coalesce($8, notes),
+          customer_name = coalesce($9, customer_name), customer_phone = coalesce($10, customer_phone),
+          customer_feedback = coalesce($11, customer_feedback), customer_signature = coalesce($12, customer_signature)
+         where id = $13`,
+        [serverNow.toISOString(), parsed.data.latitude, parsed.data.longitude, parsed.data.accuracy, geo.distance, geo.isWithin, durationSeconds, parsed.data.notes ?? null, parsed.data.customerName ?? null, parsed.data.customerPhone ?? null, parsed.data.customerFeedback ?? null, parsed.data.customerSignature ?? null, report.id]
       );
       await client.query(
         `insert into documentation_photos (work_report_id, photo_type, storage_path, latitude, longitude, accuracy, distance_to_project, is_within_radius, captured_at, metadata)
@@ -347,7 +353,7 @@ workReportRouter.post(
     }
 
     const updated = await getReportOrThrow(report.id);
-    res.json({ workReport: await mapReportFull(updated) });
+    res.json({ workReport: await mapReportFull(updated, req.user!.role) });
   })
 );
 
@@ -367,6 +373,6 @@ workReportRouter.post(
     await logAction(req.user!, 'REVIEW_REPORT', 'work_report', report.id, `Admin meninjau laporan: "${notes.data}"`);
 
     const updated = await getReportOrThrow(report.id);
-    res.json({ workReport: await mapReportFull(updated) });
+    res.json({ workReport: await mapReportFull(updated, req.user!.role) });
   })
 );
