@@ -271,59 +271,28 @@ export const ExecutorHome: React.FC = () => {
 
   const initials = user.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 
-  const SidebarItem: React.FC<{ tab: 'home' | 'jobs' | 'history' | 'profile'; label: React.ReactNode }> = ({ tab, label }) => {
+  const NavItem = ({ tab, label, icon: Icon }: { tab: 'home' | 'jobs' | 'history' | 'profile', label: string, icon: any }) => {
     const active = activeTab === tab;
     return (
       <button
         onClick={() => { setActiveTab(tab); setMobileMenuOpen(false); }}
-        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-          active
-            ? 'bg-emerald-100 text-emerald-700'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
+          active ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-900'
         }`}
       >
-        <span className="text-left">{label}</span>
+        <Icon size={20} className={active ? 'text-emerald-600' : 'text-slate-500'} strokeWidth={active ? 2.5 : 2} />
+        <span className={`text-[10px] font-medium ${active ? 'font-bold' : ''}`}>{label}</span>
       </button>
     );
   };
 
+
   return (
     <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={attemptSync} isSyncing={isSyncing} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />
+      <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={attemptSync} isSyncing={isSyncing} hideMobileMenu={true} />
       
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`absolute md:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-[var(--border-subtle)] flex flex-col transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-          <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between md:hidden">
-            <div>
-              <h2 className="font-bold text-sm text-[var(--text-primary)] tracking-tight">Menu Utama</h2>
-            </div>
-            <button className="p-1 text-slate-400" onClick={() => setMobileMenuOpen(false)}>
-              <X size={18} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            <SidebarItem tab="home" label="Home" />
-            <SidebarItem tab="jobs" label="Proyek Lapangan" />
-            <SidebarItem tab="history" label="Riwayat Pekerjaan" />
-          </div>
-          <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
-            <SidebarItem tab="profile" label="Setup Profile" />
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-rose-50 hover:text-rose-700"
-            >
-              <span className="flex-1 text-left">Keluar</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
+        
         <main className="flex-1 overflow-y-auto flex flex-col w-full relative pb-20">
       {successFeedback && (
         <div className="m-4 p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl shadow-sm text-emerald-900 flex items-start justify-between">
@@ -699,6 +668,47 @@ export const ExecutorHome: React.FC = () => {
       </div>
 
       </main>
+        
+        {/* Bottom Navigation for Mobile App UI/UX */}
+        <nav className="absolute bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-40 h-[65px] flex items-center justify-between px-4 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
+          <div className="flex-1 flex justify-around">
+            <NavItem tab="home" label="Beranda" icon={Home} />
+            <NavItem tab="jobs" label="Proyek" icon={Briefcase} />
+          </div>
+          
+          <div className="relative -top-5 flex flex-col items-center px-2">
+            {ongoingJob ? (
+              <button
+                onClick={() => setTreatmentFormReport(ongoingJob)}
+                className="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 border-4 border-white active:scale-95 transition-transform"
+              >
+                <LogOut size={24} />
+              </button>
+            ) : readyJob ? (
+              <button
+                onClick={() => setActiveCameraAction({ type: 'CHECK_IN', report: readyJob })}
+                className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 border-4 border-white active:scale-95 transition-transform"
+              >
+                <Camera size={24} />
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveTab('jobs')}
+                className="w-14 h-14 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-lg shadow-slate-800/30 border-4 border-white active:scale-95 transition-transform"
+              >
+                <Plus size={24} />
+              </button>
+            )}
+            <span className="text-[10px] font-bold text-slate-700 mt-1 whitespace-nowrap">
+              {ongoingJob ? 'Check Out' : 'Check In'}
+            </span>
+          </div>
+
+          <div className="flex-1 flex justify-around">
+            <NavItem tab="history" label="Riwayat" icon={History} />
+            <NavItem tab="profile" label="Profil" icon={UserIcon} />
+          </div>
+        </nav>
 
       {activeCameraAction && (
         <CameraCaptureModal

@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 
 interface HeaderProps {
+  hideMobileMenu?: boolean;
   currentUser: AuthUser;
   onLogout: () => void;
   pendingCount?: number;
@@ -13,7 +14,7 @@ interface HeaderProps {
   mobileMenuOpen?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCount = 0, onSync, isSyncing, onMenuToggle, mobileMenuOpen }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCount = 0, onSync, isSyncing, onMenuToggle, mobileMenuOpen, hideMobileMenu }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -22,18 +23,20 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {/* Mobile Toggle */}
-          <button
-            className="md:hidden p-2 -ml-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-            onClick={() => {
-              if (onMenuToggle) {
-                onMenuToggle();
-              } else {
-                setMenuOpen(!menuOpen);
-              }
-            }}
-          >
-            {(mobileMenuOpen ?? menuOpen) ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {!hideMobileMenu && (
+            <button
+              className="md:hidden p-2 -ml-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+              onClick={() => {
+                if (onMenuToggle) {
+                  onMenuToggle();
+                } else {
+                  setMenuOpen(!menuOpen);
+                }
+              }}
+            >
+              {(mobileMenuOpen ?? menuOpen) ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
           
           <div className="w-9 h-9 rounded-xl bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold text-sm tracking-tight border border-[var(--accent-glow)] hidden sm:flex">
             FW
