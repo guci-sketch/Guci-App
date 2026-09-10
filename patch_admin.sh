@@ -1,0 +1,1 @@
+sed -i 's/import {  LocationMap } from '\''\.\.\/maps\/LocationMap'\'';/import {  LocationMap } from '\''.\/maps\/LocationMap'\'';\nimport { AllProjectsMap } from '\''..\/maps\/AllProjectsMap'\'';/' src/components/admin/AdminDashboard.tsx
