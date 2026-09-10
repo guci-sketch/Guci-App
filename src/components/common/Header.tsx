@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AuthUser } from '../../types';
-import { Shield, HardHat, LogOut, WifiOff, RefreshCw, Menu, X } from 'lucide-react';
+import { Shield, HardHat, LogOut, WifiOff, RefreshCw, Menu, X, KeyRound } from 'lucide-react';
+import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 
 interface HeaderProps {
   currentUser: AuthUser;
@@ -12,6 +13,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCount = 0, onSync, isSyncing }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   return (
     <header className="bg-white border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-4 sm:px-6 py-3 shadow-sm">
@@ -44,7 +46,6 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
               {pendingCount} tertunda
             </button>
           )}
-
           <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs">
             {currentUser.role === 'ADMIN' ? (
               <Shield size={16} className="text-[var(--accent)] shrink-0" />
@@ -65,6 +66,14 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
               <span className="text-[10px] text-[var(--text-muted)] font-mono">{currentUser.nip || currentUser.email}</span>
             </div>
           </div>
+          
+          <button
+            onClick={() => setShowChangePassword(true)}
+            title="Ubah Kata Sandi"
+            className="flex items-center justify-center p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold border border-[var(--border-subtle)] hover:border-slate-300 transition-colors"
+          >
+            <KeyRound size={16} />
+          </button>
 
           <button
             onClick={onLogout}
@@ -99,7 +108,6 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
               <span className="text-xs text-[var(--text-muted)] font-mono">{currentUser.nip || currentUser.email}</span>
             </div>
           </div>
-
           {pendingCount > 0 && (
             <button
               onClick={onSync}
@@ -110,6 +118,14 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
               Sinkronisasi {pendingCount} Data
             </button>
           )}
+          
+          <button
+            onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
+            className="w-full flex justify-center items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold border border-[var(--border-subtle)]"
+          >
+            <KeyRound size={16} />
+            Ubah Kata Sandi
+          </button>
 
           <button
             onClick={onLogout}
@@ -120,6 +136,8 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
           </button>
         </div>
       )}
+      
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </header>
   );
 };

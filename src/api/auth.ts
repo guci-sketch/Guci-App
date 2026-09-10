@@ -19,3 +19,13 @@ export async function signup(name: string, email: string, nip: string, password:
   const res = await api.post<{ message: string }>('/auth/signup', { name, email, nip, password, role, captchaToken });
   return res.message;
 }
+
+export async function resetPassword(identifier: string) {
+  const res = await api.post<{ message: string }>('/auth/reset-password', { identifier });
+  return res.message;
+}
+
+export async function changePassword(oldPassword: string, newPassword: string) {
+  const res = await api.post<{ message: string }>('/auth/change-password', { oldPassword, newPassword });
+  return res.message;
+}

@@ -11,6 +11,7 @@ import { TreatmentFormModal } from './TreatmentFormModal';
 import { PhotoViewerModal } from '../common/PhotoViewerModal';
 import { AuthedImage } from '../common/AuthedImage';
 import { RiskBadge } from '../common/RiskBadge';
+import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { getServiceTypeMeta } from '../../utils/serviceMeta';
 import { formatDistance } from '../../utils/geo';
 import {
@@ -76,6 +77,7 @@ export const ExecutorHome: React.FC = () => {
   const [viewingPhoto, setViewingPhoto] = useState<DocumentationPhoto | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successFeedback, setSuccessFeedback] = useState<{ title: string; subtitle: string; stats?: string } | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoadError(null);
@@ -638,9 +640,15 @@ export const ExecutorHome: React.FC = () => {
                 <span className="font-bold text-[var(--text-primary)]">{reports.length} Penugasan</span>
               </div>
             </div>
-            <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--bg-tertiary)] hover:bg-rose-50 hover:text-rose-700 text-[var(--text-secondary)] text-sm font-semibold transition-colors">
-              <LogOut size={16} /> Keluar dari Akun
-            </button>
+            
+            <div className="pt-2 space-y-3">
+              <button onClick={() => setShowChangePassword(true)} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
+                <Lock size={16} /> Ubah Kata Sandi
+              </button>
+              <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--bg-tertiary)] hover:bg-rose-50 hover:text-rose-700 text-[var(--text-secondary)] text-sm font-semibold transition-colors">
+                <LogOut size={16} /> Keluar dari Akun
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -695,6 +703,7 @@ export const ExecutorHome: React.FC = () => {
 
       {showCreateProject && <CreateProjectModal onClose={() => setShowCreateProject(false)} onSubmit={handleCreateProjectSubmit} />}
       {viewingPhoto && <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />}
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 };

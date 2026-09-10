@@ -107,6 +107,81 @@ authRouter.post(
   })
 );
 
+const resetPasswordSchema = z.object({
+  identifier: z.string().min(1, 'Masukkan ID Pegawai atau email.'),
+});
+
+authRouter.post(
+  '/reset-password',
+  asyncHandler(async (req, res) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data tidak valid.');
+    }
+    const identifier = parsed.data.identifier.trim().toLowerCase();
+    const rows = await query<UserRow>(
+      `select * from users where lower(email) = $1 or lower(nip) = $1 limit 1`,
+      [identifier]
+    );
+    const user = rows[0];
+    if (!user) {
+      throw new HttpError(404, 'ID Pegawai atau email tidak terdaftar.');
+    }
+
+    const defaultPassword = '12345678';
+    const hash = await bcrypt.hash(defaultPassword, 10);
+    
+    await query(`update users set password_hash = $1 where id = $2`, [hash, user.id]);
+    await logAction(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      'RESET_PASSWORD',
+      'system',
+      null,
+      `Kata sandi untuk ${user.name} telah direset ke default.`
+    );
+
+    res.json({ message: 'Kata sandi berhasil di-reset menjadi 12345678. Silakan login dan segera ganti kata sandi Anda.' });
+  })
+);
+
+const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, 'Masukkan kata sandi lama.'),
+  newPassword: z.string().min(6, 'Kata sandi baru minimal 6 karakter.'),
+});
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data tidak valid.');
+    }
+
+    const rows = await query<UserRow>('select * from users where id = $1', [req.user!.id]);
+    const user = rows[0];
+    if (!user) throw new HttpError(404, 'Pengguna tidak ditemukan.');
+
+    const passwordOk = await bcrypt.compare(parsed.data.oldPassword, user.password_hash);
+    if (!passwordOk) {
+      throw new HttpError(401, 'Kata sandi lama tidak sesuai.');
+    }
+
+    const hash = await bcrypt.hash(parsed.data.newPassword, 10);
+    await query(`update users set password_hash = $1 where id = $2`, [hash, user.id]);
+
+    await logAction(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      'CHANGE_PASSWORD',
+      'system',
+      null,
+      `${user.name} telah mengubah kata sandi mereka.`
+    );
+
+    res.json({ message: 'Kata sandi berhasil diubah.' });
+  })
+);
+
 authRouter.get(
   '/me',
   requireAuth,

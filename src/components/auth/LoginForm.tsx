@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../context/AuthContext';
-import { signup } from '../../api/auth';
-import { ApiError } from '../../api/client';
-import { Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight, FileCheck, ChevronDown, User, Hash } from 'lucide-react';
+import { signup, resetPassword } from '../../api/auth';
+import { Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight, FileCheck, ChevronDown, User, Hash, KeyRound } from 'lucide-react';
 
 const DEMO_ACCOUNTS = [
   { name: 'Ahmad Fauzi (Admin)', identifier: 'admin.fauzi@fieldwork.id', password: 'admin123' },
@@ -19,14 +18,13 @@ export const LoginForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [name, setName] = useState('');
   const [nip, setNip] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'TEKNISI'>('TEKNISI');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showDemoHints, setShowDemoHints] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,15 +32,20 @@ export const LoginForm: React.FC = () => {
     setSuccessMsg(null);
     setIsLoading(true);
     try {
-      if (isSignup) {
+      if (mode === 'signup') {
         if (!captchaToken) {
             throw new Error("Harap lengkapi verifikasi captcha untuk membuktikan Anda bukan robot.");
         }
         const msg = await signup(name.trim(), identifier.trim(), nip.trim(), password, role, captchaToken);
         setSuccessMsg(msg);
-        setIsSignup(false);
+        setMode('login');
         setPassword('');
         setCaptchaToken(null);
+      } else if (mode === 'forgot') {
+        const msg = await resetPassword(identifier.trim());
+        setSuccessMsg(msg);
+        setMode('login');
+        setPassword('');
       } else {
         await login(identifier.trim(), password);
       }
@@ -51,6 +54,18 @@ export const LoginForm: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getTitle = () => {
+    if (mode === 'signup') return 'Pendaftaran Akun Baru';
+    if (mode === 'forgot') return 'Reset Kata Sandi';
+    return 'Masuk ke Akun Kerja';
+  };
+
+  const getSubtitle = () => {
+    if (mode === 'signup') return 'Daftarkan diri Anda. Admin akan meninjau pendaftaran ini.';
+    if (mode === 'forgot') return 'Masukkan ID Pegawai (NIP) atau email dinas Anda untuk me-reset sandi ke bawaan.';
+    return 'Masukkan ID Pegawai (NIP) atau email dinas Anda.';
   };
 
   return (
@@ -75,8 +90,8 @@ export const LoginForm: React.FC = () => {
               <span className="text-xs font-semibold text-[var(--accent)] bg-[var(--accent-glow)] px-2.5 py-1 rounded-md border border-[var(--accent-glow)] inline-block mb-2">
                 Portal Autentikasi Pegawai
               </span>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">{isSignup ? 'Pendaftaran Akun Baru' : 'Masuk ke Akun Kerja'}</h1>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">{isSignup ? 'Daftarkan diri Anda. Admin akan meninjau pendaftaran ini.' : 'Masukkan ID Pegawai (NIP) atau email dinas Anda.'}</p>
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">{getTitle()}</h1>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">{getSubtitle()}</p>
             </div>
 
             
@@ -84,7 +99,7 @@ export const LoginForm: React.FC = () => {
               <div className="mb-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-start gap-2.5">
                 <FileCheck size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold block">Pendaftaran Berhasil</span>
+                  <span className="font-semibold block">Berhasil</span>
                   <span>{successMsg}</span>
                 </div>
               </div>
@@ -93,7 +108,7 @@ export const LoginForm: React.FC = () => {
               <div className="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
                 <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold block">Autentikasi Gagal</span>
+                  <span className="font-semibold block">Aksi Gagal</span>
                   <span>{errorMessage}</span>
                 </div>
               </div>
@@ -101,7 +116,7 @@ export const LoginForm: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
-              {isSignup && (
+              {mode === 'signup' && (
                 <>
                   <div>
                     <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama Lengkap</label>
@@ -149,32 +164,41 @@ export const LoginForm: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="input-password" className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Kata Sandi Akun</label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-3 top-3 text-slate-400" />
-                  <input
-                    id="input-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    autoComplete="current-password"
-                    placeholder="Masukkan kata sandi..."
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2.5 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:bg-white transition-all font-medium"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
-                    title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+              {mode !== 'forgot' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="input-password" className="block text-xs font-semibold text-[var(--text-secondary)]">Kata Sandi Akun</label>
+                    {mode === 'login' && (
+                      <button type="button" onClick={() => { setMode('forgot'); setErrorMessage(null); setSuccessMsg(null); }} className="text-[11px] text-[var(--accent)] hover:underline font-semibold">
+                        Lupa kata sandi?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      id="input-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      autoComplete="current-password"
+                      placeholder="Masukkan kata sandi..."
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full pl-9 pr-10 py-2.5 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:bg-white transition-all font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                      title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {isSignup && (
+              {mode === 'signup' && (
                 <div className="flex justify-center mt-2 mb-2">
                   <ReCAPTCHA
                     sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
@@ -192,7 +216,7 @@ export const LoginForm: React.FC = () => {
                   <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>{isSignup ? 'Daftar Akun Baru' : 'Masuk ke Dashboard'}</span>
+                    <span>{mode === 'signup' ? 'Daftar Akun Baru' : mode === 'forgot' ? 'Reset Kata Sandi' : 'Masuk ke Dashboard'}</span>
                     <ArrowRight size={16} />
                   </>
                 )}
@@ -200,9 +224,15 @@ export const LoginForm: React.FC = () => {
             </form>
 
             <div className="mt-4 text-center">
-              <button type="button" onClick={() => { setIsSignup(!isSignup); setErrorMessage(null); setSuccessMsg(null); }} className="text-xs text-[var(--accent)] hover:underline font-semibold">
-                {isSignup ? 'Sudah punya akun? Masuk di sini' : 'Belum punya akun? Daftar sekarang'}
-              </button>
+              {mode !== 'login' ? (
+                <button type="button" onClick={() => { setMode('login'); setErrorMessage(null); setSuccessMsg(null); }} className="text-xs text-[var(--accent)] hover:underline font-semibold">
+                  Kembali ke halaman Masuk
+                </button>
+              ) : (
+                <button type="button" onClick={() => { setMode('signup'); setErrorMessage(null); setSuccessMsg(null); }} className="text-xs text-[var(--accent)] hover:underline font-semibold">
+                  Belum punya akun? Daftar sekarang
+                </button>
+              )}
             </div>
 
 
