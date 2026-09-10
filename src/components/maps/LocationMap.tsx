@@ -200,7 +200,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 right-3 z-[1000] bg-white/90 border border-slate-200 rounded-md px-2.5 py-1 text-[10px] text-slate-600 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 shadow-sm">
+      <div className="absolute bottom-3 left-3 z-[1000] bg-white/90 border border-slate-200 rounded-md px-2.5 py-1 text-[10px] text-slate-600 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 shadow-sm">
         <div className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-full bg-slate-800 inline-block" /> Proyek
         </div>
