@@ -14,3 +14,12 @@ coverage/
 # Local evidence photo storage (dev fallback only — production uses Supabase Storage)
 uploads/*
 !uploads/.gitkeep
+.vscode/
+.idea/
+*.swp
+*.swo
+.env*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
