@@ -41,10 +41,7 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      "/api": "http://localhost:3000"
-    },
-    port: 5173,
+    port: 3000,
     hmr: false,
   },
 });

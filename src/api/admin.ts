@@ -82,25 +82,27 @@ export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
   URL.revokeObjectURL(url);
 }
 
-export interface PendingUser {
+export interface AdminUser {
   id: string;
   name: string;
   email: string;
   nip: string | null;
+  role: 'ADMIN' | 'EXECUTOR';
+  is_active: boolean;
   created_at: string;
 }
 
-export async function fetchPendingUsers() {
-  const res = await api.get<{ pendingUsers: PendingUser[] }>('/admin/users/pending');
-  return res.pendingUsers;
+export async function fetchUsers() {
+  const res = await api.get<{ users: AdminUser[] }>('/admin/users');
+  return res.users;
 }
 
-export async function approveUser(id: string) {
-  await api.post(`/admin/users/${id}/approve`);
+export async function suspendUser(id: string) {
+  await api.post(`/admin/users/${id}/suspend`);
 }
 
-export async function rejectUser(id: string) {
-  await api.post(`/admin/users/${id}/reject`);
+export async function activateUser(id: string) {
+  await api.post(`/admin/users/${id}/activate`);
 }
 
 export interface PhotoPurgePreview {

@@ -16,6 +16,7 @@ interface CameraCaptureModalProps {
 }
 
 type GpsState =
+  | { status: 'idle' }
   | { status: 'locating' }
   | { status: 'ready'; latitude: number; longitude: number; accuracy: number }
   | { status: 'denied'; message: string };
@@ -43,7 +44,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [camera, setCamera] = useState<CameraState>({ status: 'starting' });
-  const [gps, setGps] = useState<GpsState>({ status: 'locating' });
+  const [gps, setGps] = useState<GpsState>({ status: 'idle' });
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,10 +62,6 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);
-
-  useEffect(() => {
-    requestGps();
-  }, [requestGps]);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,6 +223,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 <div className="flex items-center justify-between text-xs gap-2">
                   <span className="flex items-center gap-1.5 font-bold text-slate-200 min-w-0 truncate">
                     <MapPin size={14} className="text-sky-400 shrink-0" />
+                    {gps.status === 'idle' && 'Lokasi belum aktif'}
                     {gps.status === 'locating' && 'Menentukan lokasi Anda...'}
                     {gps.status === 'ready' && `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}`}
                     {gps.status === 'denied' && 'Lokasi tidak tersedia'}
@@ -251,14 +249,46 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               </div>
             </div>
 
+            {gps.status === 'idle' && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-6 backdrop-blur-sm">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm text-center shadow-2xl pointer-events-auto">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto mb-4 border border-emerald-500/30">
+                    <MapPin size={32} />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-2">Akses Lokasi Dibutuhkan</h3>
+                  <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+                    Sistem membutuhkan izin akses GPS pada perangkat Anda untuk mencatat titik koordinat check-in secara otomatis.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold text-sm transition-colors hover:bg-slate-700">
+                      Batal
+                    </button>
+                    <button onClick={requestGps} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm transition-colors hover:bg-emerald-500 shadow-lg shadow-emerald-900/50">
+                      Izinkan GPS
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {gps.status === 'denied' && (
-              <div className="absolute bottom-28 inset-x-4 z-20 flex justify-center">
-                <div className="bg-[var(--accent)]/95 border border-rose-500/40 rounded-xl p-4 max-w-sm text-center">
-                  <p className="text-xs text-rose-300 font-semibold mb-1">Lokasi belum tersedia</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mb-3">{gps.message}</p>
-                  <button onClick={requestGps} className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded-lg">
-                    Coba Lagi
-                  </button>
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-6 backdrop-blur-sm">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm text-center shadow-2xl pointer-events-auto">
+                  <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 mx-auto mb-4 border border-rose-500/30">
+                    <AlertTriangle size={32} />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-2">Akses Lokasi Ditolak</h3>
+                  <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+                    {gps.message}
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold text-sm transition-colors hover:bg-slate-700">
+                      Tutup
+                    </button>
+                    <button onClick={requestGps} className="flex-1 py-3 rounded-xl bg-rose-600 text-white font-bold text-sm transition-colors hover:bg-rose-500 shadow-lg shadow-rose-900/50">
+                      Coba Lagi
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

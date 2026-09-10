@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {  WorkReport, WorkReportListItem, Project, ExecutorStats, AuditLogEntry, RiskConfig, DocumentationPhoto, ReportFilters, DEFAULT_FILTERS } from '../../types';
 import { 
   fetchAdminReports, fetchAdminReportDetail, fetchAdminSummary, fetchExecutors, fetchAdminProjects,
-  fetchAuditLogs, fetchRiskConfig, updateRiskConfig, reviewReport, downloadReportsCsv, fetchPendingUsers, approveUser, rejectUser, PendingUser,
+  fetchAuditLogs, fetchRiskConfig, updateRiskConfig, reviewReport, downloadReportsCsv, fetchUsers, suspendUser, activateUser, AdminUser,
   fetchPhotoPurgePreview, purgeOldPhotos, PhotoPurgePreview,
 } from '../../api/admin';
 import {  fetchLatestLocations, UserLocation } from '../../api/location';
@@ -50,7 +50,7 @@ export const AdminDashboard: React.FC = () => {
   const [reports, setReports] = useState<WorkReportListItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [executors, setExecutors] = useState<ExecutorStats[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[] | null>(null);
   const [riskConfig, setRiskConfig] = useState<RiskConfig | null>(null);
   const [userLocations, setUserLocations] = useState<UserLocation[]>([]);
@@ -117,7 +117,7 @@ export const AdminDashboard: React.FC = () => {
       fetchLatestLocations().then(setUserLocations).catch(() => setUserLocations([]));
     }
     if (activeTab === 'approval') {
-      fetchPendingUsers().then(setPendingUsers).catch(() => setPendingUsers([]));
+      fetchUsers().then(setAdminUsers).catch(() => setAdminUsers([]));
     }
   }, [activeTab, auditLogs, riskConfig]);
 
@@ -139,14 +139,14 @@ export const AdminDashboard: React.FC = () => {
   }, [reports, activeTab]);
 
   
-  const handleApprove = async (id: string) => {
-    await approveUser(id);
-    setPendingUsers(prev => prev.filter(u => u.id !== id));
+  const handleActivate = async (id: string) => {
+    await activateUser(id);
+    setAdminUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: true } : u));
   };
-  const handleReject = async (id: string) => {
-    if(!confirm('Tolak pendaftaran user ini?')) return;
-    await rejectUser(id);
-    setPendingUsers(prev => prev.filter(u => u.id !== id));
+  const handleSuspend = async (id: string) => {
+    if(!confirm('Suspend/nonaktifkan user ini? User tidak akan bisa login.')) return;
+    await suspendUser(id);
+    setAdminUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: false } : u));
   };
 
   const handleExportCsv = async () => {
@@ -270,7 +270,7 @@ export const AdminDashboard: React.FC = () => {
                   <Users size={14} className="inline mr-1" /> Pelaksana
                 </TabButton>
                 <TabButton active={activeTab === 'approval'} onClick={() => setActiveTab('approval')}>
-                  <UserCheck size={14} className="inline mr-1" /> Persetujuan Akun {pendingUsers.length > 0 && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1">{pendingUsers.length}</span>}
+                  <UserCheck size={14} className="inline mr-1" /> Manajemen Akun {adminUsers.length > 0 && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1">{adminUsers.length}</span>}
                 </TabButton>
                 <TabButton active={activeTab === 'tracking'} onClick={() => setActiveTab('tracking')}>
                   <MapPin size={14} className="inline mr-1" /> GPS Tracker
@@ -665,24 +665,30 @@ export const AdminDashboard: React.FC = () => {
             
             {activeTab === 'approval' && (
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)] shadow-sm overflow-hidden p-4">
-                <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">Persetujuan Pendaftaran Akun</h3>
-                {pendingUsers.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-[var(--text-muted)]">Tidak ada akun yang menunggu persetujuan.</div>
+                <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">Manajemen Akun Pengguna</h3>
+                {adminUsers.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[var(--text-muted)]">Tidak ada data pengguna.</div>
                 ) : (
                   <div className="space-y-3">
-                    {pendingUsers.map(u => (
-                      <div key={u.id} className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                    {adminUsers.map(u => (
+                      <div key={u.id} className={`p-4 rounded-xl border border-[var(--border-subtle)] ${u.is_active ? 'bg-[var(--bg-tertiary)]' : 'bg-red-50/50 border-red-100'} flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs`}>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-[var(--text-primary)] text-sm">{u.name}</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">MENUNGGU PERSETUJUAN</span>
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border ${u.is_active ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
+                              {u.is_active ? 'AKTIF' : 'DITANGGUHKAN'}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 text-[var(--text-secondary)] font-bold">{u.role}</span>
                           </div>
                           <p className="text-[var(--text-secondary)] font-mono">{u.email} • NIP: {u.nip || '-'}</p>
                           <p className="text-[10px] text-[var(--text-muted)] mt-1">Mendaftar pada: {new Date(u.created_at).toLocaleString('id-ID')} WIB</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <button onClick={() => handleReject(u.id)} className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold transition-colors">Tolak</button>
-                          <button onClick={() => handleApprove(u.id)} className="px-4 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold transition-colors shadow-sm">Setujui Akses</button>
+                          {u.is_active ? (
+                            <button onClick={() => handleSuspend(u.id)} className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold transition-colors">Suspend Akun</button>
+                          ) : (
+                            <button onClick={() => handleActivate(u.id)} className="px-4 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold transition-colors shadow-sm">Aktifkan Akun</button>
+                          )}
                         </div>
                       </div>
                     ))}

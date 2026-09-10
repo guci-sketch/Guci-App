@@ -24,6 +24,7 @@ import { postLocation } from '../../api/location';
 export const ExecutorHome: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'history' | 'profile'>('home');
+  const [searchQuery, setSearchQuery] = useState('');
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,9 +110,23 @@ export const ExecutorHome: React.FC = () => {
 
   if (!user) return null;
 
-  const ongoingJob = reports.find(r => r.status === 'WORKING');
-  const readyJob = reports.find(r => r.status === 'READY' || r.status === 'DRAFT');
-  const completedJobs = reports.filter(r => ['COMPLETED', 'FLAGGED', 'REVIEWED'].includes(r.status));
+  const filteredReports = reports.filter(r => 
+    searchQuery === '' || 
+    r.projectName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (r.clientName && r.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    r.projectAddress.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const ongoingJob = filteredReports.find(r => r.status === 'WORKING');
+  const readyJob = filteredReports.find(r => r.status === 'READY' || r.status === 'DRAFT');
+  const completedJobs = filteredReports.filter(r => ['COMPLETED', 'FLAGGED', 'REVIEWED'].includes(r.status));
+
+  const filteredProjects = projects.filter(p => 
+    searchQuery === '' || 
+    p.projectName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.clientName && p.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    p.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleCreateProjectSubmit = async (data: CreateProjectInput) => {
     await createProject(data);
@@ -295,6 +310,23 @@ export const ExecutorHome: React.FC = () => {
           </div>
         )}
 
+        {!isLoading && !loadError && (
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Cari berdasarkan nama proyek, klien, atau alamat..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white text-[var(--text-primary)] placeholder-[var(--text-muted)] shadow-sm"
+            />
+          </div>
+        )}
+
         {!isLoading && !loadError && activeTab === 'home' && (
           <>
             <div className="clean-card p-4 flex items-center justify-between">
@@ -335,9 +367,6 @@ export const ExecutorHome: React.FC = () => {
                   {ongoingJob.pestTarget && ongoingJob.targetPests?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {ongoingJob.pestTarget}</span>}
                 </div>
                 <h3 className="text-base font-bold text-white tracking-tight">{ongoingJob.projectName}</h3>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5 flex items-center gap-1">
-                  <Building size={13} className="text-[var(--text-muted)]" /> {ongoingJob.clientName}
-                </p>
                 <p className="text-xs text-[var(--text-muted)] mt-1 flex items-start gap-1">
                   <MapPin size={13} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
                   <span className="truncate">{ongoingJob.projectAddress}</span>
@@ -399,9 +428,9 @@ export const ExecutorHome: React.FC = () => {
                   {readyJob.pestTarget && readyJob.targetPests?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {readyJob.pestTarget}</span>}
                 </div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">{readyJob.projectName}</h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{readyJob.clientName}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1 flex items-center gap-1">
-                  <MapPin size={13} className="text-[var(--text-muted)] shrink-0" /> {readyJob.projectAddress}
+                <p className="text-xs text-[var(--text-muted)] mt-1 flex items-start gap-1">
+                  <MapPin size={13} className="text-[var(--text-muted)] shrink-0 mt-0.5" />
+                  <span className="truncate">{readyJob.projectAddress}</span>
                 </p>
 
                 <div className="bg-[var(--bg-tertiary)] rounded-lg p-3 my-4 border border-[var(--border-subtle)] text-xs space-y-1">
@@ -494,9 +523,9 @@ export const ExecutorHome: React.FC = () => {
               </button>
             </div>
 
-            {projects.length === 0 && <p className="text-xs text-[var(--text-muted)] text-center py-8">Belum ada proyek. Buat proyek pertama Anda.</p>}
+            {filteredProjects.length === 0 && <p className="text-xs text-[var(--text-muted)] text-center py-8">Belum ada proyek. Buat proyek pertama Anda.</p>}
 
-            {projects.map(proj => {
+            {filteredProjects.map(proj => {
               const report = reports.find(r => r.projectId === proj.id);
               const isLocked = !!proj.lockedAt;
               const meta = getServiceTypeMeta(proj.serviceType);
@@ -509,9 +538,8 @@ export const ExecutorHome: React.FC = () => {
                         <Icon size={11} /> {meta.shortLabel}
                       </span>
                       <h3 className="font-bold text-sm text-[var(--text-primary)]">{proj.projectName}</h3>
-                      <p className="text-xs text-[var(--text-muted)]">{proj.clientName}</p>
                     </div>
-                    {isLocked ? (
+                    {proj.lockedAt ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded border border-slate-200">
                         <Lock size={11} /> Terkunci
                       </span>

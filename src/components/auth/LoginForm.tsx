@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../context/AuthContext';
 import { signup } from '../../api/auth';
 import { ApiError } from '../../api/client';
@@ -21,8 +22,10 @@ export const LoginForm: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [name, setName] = useState('');
   const [nip, setNip] = useState('');
+  const [role, setRole] = useState<'ADMIN' | 'TEKNISI'>('TEKNISI');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showDemoHints, setShowDemoHints] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,10 +35,14 @@ export const LoginForm: React.FC = () => {
     setIsLoading(true);
     try {
       if (isSignup) {
-        const msg = await signup(name.trim(), identifier.trim(), nip.trim(), password);
+        if (!captchaToken) {
+            throw new Error("Harap lengkapi verifikasi captcha untuk membuktikan Anda bukan robot.");
+        }
+        const msg = await signup(name.trim(), identifier.trim(), nip.trim(), password, role, captchaToken);
         setSuccessMsg(msg);
         setIsSignup(false);
         setPassword('');
+        setCaptchaToken(null);
       } else {
         await login(identifier.trim(), password);
       }
@@ -110,6 +117,17 @@ export const LoginForm: React.FC = () => {
                       <input type="text" value={nip} onChange={e => setNip(e.target.value)} placeholder="Nomor Induk Pegawai" className="w-full pl-9 pr-3.5 py-2.5 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent)]" />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Peran (Role)</label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-3 text-slate-400" />
+                      <select value={role} onChange={e => setRole(e.target.value as 'ADMIN' | 'TEKNISI')} className="w-full pl-9 pr-3.5 py-2.5 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--accent)] appearance-none">
+                        <option value="TEKNISI">Pelaksana Lapangan (Teknisi)</option>
+                        <option value="ADMIN">Administrator</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
                 </>
               )}
               <div>
@@ -155,6 +173,15 @@ export const LoginForm: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {isSignup && (
+                <div className="flex justify-center mt-2 mb-2">
+                  <ReCAPTCHA
+                    sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+                    onChange={(token) => setCaptchaToken(token)}
+                  />
+                </div>
+              )}
 
               <button
                 type="submit"

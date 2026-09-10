@@ -19,8 +19,6 @@ const createProjectSchema = z.object({
   projectName: z.string().min(3, 'Nama proyek minimal 3 karakter.'),
   clientName: z.string().optional().default(''),
   address: z.string().min(5, 'Alamat wajib diisi.'),
-  latitude: z.number(),
-  longitude: z.number(),
   radius: z.number().int().min(20).max(2000).default(100),
   workDate: z.string().min(1, 'Tanggal kerja wajib diisi.'),
   workType: z.string().optional().default(''),
@@ -73,12 +71,12 @@ projectRouter.post(
     }
     const d = parsed.data;
 
-    if (!isValidCoordinate(d.latitude, d.longitude)) {
-      throw new HttpError(400, 'Koordinat lokasi tidak valid.');
-    }
     if (d.contractType === 'RECURRING' && !d.nextServiceDate) {
       throw new HttpError(400, 'Kontrak berkala memerlukan tanggal layanan berikutnya.');
     }
+
+    const initialLatitude = 0;
+    const initialLongitude = 0;
 
     const rows = await query(
       `insert into projects (
@@ -88,7 +86,7 @@ projectRouter.post(
       ) 
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`,
       [
-        d.projectName.trim(), d.clientName?.trim() || '', d.address.trim(), d.latitude, d.longitude, d.radius, d.workDate, d.workType?.trim() || '',
+        d.projectName.trim(), d.clientName?.trim() || '', d.address.trim(), initialLatitude, initialLongitude, d.radius, d.workDate, d.workType?.trim() || '',
         d.serviceType, d.pestTarget?.trim() || null, JSON.stringify(d.targetPests), d.buildingAreaSqm ?? null, d.contractType, d.warrantyMonths, d.nextServiceDate || null,
         d.scheduledStartTime, d.notes?.trim() || null, req.user!.id,
       ]

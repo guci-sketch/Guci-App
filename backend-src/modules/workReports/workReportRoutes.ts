@@ -92,15 +92,25 @@ workReportRouter.post(
     }
 
     const serverNow = new Date(); // Rule 6: server timestamp is the official timestamp.
-    const geo = isWithinRadius(
-      { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
-      { latitude: Number(report.project_latitude), longitude: Number(report.project_longitude) },
-      report.project_radius
-    );
+    let geo = { isWithin: true, distance: 0 };
+    const isFirstCheckIn = Number(report.project_latitude) === 0 && Number(report.project_longitude) === 0;
+
+    if (!isFirstCheckIn) {
+      geo = isWithinRadius(
+        { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
+        { latitude: Number(report.project_latitude), longitude: Number(report.project_longitude) },
+        report.project_radius
+      );
+    }
 
     const storagePath = await savePhoto(req.file.buffer, 'jpg');
 
     const result = await withTransaction(async client => {
+      if (isFirstCheckIn) {
+        // Automatically set project coordinates based on the first check-in location
+        await client.query(`update projects set latitude = $1, longitude = $2 where id = $3`, [parsed.data.latitude, parsed.data.longitude, report.project_id]);
+      }
+
       await client.query(
         `update work_reports set status = 'WORKING', check_in_at = $1, check_in_latitude = $2, check_in_longitude = $3,
           check_in_accuracy = $4, check_in_distance = $5, check_in_valid = $6, notes = coalesce($7, notes)

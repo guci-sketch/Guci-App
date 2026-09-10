@@ -32,15 +32,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
-  const [radius, setRadius] = useState<number>(100);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // GPS Coordinates
-  const [latitude, setLatitude] = useState<number>(-6.298144);
-  const [longitude, setLongitude] = useState<number>(106.671342);
-  const [isGettingGps, setIsGettingGps] = useState(false);
-  const [gpsSuccessMessage, setGpsSuccessMessage] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -51,39 +44,28 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     setServiceType(type);
     setTargetPests([]);
     setOtherPest('');
-  };
-
-  const handleFetchCurrentGps = () => {
-    setIsGettingGps(true);
-    setGpsSuccessMessage(null);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          setLatitude(pos.coords.latitude);
-          setLongitude(pos.coords.longitude);
-          setIsGettingGps(false);
-          setGpsSuccessMessage(`GPS Terdeteksi (Akurasi: ±${Math.round(pos.coords.accuracy || 10)}m)`);
-        },
-        err => {
-          console.warn('GPS error:', err);
-          setIsGettingGps(false);
-          setGpsSuccessMessage('GPS tidak dapat diakses, menggunakan titik koordinat saat ini');
-        },
-        { enableHighAccuracy: true, timeout: 7000 }
-      );
+    // Auto setup project name when service type is selected
+    const serviceName = SERVICE_TYPE_META[type].label;
+    if (clientName) {
+      setProjectName(`${serviceName} - ${clientName}`);
     } else {
-      setIsGettingGps(false);
+      setProjectName(serviceName);
     }
   };
 
-  const handleApplyPreset = (index: number) => {
-    const p = PRESET_PROJECT_LOCATIONS[index];
-    setProjectName(p.name);
-    setAddress(p.address);
-    setLatitude(p.latitude);
-    setLongitude(p.longitude);
-    setRadius(p.radius);
-    setGpsSuccessMessage(`Koordinat ${p.name} diterapkan`);
+  // Also auto update project name if client name changes and project name is currently just the service name
+  const handleClientNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newClientName = e.target.value;
+    setClientName(newClientName);
+    
+    const serviceName = SERVICE_TYPE_META[serviceType].label;
+    if (projectName === serviceName || projectName === `${serviceName} - ${clientName}`) {
+      if (newClientName) {
+        setProjectName(`${serviceName} - ${newClientName}`);
+      } else {
+        setProjectName(serviceName);
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,9 +91,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         projectName,
         clientName: clientName || 'Klien Layanan Lapangan',
         address,
-        latitude,
-        longitude,
-        radius,
+        radius: 100, // Hardcode default radius
         workDate,
         serviceType,
         targetPests: finalPests,
@@ -224,7 +204,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   type="text"
                   placeholder="PT Medika Lestari"
                   value={clientName}
-                  onChange={e => setClientName(e.target.value)}
+                  onChange={handleClientNameChange}
                   className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
                 />
               </div>
@@ -314,104 +294,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
             )}
-          </div>
-
-          {/* Quick Presets */}
-          <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-sky-900 flex items-center gap-1">
-                <Sparkles size={14} className="text-sky-600" /> Lokasi Klien Tersimpan:
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {PRESET_PROJECT_LOCATIONS.map((preset, idx) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => handleApplyPreset(idx)}
-                  className="text-[11px] px-2.5 py-1 bg-white hover:bg-sky-100/60 text-[var(--text-secondary)] border border-sky-200 rounded-lg transition-colors font-medium text-left"
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* GPS Location & Radius Section */}
-          <div className="bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-subtle)]/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin size={15} className="text-emerald-600" /> Titik Pusat Geofence Lokasi
-              </span>
-              <button
-                id="btn-get-device-gps"
-                type="button"
-                onClick={handleFetchCurrentGps}
-                disabled={isGettingGps}
-                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-100/70 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
-              >
-                <Crosshair size={13} /> {isGettingGps ? 'Mendeteksi...' : 'Ambil GPS Sekarang'}
-              </button>
-            </div>
-
-            {gpsSuccessMessage && (
-              <div className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60 flex items-center gap-1">
-                <CheckCircle2 size={13} /> {gpsSuccessMessage}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="block text-[11px] font-medium text-[var(--text-muted)] mb-0.5">Latitude</span>
-                <input
-                  id="input-lat"
-                  type="number"
-                  step="0.000001"
-                  value={latitude}
-                  onChange={e => setLatitude(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
-                />
-              </div>
-              <div>
-                <span className="block text-[11px] font-medium text-[var(--text-muted)] mb-0.5">Longitude</span>
-                <input
-                  id="input-lng"
-                  type="number"
-                  step="0.000001"
-                  value={longitude}
-                  onChange={e => setLongitude(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="font-semibold text-[var(--text-secondary)]">Batas Toleransi Radius Validasi:</span>
-                <span className="font-bold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  {radius} meter
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {[50, 80, 100, 150, 200].map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRadius(r)}
-                    className={`flex-1 py-1 text-xs rounded-lg border font-semibold transition-all ${
-                      radius === r
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : 'bg-white text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]'
-                    }`}
-                  >
-                    {r}m
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
-                Check-in yang berjarak lebih dari {radius}m akan otomatis tercatat sebagai anomali resiko (+30 poin).
-              </p>
-            </div>
           </div>
 
           {/* Notes */}

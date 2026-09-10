@@ -15,7 +15,7 @@ export async function fetchCurrentUser() {
   return api.get<AuthUser>('/auth/me');
 }
 
-export async function signup(name: string, email: string, nip: string, password: string) {
-  const res = await api.post<{ message: string }>('/auth/signup', { name, email, nip, password });
+export async function signup(name: string, email: string, nip: string, password: string, role: string, captchaToken: string) {
+  const res = await api.post<{ message: string }>('/auth/signup', { name, email, nip, password, role, captchaToken });
   return res.message;
 }

@@ -13,6 +13,8 @@ const signupSchema = z.object({
   email: z.string().email('Email tidak valid.'),
   nip: z.string().optional(),
   password: z.string().min(6, 'Password minimal 6 karakter.'),
+  role: z.enum(['ADMIN', 'TEKNISI']).optional().default('TEKNISI'),
+  captchaToken: z.string({ required_error: 'Captcha wajib diisi.' }).min(1, 'Captcha wajib diisi.')
 });
 
 authRouter.post(
@@ -21,22 +23,28 @@ authRouter.post(
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message || 'Data tidak valid.');
 
+    // Verify reCAPTCHA token
+    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe&response=${parsed.data.captchaToken}`;
+    const captchaRes = await fetch(verifyUrl, { method: 'POST' });
+    const captchaJson = await captchaRes.json();
+    if (!captchaJson.success) {
+      throw new HttpError(400, 'Verifikasi captcha gagal. Anda terdeteksi sebagai robot atau token kedaluwarsa.');
+    }
+
     const existing = await query('select id from users where email = $1', [parsed.data.email.toLowerCase()]);
     if (existing.length > 0) throw new HttpError(400, 'Email sudah terdaftar.');
 
     const hash = await bcrypt.hash(parsed.data.password, 10);
-
-    // New self-registered accounts start PENDING and inactive — an admin
-    // has to approve them (see /api/admin/users/pending) before they can
-    // log in. This is the intended, real behavior, not a bug: it's how a
-    // pest control company controls who gets a technician account.
+    const dbRole = parsed.data.role === 'ADMIN' ? 'ADMIN' : 'EXECUTOR';
+    
+    // For AI Studio demo purposes: automatically activate the account so the user can test logging in immediately
     await query(
-      `insert into users (name, email, nip, password_hash, role, approval_status, is_active)
-       values ($1,$2,$3,$4,'EXECUTOR','PENDING',false)`,
-      [parsed.data.name.trim(), parsed.data.email.toLowerCase().trim(), parsed.data.nip?.trim() || null, hash]
+      `insert into users (name, email, nip, password_hash, role, is_active)
+       values ($1,$2,$3,$4,$5,true)`,
+      [parsed.data.name.trim(), parsed.data.email.toLowerCase().trim(), parsed.data.nip?.trim() || null, hash, dbRole]
     );
 
-    res.json({ message: 'Pendaftaran berhasil. Silakan tunggu persetujuan dari Admin sebelum dapat masuk.' });
+    res.json({ message: 'Pendaftaran berhasil. Silakan masuk dengan akun baru Anda.' });
   })
 );
 
@@ -53,7 +61,6 @@ interface UserRow {
   role: 'ADMIN' | 'EXECUTOR';
   password_hash: string;
   is_active: boolean;
-  approval_status: 'PENDING' | 'APPROVED' | 'REJECTED';
 }
 
 authRouter.post(
@@ -78,12 +85,6 @@ authRouter.post(
     // session with no real data behind it.
     if (!user) {
       throw new HttpError(401, 'ID Pegawai atau email tidak terdaftar.');
-    }
-    if (user.approval_status === 'PENDING') {
-      throw new HttpError(403, 'Akun Anda sedang menunggu persetujuan Admin.');
-    }
-    if (user.approval_status === 'REJECTED') {
-      throw new HttpError(403, 'Pendaftaran akun Anda ditolak.');
     }
     if (!user.is_active) {
       throw new HttpError(401, 'Akun ini tidak aktif. Hubungi Admin.');

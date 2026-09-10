@@ -12,33 +12,33 @@ export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('ADMIN'));
 
 // ==========================================
-// USER APPROVAL ROUTES
+// USER MANAGEMENT ROUTES
 // ==========================================
 
-adminRouter.get('/users/pending', asyncHandler(async (req, res) => {
+adminRouter.get('/users', asyncHandler(async (req, res) => {
   const rows = await query(
-    "select id, name, email, nip, created_at from users where approval_status = 'PENDING' order by created_at desc"
+    "select id, name, email, nip, role, is_active, created_at from users order by created_at desc"
   );
-  res.json({ pendingUsers: rows });
+  res.json({ users: rows });
 }));
 
-adminRouter.post('/users/:id/approve', asyncHandler(async (req, res) => {
+adminRouter.post('/users/:id/suspend', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const result = await query(
-    "update users set approval_status = 'APPROVED', is_active = true, updated_at = now() where id = $1 and approval_status = 'PENDING' returning id",
+    "update users set is_active = false, updated_at = now() where id = $1 returning id",
     [id]
   );
-  if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan atau sudah diproses.');
+  if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
   res.json({ success: true });
 }));
 
-adminRouter.post('/users/:id/reject', asyncHandler(async (req, res) => {
+adminRouter.post('/users/:id/activate', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const result = await query(
-    "update users set approval_status = 'REJECTED', is_active = false, updated_at = now() where id = $1 and approval_status = 'PENDING' returning id",
+    "update users set is_active = true, updated_at = now() where id = $1 returning id",
     [id]
   );
-  if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan atau sudah diproses.');
+  if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
   res.json({ success: true });
 }));
 
