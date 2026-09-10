@@ -31,25 +31,6 @@ The repo we received had already been extended with real, legitimate features �
 
 8. Smaller things: `api/index.ts` imported `'../backend-src/app.ts'` with a `.ts` extension (works via Vite/esbuild's bundler resolution but is inconsistent); `app.ts` computed a CORS allow-list it never used, and CORS doesn't apply anyway now that frontend+API are one origin; `server.ts` had redundant Vite-middleware-embedding logic left over from an earlier local-dev pattern; the repo had two full duplicate copies of the frontend and backend (`frontend/`, `backend/`) — including `frontend/node_modules` and `frontend/dist` committed — plus a stray Puppeteer debug script and three different `.env.example` files. All cleaned up; this zip has one copy of everything and one `.gitignore` at the root (which the repo didn't have before, hence why `node_modules` ended up committed).
 
-## Why your `.env` had 10 variables and now needs 4
-
-Looking at the variables you had set, most of them were leftovers from an earlier two-project architecture (separate frontend/backend deployments) that no longer applies now that this is one monolith Vercel project:
-
-| Variable | Still needed? | Why |
-|---|---|---|
-| `DATABASE_URL` | **Yes — core** | No default is possible; this is your Supabase connection. |
-| `JWT_SECRET` | **Yes — core** | No default on purpose (see fix #4 above). |
-| `SUPABASE_URL` | **Yes — core** | Needed to reach Supabase Storage. |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Yes — core** | Same. |
-| `SUPABASE_STORAGE_BUCKET` | Optional | Defaults to `evidence-photos` in code. |
-| `JWT_EXPIRES_IN` | Optional | Defaults to `12h` in code. |
-| `MAX_PHOTO_SIZE_MB` | Optional | Defaults to `8` in code. |
-| `CORS_ORIGIN` | **No — delete it** | Was for cross-origin requests between two separate deployments. Frontend and API are the same origin now; the browser never makes a cross-origin request here, and the code no longer even sets up CORS middleware. |
-| `UPLOAD_DIR` | **No — delete it** | Was the local-disk fallback path. Production always uses Supabase Storage once `SUPABASE_URL` is set; this only ever mattered for local dev, which already has a working default. |
-| `VITE_API_URL` | **No — delete it** | The frontend calls a hardcoded relative `/api` path (same-origin), so this was never actually read even before this fix pass. |
-
-See `.env.example` for the full breakdown with comments.
-
 ## New: photo retention (delete old photo files, keep everything else)
 
 Admin dashboard → **Konfigurasi Risiko** tab → **Retensi Penyimpanan Foto** panel. Pick a window (1/2/3/6/12 months), see how many photo files are older than that, and delete them with one click.
