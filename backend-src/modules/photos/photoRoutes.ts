@@ -17,7 +17,7 @@ photoRouter.get(
   '/:id/file',
   asyncHandler(async (req, res) => {
     const rows = await query(
-      `select dp.storage_path, wr.executor_id from documentation_photos dp
+      `select dp.storage_path, dp.purged_at, wr.executor_id from documentation_photos dp
        join work_reports wr on wr.id = dp.work_report_id
        where dp.id = $1`,
       [req.params.id]
@@ -26,6 +26,12 @@ photoRouter.get(
     if (!photo) throw new HttpError(404, 'Foto tidak ditemukan.');
     if (req.user!.role === 'EXECUTOR' && photo.executor_id !== req.user!.id) {
       throw new HttpError(403, 'Anda tidak memiliki akses ke foto ini.');
+    }
+    if (photo.purged_at) {
+      // 410 Gone: the record still exists (see /admin/photos/purge) — only
+      // the file was removed by the retention job. Distinct from 404 so the
+      // frontend can show "purged" instead of a generic broken-image state.
+      throw new HttpError(410, 'File foto ini telah dihapus sesuai kebijakan retensi penyimpanan.');
     }
 
     const buffer = await readPhoto(photo.storage_path);

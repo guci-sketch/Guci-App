@@ -10,7 +10,7 @@ export const projectRouter = Router();
 projectRouter.use(requireAuth);
 
 const SERVICE_TYPES = [
-  'PEST_CONTROL',
+  'GENERAL_PEST_CONTROL',
   'TERMITE_CONTROL',
   'FUMIGATION',
 ] as const;
@@ -24,7 +24,7 @@ const createProjectSchema = z.object({
   radius: z.number().int().min(20).max(2000).default(100),
   workDate: z.string().min(1, 'Tanggal kerja wajib diisi.'),
   workType: z.string().optional().default(''),
-  serviceType: z.enum(SERVICE_TYPES).default('PEST_CONTROL'),
+  serviceType: z.enum(SERVICE_TYPES).default('GENERAL_PEST_CONTROL'),
   pestTarget: z.string().optional(),
   targetPests: z.array(z.string()).default([]),
   buildingAreaSqm: z.number().min(0).optional(),

@@ -13,13 +13,13 @@ interface CreateProjectModalProps {
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_META) as ServiceType[];
 
 const TARGET_PEST_OPTIONS: Record<ServiceType, string[]> = {
-  PEST_CONTROL: ['Tikus (Rattus spp.)', 'Kucing Liar (Felis catus)', 'Kecoa (Periplaneta americana)', 'Nyamuk', 'Semut', 'Lalat'],
+  GENERAL_PEST_CONTROL: ['Tikus (Rattus spp.)', 'Kucing Liar (Felis catus)', 'Kecoa (Periplaneta americana)', 'Nyamuk', 'Semut', 'Lalat'],
   TERMITE_CONTROL: ['Rayap Tanah (Coptotermes gestroi)', 'Rayap Kayu Kering (Cryptotermes spp.)', 'Rayap Kayu Basah (Glyptotermes spp.)'],
   FUMIGATION: ['Kutu Beras (Sitophilus oryzae)', 'Kumbang Tepung (Tribolium castaneum)'],
 };
 
 const DEFAULT_WORK_TYPE_BY_SERVICE: Record<ServiceType, string> = {
-  PEST_CONTROL: 'Pest Control Umum Bulanan',
+  GENERAL_PEST_CONTROL: 'Pest Control Umum Bulanan',
   TERMITE_CONTROL: 'Anti Rayap Pasca Konstruksi',
   FUMIGATION: 'Fumigasi Gudang / Kontainer',
 };
@@ -29,7 +29,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
   const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serviceType, setServiceType] = useState<ServiceType>('PEST_CONTROL');
+  const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [radius, setRadius] = useState<number>(100);

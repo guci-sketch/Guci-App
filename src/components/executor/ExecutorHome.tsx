@@ -353,7 +353,7 @@ export const ExecutorHome: React.FC = () => {
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {ongoingJob.photos.map(photo => (
                       <button key={photo.id} type="button" onClick={() => setViewingPhoto(photo)} className="relative w-16 h-16 rounded overflow-hidden border border-zinc-700 shrink-0 group hover:border-emerald-400 transition-colors">
-                        <AuthedImage path={photo.url} alt="evidence" className="w-full h-full object-cover" />
+                        <AuthedImage path={photo.url} alt="evidence" purged={!!photo.purgedAt} className="w-full h-full object-cover" />
                         <span className="absolute bottom-0 inset-x-0 bg-zinc-950/80 text-[9px] font-medium text-white text-center py-0.5 uppercase">
                           {photo.photoTag ? (photo.photoTag === 'BEFORE' ? 'Awal' : 'Hasil') : photo.photoType === 'CHECK_IN' ? 'Cin' : photo.photoType === 'PROGRESS' ? 'Prog' : 'Cout'}
                         </span>
@@ -471,7 +471,7 @@ export const ExecutorHome: React.FC = () => {
                       </div>
                       {rep.photos.length > 0 && (
                         <button type="button" onClick={() => setViewingPhoto(rep.photos[0])} className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 shrink-0 relative group">
-                          <AuthedImage path={rep.photos[0].url} alt="thumb" className="w-full h-full object-cover" />
+                          <AuthedImage path={rep.photos[0].url} alt="thumb" purged={!!rep.photos[0].purgedAt} className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                             <Eye size={14} className="text-white" />
                           </div>
@@ -576,7 +576,7 @@ export const ExecutorHome: React.FC = () => {
                   <div className="flex gap-2 overflow-x-auto pt-1">
                     {rep.photos.map(p => (
                       <button key={p.id} type="button" onClick={() => setViewingPhoto(p)} className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 shrink-0">
-                        <AuthedImage path={p.url} alt="evidence" className="w-full h-full object-cover" />
+                        <AuthedImage path={p.url} alt="evidence" purged={!!p.purgedAt} className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>

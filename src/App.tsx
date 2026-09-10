@@ -15,7 +15,7 @@ const Shell: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    setPendingCount(getQueueLength());
+    getQueueLength().then(setPendingCount);
   }, []);
 
   const handleSync = useCallback(async () => {

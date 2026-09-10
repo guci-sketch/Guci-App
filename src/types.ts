@@ -24,7 +24,7 @@ export type PhotoTag = 'BEFORE' | 'AFTER' | null;
 
 /** Pest control service taxonomy. */
 export type ServiceType =
-  | 'PEST_CONTROL'
+  | 'GENERAL_PEST_CONTROL'
   | 'TERMITE_CONTROL'
   | 'FUMIGATION';
 
@@ -91,6 +91,7 @@ export interface DocumentationPhoto {
   isWithinRadius: boolean;
   capturedAt: string;
   metadata: { projectName?: string; executorName?: string; caption?: string | null };
+  purgedAt?: string | null; // set once the file (not the record) has been deleted by retention
   url: string; // e.g. "/photos/{id}/file" — fetch via AuthedImage, never a bare <img src>
 }
 

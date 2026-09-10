@@ -10,12 +10,12 @@ interface ServiceTypeMeta {
 }
 
 export const SERVICE_TYPE_META: Record<ServiceType, ServiceTypeMeta> = {
-  PEST_CONTROL: {
-    label: 'Pest Control',
+  GENERAL_PEST_CONTROL: {
+    label: 'Pest Control Umum',
     shortLabel: 'Pest Control',
     icon: Bug,
     badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    description: 'Pengendalian tikus, kucing liar, kecoa, semut, lalat, nyamuk, dll.',
+    description: 'Pengendalian tikus, kecoa, semut, lalat, nyamuk, dan hama umum lainnya.',
   },
   TERMITE_CONTROL: {
     label: 'Anti Rayap',
@@ -54,5 +54,5 @@ export const APPLICATION_METHOD_OPTIONS: { value: ApplicationMethod; label: stri
 ).map(([value, label]) => ({ value, label }));
 
 export function getServiceTypeMeta(type: ServiceType): ServiceTypeMeta {
-  return SERVICE_TYPE_META[type] ?? SERVICE_TYPE_META.PEST_CONTROL;
+  return SERVICE_TYPE_META[type] ?? SERVICE_TYPE_META.GENERAL_PEST_CONTROL;
 }

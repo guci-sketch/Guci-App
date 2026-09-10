@@ -3,6 +3,7 @@ import {  WorkReport, WorkReportListItem, Project, ExecutorStats, AuditLogEntry,
 import { 
   fetchAdminReports, fetchAdminReportDetail, fetchAdminSummary, fetchExecutors, fetchAdminProjects,
   fetchAuditLogs, fetchRiskConfig, updateRiskConfig, reviewReport, downloadReportsCsv, fetchPendingUsers, approveUser, rejectUser, PendingUser,
+  fetchPhotoPurgePreview, purgeOldPhotos, PhotoPurgePreview,
 } from '../../api/admin';
 import {  fetchLatestLocations, UserLocation } from '../../api/location';
 import {  ApiError } from '../../api/client';
@@ -14,10 +15,10 @@ import {  RISK_LEVEL_OPTIONS, STATUS_OPTIONS } from '../../utils/riskMeta';
 import {  SERVICE_TYPE_OPTIONS, getServiceTypeMeta, APPLICATION_METHOD_LABELS } from '../../utils/serviceMeta';
 import { 
   RefreshCw, ShieldAlert, Search, Download, Clock, MapPin, UserCheck, CheckCircle2, AlertTriangle, Eye,
-  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical,
+  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical, Trash2, ImageOff,
 } from 'lucide-react';
 
-type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking';
+type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval';
 
 const DATE_PRESETS = [
   { id: 'all', label: 'Semua' },
@@ -691,7 +692,10 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             {activeTab === 'risk-config' && (
-              <RiskConfigPanel config={riskConfig} onSave={handleSaveRiskConfig} />
+              <div className="space-y-4">
+                <RiskConfigPanel config={riskConfig} onSave={handleSaveRiskConfig} />
+                <PhotoRetentionPanel />
+              </div>
             )}
           </>
         )}
@@ -880,7 +884,7 @@ export const AdminDashboard: React.FC = () => {
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {selectedReport.photos.map(photo => (
                           <div key={photo.id} onClick={() => setViewingPhoto(photo)} className="group relative rounded-xl overflow-hidden border border-[var(--border-subtle)]  cursor-pointer hover:border-emerald-500 transition-all aspect-video bg-black">
-                            <AuthedImage path={photo.url} alt="evidence" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                            <AuthedImage path={photo.url} alt="evidence" purged={!!photo.purgedAt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-white pointer-events-none">
                               <span className="text-[10px] font-bold block uppercase tracking-wide">{photo.photoTag ? (photo.photoTag === 'BEFORE' ? 'Kondisi Awal' : 'Hasil Perlakuan') : photo.photoType.replace('_', ' ')}</span>
                               <span className="text-[9px] text-slate-300 font-mono block">{new Date(photo.capturedAt).toLocaleTimeString('id-ID')} WIB</span>
@@ -1045,6 +1049,118 @@ const RiskConfigPanel: React.FC<{ config: RiskConfig | null; onSave: (partial: P
         <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-60 flex items-center gap-2">
           {saving && <Loader2 size={16} className="animate-spin" />} Simpan Konfigurasi
         </button>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Deletes old photo *files* to save storage — everything else (check-in/out
+ * times, risk scores, treatment records, customer reviews, audit log) stays
+ * forever. See backend-src/modules/photos/retention.ts for exactly what's
+ * kept vs. deleted.
+ */
+const PhotoRetentionPanel: React.FC = () => {
+  const [months, setMonths] = useState(2);
+  const [preview, setPreview] = useState<PhotoPurgePreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(true);
+  const [isPurging, setIsPurging] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPreview = useCallback(async (m: number) => {
+    setIsLoadingPreview(true);
+    setError(null);
+    try {
+      const res = await fetchPhotoPurgePreview(m);
+      setPreview(res);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Gagal memuat perkiraan.');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPreview(months);
+  }, [months, loadPreview]);
+
+  const handlePurge = async () => {
+    setIsPurging(true);
+    setError(null);
+    try {
+      const result = await purgeOldPhotos(months);
+      setResultMessage(`${result.purgedCount} foto berhasil dihapus${result.failedCount > 0 ? `, ${result.failedCount} gagal` : ''}. Data laporan lainnya tidak berubah.`);
+      setConfirmOpen(false);
+      await loadPreview(months);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Gagal menghapus foto.');
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
+  return (
+    <div className="clean-card bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border-subtle)]">
+      <h3 className="font-bold text-sm text-[var(--text-primary)] mb-1 flex items-center gap-2">
+        <Trash2 size={16} className="text-rose-600" /> Retensi Penyimpanan Foto
+      </h3>
+      <p className="text-xs text-[var(--text-muted)] mb-4">
+        Menghapus <strong>file foto</strong> yang lebih lama dari batas waktu di bawah untuk menghemat penyimpanan. Data laporan, GPS, timestamp, riwayat treatment, dan audit log <strong>tidak ikut terhapus</strong> — hanya gambarnya.
+      </p>
+
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-xs font-semibold text-[var(--text-secondary)]">Hapus foto lebih lama dari:</span>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 6, 12].map(m => (
+            <button
+              key={m}
+              onClick={() => setMonths(m)}
+              className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${
+                months === m ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]'
+              }`}
+            >
+              {m} bulan
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 mb-3">{error}</p>}
+      {resultMessage && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3">{resultMessage}</p>}
+
+      <div className="bg-[var(--bg-tertiary)] rounded-lg p-3.5 border border-[var(--border-subtle)] flex items-center justify-between">
+        {isLoadingPreview ? (
+          <span className="text-xs text-[var(--text-muted)]">Menghitung...</span>
+        ) : preview ? (
+          <div className="text-xs text-[var(--text-secondary)]">
+            <span className="font-bold text-[var(--text-primary)] text-base">{preview.eligibleCount}</span> foto akan dihapus
+            {preview.oldestPhotoDate && (
+              <span> (paling lama: {new Date(preview.oldestPhotoDate).toLocaleDateString('id-ID')})</span>
+            )}
+          </div>
+        ) : null}
+
+        {!confirmOpen ? (
+          <button
+            onClick={() => setConfirmOpen(true)}
+            disabled={isLoadingPreview || !preview || preview.eligibleCount === 0}
+            className="text-xs font-bold px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Hapus Sekarang
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-rose-700">Yakin?</span>
+            <button onClick={() => setConfirmOpen(false)} disabled={isPurging} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+              Batal
+            </button>
+            <button onClick={handlePurge} disabled={isPurging} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 disabled:opacity-60">
+              {isPurging && <Loader2 size={13} className="animate-spin" />} Ya, Hapus
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

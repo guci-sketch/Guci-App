@@ -72,7 +72,7 @@ export const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ photo, onClo
         </div>
 
         <div className="relative flex-1 bg-black flex items-center justify-center overflow-auto min-h-[300px] max-h-[60vh] p-2">
-          <AuthedImage path={photo.url} alt="Dokumentasi Pekerjaan Lapangan" className="max-h-full max-w-full object-contain rounded shadow-lg" />
+          <AuthedImage path={photo.url} alt="Dokumentasi Pekerjaan Lapangan" purged={!!photo.purgedAt} className="max-h-full max-w-full object-contain rounded shadow-lg" />
         </div>
 
         <div className="p-4 bg-[var(--accent)] border-t border-slate-800 text-xs sm:text-sm">

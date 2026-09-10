@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { getRiskConfig, updateRiskConfig } from '../risk/riskConfigRepository.js';
 import { logAction } from '../../utils/audit.js';
 import { getReportOrThrow, mapReportFull } from '../workReports/reportMapper.js';
+import { previewPhotoPurge, purgeOldPhotos } from '../photos/retention.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('ADMIN'));
@@ -330,5 +331,44 @@ adminRouter.get(
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="fieldwork-reports-${new Date().toISOString().slice(0, 10)}.csv"`);
     res.send(lines.join('\n'));
+  })
+);
+
+const purgeQuerySchema = z.object({
+  olderThanMonths: z.coerce.number().int().min(1).max(60).optional(),
+});
+
+// Preview before committing to a purge — how many photo *files* would be
+// deleted, and how far back the oldest one goes. Nothing is deleted here.
+adminRouter.get(
+  '/photos/purge-preview',
+  asyncHandler(async (req, res) => {
+    const parsed = purgeQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new HttpError(400, 'Parameter tidak valid.');
+    const preview = await previewPhotoPurge(parsed.data.olderThanMonths);
+    res.json(preview);
+  })
+);
+
+// Deletes the underlying file for photos older than the retention window.
+// Everything else — work reports, risk events, treatment records, customer
+// reviews, audit logs, and the photo rows themselves (GPS/timestamp/
+// metadata) — is left exactly as it was. See modules/photos/retention.ts.
+adminRouter.post(
+  '/photos/purge',
+  asyncHandler(async (req, res) => {
+    const parsed = purgeQuerySchema.safeParse(req.body);
+    if (!parsed.success) throw new HttpError(400, 'Parameter tidak valid.');
+    const months = parsed.data.olderThanMonths ?? 2;
+
+    const result = await purgeOldPhotos(months);
+    await logAction(
+      req.user!,
+      'PURGE_PHOTOS',
+      'system',
+      null,
+      `Menghapus file foto lebih lama dari ${months} bulan (sebelum ${new Date(result.cutoffDate).toLocaleDateString('id-ID')}): ${result.purgedCount} berhasil, ${result.failedCount} gagal. Data laporan/riwayat lain tidak diubah.`
+    );
+    res.json(result);
   })
 );

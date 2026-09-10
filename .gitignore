@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dev-dist/
+build/
+.vercel
+.env
+.env.local
+!.env.example
+*.log
+.DS_Store
+coverage/
+
+# Local evidence photo storage (dev fallback only — production uses Supabase Storage)
+uploads/*
+!uploads/.gitkeep

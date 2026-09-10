@@ -34,29 +34,29 @@ async function seed() {
     const fieldPass = await bcrypt.hash('lapangan123', 10);
 
     const admin = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone)
-       values ($1,$2,$3,$4,'ADMIN',$5) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
+       values ($1,$2,$3,$4,'ADMIN',$5,'APPROVED',true) returning id`,
       ['Ahmad Fauzi', 'admin.fauzi@fieldwork.id', 'OPS-198804-001', adminPass, '0812-1000-2001']
     );
     const adminId = admin.rows[0].id;
 
     const budi = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone)
-       values ($1,$2,$3,$4,'EXECUTOR',$5) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
       ['Budi Santoso', 'budi.santoso@fieldwork.id', 'TEK-202108-014', fieldPass, '0813-2000-3014']
     );
     const budiId = budi.rows[0].id;
 
     const sinta = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone)
-       values ($1,$2,$3,$4,'EXECUTOR',$5) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
       ['Sinta Maharani', 'sinta.maharani@fieldwork.id', 'TEK-202203-029', fieldPass, '0814-3000-4029']
     );
     const sintaId = sinta.rows[0].id;
 
     const andi = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone)
-       values ($1,$2,$3,$4,'EXECUTOR',$5) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
       ['Andi Pratama', 'andi.pratama@fieldwork.id', 'TEK-202301-042', fieldPass, '0815-4000-5042']
     );
     const andiId = andi.rows[0].id;
@@ -152,7 +152,7 @@ async function seed() {
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
         service_type, pest_target, building_area_sqm, contract_type, warranty_months, next_service_date, scheduled_start_time, created_by
-      ) values ($1,$2,$3,$4,$5,$6,current_date,$7,'RODENT_CONTROL',$8,$9,'RECURRING',6,current_date + interval '1 month','08:00',$10)
+      ) values ($1,$2,$3,$4,$5,$6,current_date,$7,'GENERAL_PEST_CONTROL',$8,$9,'RECURRING',6,current_date + interval '1 month','08:00',$10)
        returning id`,
       ['Kantor Cabang Sudirman', 'Bank Central Asia', 'Jl. Jend. Sudirman Kav. 22-23, Jakarta Selatan', -6.224, 106.809, 100,
         'Pengendalian Tikus Rutin Bulanan', 'Tikus Got & Tikus Rumah', 620, andiId]

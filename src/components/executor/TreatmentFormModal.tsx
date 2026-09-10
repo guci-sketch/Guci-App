@@ -13,7 +13,7 @@ interface TreatmentFormModalProps {
 }
 
 const DEFAULT_METHOD_BY_SERVICE: Partial<Record<ServiceType, ApplicationMethod>> = {
-  PEST_CONTROL: 'SPRAYING',
+  GENERAL_PEST_CONTROL: 'SPRAYING',
   TERMITE_CONTROL: 'DRILLING',
   FUMIGATION: 'FOGGING',
 };

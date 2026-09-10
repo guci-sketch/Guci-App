@@ -114,6 +114,7 @@ export async function mapReportFull(report: any, role?: string) {
       isWithinRadius: p.is_within_radius,
       capturedAt: p.captured_at,
       metadata: p.metadata,
+      purgedAt: p.purged_at,
       url: `/api/photos/${p.id}/file`,
     })),
     riskEvents: events.map(e => ({

@@ -19,10 +19,16 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-ai-studio';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  // Never fall back to a hardcoded secret here — anyone who has read this
+  // source file (which is public, on GitHub) could forge a valid admin
+  // token signed with it. Fail loudly instead so a missing env var is
+  // caught at boot, not discovered as a security hole later.
+  throw new Error('JWT_SECRET is not set. Set it in .env locally or in your Vercel project settings.');
+}
 
 export function signToken(user: AuthUser): string {
-  if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured');
   return jwt.sign(user, JWT_SECRET, { expiresIn: (process.env.JWT_EXPIRES_IN as any) || '12h' });
 }
 
@@ -32,7 +38,6 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     throw new HttpError(401, 'Sesi tidak ditemukan. Silakan masuk kembali.');
   }
   const token = header.slice('Bearer '.length);
-  if (!JWT_SECRET) throw new Error('JWT_SECRET is not configured');
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
     req.user = decoded;

@@ -60,8 +60,6 @@ export async function reviewReport(id: string, notes: string) {
   return res.workReport;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
 /** CSV export streams a file download — needs the real URL + token, not the JSON client. */
 export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
   const params = new URLSearchParams();
@@ -69,7 +67,7 @@ export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
     if (v) params.set(k, v);
   }
   const token = getToken();
-  const response = await fetch(`${API_URL}/admin/reports/export.csv?${params.toString()}`, {
+  const response = await fetch(`/api/admin/reports/export.csv?${params.toString()}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) throw new Error('Gagal mengekspor data.');
@@ -103,4 +101,26 @@ export async function approveUser(id: string) {
 
 export async function rejectUser(id: string) {
   await api.post(`/admin/users/${id}/reject`);
+}
+
+export interface PhotoPurgePreview {
+  cutoffDate: string;
+  eligibleCount: number;
+  oldestPhotoDate: string | null;
+}
+
+export interface PhotoPurgeResult {
+  cutoffDate: string;
+  purgedCount: number;
+  failedCount: number;
+}
+
+/** How many photo files are older than the retention window — nothing is deleted by calling this. */
+export async function fetchPhotoPurgePreview(olderThanMonths = 2) {
+  return api.get<PhotoPurgePreview>('/admin/photos/purge-preview', { olderThanMonths: String(olderThanMonths) });
+}
+
+/** Deletes the underlying file for photos older than the window. Every other record (reports, risk events, treatment, audit log) is untouched. */
+export async function purgeOldPhotos(olderThanMonths = 2) {
+  return api.post<PhotoPurgeResult>('/admin/photos/purge', { olderThanMonths });
 }

@@ -8,16 +8,8 @@ export type PhotoType = 'CHECK_IN' | 'PROGRESS' | 'CHECK_OUT';
 
 export type PhotoTag = 'BEFORE' | 'AFTER' | null;
 
-/** Pest control service taxonomy — see schema.sql for the Indonesian gloss on each. */
-export type ServiceType =
-  | 'GENERAL_PEST_CONTROL'
-  | 'TERMITE_CONTROL'
-  | 'FUMIGATION'
-  | 'RODENT_CONTROL'
-  | 'MOSQUITO_CONTROL'
-  | 'BIRD_CONTROL'
-  | 'BED_BUG_CONTROL'
-  | 'DISINFECTION';
+/** Pest control service taxonomy — see db/migrations/001_init.sql for the full enum (this app currently only exposes 3 broad categories in the UI; the DB enum has more room for future granularity). */
+export type ServiceType = 'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL' | 'FUMIGATION';
 
 export type ApplicationMethod =
   | 'SPRAYING'
