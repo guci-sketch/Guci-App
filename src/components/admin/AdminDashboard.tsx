@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {  WorkReport, WorkReportListItem, Project, ExecutorStats, AuditLogEntry, RiskConfig, DocumentationPhoto, ReportFilters, DEFAULT_FILTERS } from '../../types';
 import { 
   fetchAdminReports, fetchAdminReportDetail, fetchAdminSummary, fetchExecutors, fetchAdminProjects,
-  fetchAuditLogs, fetchRiskConfig, updateRiskConfig, reviewReport, downloadReportsCsv, fetchUsers, suspendUser, activateUser, AdminUser,
+  fetchAuditLogs, fetchRiskConfig, updateRiskConfig, reviewReport, downloadReportsCsv, fetchUsers, suspendUser, activateUser, deleteUser, AdminUser,
   fetchPhotoPurgePreview, purgeOldPhotos, PhotoPurgePreview,
 } from '../../api/admin';
 import {  fetchLatestLocations, UserLocation } from '../../api/location';
@@ -157,6 +157,16 @@ export const AdminDashboard: React.FC = () => {
     if(!confirm('Suspend/nonaktifkan user ini? User tidak akan bisa login.')) return;
     await suspendUser(id);
     setAdminUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: false } : u));
+  };
+  const handleDeleteUser = async (id: string) => {
+    if(!confirm('PERINGATAN: Apakah Anda yakin ingin menghapus user ini secara PERMANEN? Data akan hilang dan laporan pekerjaannya akan menjadi tanpa nama.')) return;
+    try {
+      await deleteUser(id);
+      setAdminUsers(prev => prev.filter(u => u.id !== id));
+      alert('User berhasil dihapus.');
+    } catch (e: any) {
+      alert(e.message || 'Gagal menghapus user');
+    }
   };
 
   const handleExportCsv = async () => {
@@ -748,6 +758,9 @@ export const AdminDashboard: React.FC = () => {
                           ) : (
                             <button onClick={() => handleActivate(u.id)} className="px-4 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold transition-colors shadow-sm">Aktifkan Akun</button>
                           )}
+                          <button onClick={() => handleDeleteUser(u.id)} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors" title="Hapus Akun Permanen">
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -843,8 +856,8 @@ export const AdminDashboard: React.FC = () => {
                       projectLat={selectedReport.projectLatitude}
                       projectLng={selectedReport.projectLongitude}
                       projectRadius={selectedReport.projectRadius}
-                      executorLat={selectedReport.checkInLatitude}
-                      executorLng={selectedReport.checkInLongitude}
+                      executorLat={selectedReport.checkInLatitude ?? null}
+                      executorLng={selectedReport.checkInLongitude ?? null}
                       executorAccuracy={selectedReport.checkInAccuracy}
                       distanceMeters={selectedReport.checkInDistance}
                       isWithinRadius={selectedReport.checkInValid}

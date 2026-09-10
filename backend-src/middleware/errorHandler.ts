@@ -15,5 +15,5 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   console.error('[error]', err);
-  return res.status(500).json({ error: 'Terjadi kesalahan pada server. Coba lagi sebentar lagi.' });
+  return res.status(500).json({ error: 'Terjadi kesalahan pada server. Coba lagi sebentar lagi.', details: message, stack: err instanceof Error ? err.stack : undefined });
 }

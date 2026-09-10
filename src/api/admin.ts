@@ -105,6 +105,10 @@ export async function activateUser(id: string) {
   await api.post(`/admin/users/${id}/activate`);
 }
 
+export async function deleteUser(id: string) {
+  await api.delete(`/admin/users/${id}`);
+}
+
 export interface PhotoPurgePreview {
   cutoffDate: string;
   eligibleCount: number;

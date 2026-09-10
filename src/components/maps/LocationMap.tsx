@@ -36,7 +36,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const hasExecutorLoc = executorLat !== undefined && executorLat !== null && executorLng !== undefined && executorLng !== null;
+  const hasExecutorLoc = typeof executorLat === "number" && typeof executorLng === "number";
 
   useEffect(() => {
     if (!mapContainerRef.current) return;

@@ -36,7 +36,7 @@ export const AllProjectsMap: React.FC<AllProjectsMapProps> = ({
       mapInstanceRef.current = map;
 
       // Add CartoDB Positron tiles for a clean dashboard look
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 20,
         attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);

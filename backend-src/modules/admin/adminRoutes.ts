@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { query } from '../../db/pool.js';
+import { query, withTransaction } from '../../db/pool.js';
 import { asyncHandler, HttpError } from '../../utils/asyncHandler.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { getRiskConfig, updateRiskConfig } from '../risk/riskConfigRepository.js';
@@ -40,6 +40,42 @@ adminRouter.post('/users/:id/activate', asyncHandler(async (req, res) => {
   );
   if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
   res.json({ success: true });
+}));
+
+adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  // Admin cannot delete themselves
+  if (req.user?.id === id) {
+    throw new HttpError(400, 'Tidak dapat menghapus akun Anda sendiri.');
+  }
+
+  await withTransaction(async (client) => {
+    const userCheck = await client.query('select name from users where id = $1', [id]);
+    if (userCheck.rowCount === 0) throw new HttpError(404, 'User tidak ditemukan.');
+    const userName = userCheck.rows[0].name;
+
+    // Remove all references to this user safely (soft detach)
+    await client.query('update audit_logs set user_id = null where user_id = $1', [id]);
+    await client.query('update risk_config set updated_by = null where updated_by = $1', [id]);
+    await client.query('update projects set created_by = null where created_by = $1', [id]);
+    await client.query('update work_reports set executor_id = null where executor_id = $1', [id]);
+    await client.query('update work_reports set reviewed_by = null where reviewed_by = $1', [id]);
+    
+    // Delete cascading dependencies explicitly just in case
+    await client.query('delete from user_locations where user_id = $1', [id]);
+    
+    // Delete the user
+    await client.query('delete from users where id = $1', [id]);
+    
+    // Log the deletion (via direct query because logAction might use pool.query instead of client)
+    await client.query(
+      `insert into audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [req.user!.id, req.user!.name, req.user!.role, 'DELETE_USER', 'users', id, `Akun pengguna ${userName} telah dihapus permanen.`]
+    );
+  });
+
+  res.json({ success: true, message: 'User berhasil dihapus.' });
 }));
 
 // ==========================================

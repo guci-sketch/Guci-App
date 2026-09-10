@@ -86,7 +86,7 @@ create table projects (
   next_service_date date, -- untuk kontrak berkala (recurring)
   scheduled_start_time time not null default '08:00',
   notes text,
-  created_by uuid not null references users(id),
+  created_by uuid references users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   locked_at timestamptz
@@ -95,7 +95,7 @@ create table projects (
 create table work_reports (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
-  executor_id uuid not null references users(id),
+  executor_id uuid references users(id) on delete set null,
 
   status work_report_status not null default 'READY',
 
@@ -231,7 +231,7 @@ insert into risk_config (id) values (1) on conflict (id) do nothing;
 
 create table audit_logs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references users(id),
+  user_id uuid references users(id) on delete set null,
   user_name varchar(120) not null,
   user_role user_role not null,
   action varchar(60) not null,
