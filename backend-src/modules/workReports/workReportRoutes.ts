@@ -92,24 +92,33 @@ workReportRouter.post(
     }
 
     const serverNow = new Date(); // Rule 6: server timestamp is the official timestamp.
-    let geo = { isWithin: true, distance: 0 };
-    const isFirstCheckIn = Number(report.project_latitude) === 0 && Number(report.project_longitude) === 0;
 
-    if (!isFirstCheckIn) {
-      geo = isWithinRadius(
-        { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
-        { latitude: Number(report.project_latitude), longitude: Number(report.project_longitude) },
-        report.project_radius
-      );
+    let geo = { isWithin: true, distance: 0 };
+    
+    // AI Verification using Gemini Flash to check if the coordinates match the address
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const aiResp = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: `I am currently at coordinates: Latitude ${parsed.data.latitude}, Longitude ${parsed.data.longitude}. The project address is: "${report.project_address}". Does this coordinate realistically match or correspond to this address or its general area? Reply with exactly 'YES' if it matches or 'NO' if it doesn't. Do not add any explanation.`,
+        });
+        const ans = aiResp.text?.trim().toUpperCase() || 'YES';
+        geo.isWithin = ans.includes('YES');
+        if (!geo.isWithin) {
+          geo.distance = 999; // Mock anomaly distance
+        }
+      } catch (err) {
+        console.error('Gemini Check-In Verification failed:', err);
+      }
     }
 
     const storagePath = await savePhoto(req.file.buffer, 'jpg');
 
     const result = await withTransaction(async client => {
-      if (isFirstCheckIn) {
-        // Automatically set project coordinates based on the first check-in location
-        await client.query(`update projects set latitude = $1, longitude = $2 where id = $3`, [parsed.data.latitude, parsed.data.longitude, report.project_id]);
-      }
+      // Set the project coordinates based on check-in to be the anchor
+      await client.query(`update projects set latitude = $1, longitude = $2 where id = $3`, [parsed.data.latitude, parsed.data.longitude, report.project_id]);
 
       await client.query(
         `update work_reports set status = 'WORKING', check_in_at = $1, check_in_latitude = $2, check_in_longitude = $3,

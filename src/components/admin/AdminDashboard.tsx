@@ -15,17 +15,19 @@ import {  RISK_LEVEL_OPTIONS, STATUS_OPTIONS } from '../../utils/riskMeta';
 import {  SERVICE_TYPE_OPTIONS, getServiceTypeMeta, APPLICATION_METHOD_LABELS } from '../../utils/serviceMeta';
 import { 
   RefreshCw, ShieldAlert, Search, Download, Clock, MapPin, UserCheck, CheckCircle2, AlertTriangle, Eye,
-  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical, Trash2, ImageOff,
+  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical, Trash2, ImageOff, LogOut
 } from 'lucide-react';
 
-type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval';
+import { useAuth } from '../../context/AuthContext';
+import { ChangePasswordModal } from '../auth/ChangePasswordModal';
+
+type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile';
 
 const DATE_PRESETS = [
   { id: 'all', label: 'Semua' },
   { id: 'today', label: 'Hari Ini' },
   { id: 'last7days', label: '7 Hari' },
-  { id: 'last30days', label: '30 Hari' },
-  { id: 'custom', label: 'Kustom' },
+  { id: 'last30days', label: '30 Hari' }
 ] as const;
 
 function presetToRange(preset: string): { startDate?: string; endDate?: string } {
@@ -45,8 +47,14 @@ function presetToRange(preset: string): { startDate?: string; endDate?: string }
   return {};
 }
 
+import { Header } from '../common/Header';
+
 export const AdminDashboard: React.FC = () => {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('reports');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [reports, setReports] = useState<WorkReportListItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [executors, setExecutors] = useState<ExecutorStats[]>([]);
@@ -174,116 +182,148 @@ export const AdminDashboard: React.FC = () => {
     setRiskConfig(updated);
   };
 
+  const SidebarItem: React.FC<{ tab: Tab; label: React.ReactNode; danger?: boolean; count?: number }> = ({ tab, label, danger, count }) => {
+    const active = activeTab === tab;
+    return (
+      <button
+        onClick={() => { setActiveTab(tab); setMobileMenuOpen(false); }}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+          active
+            ? danger ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        }`}
+      >
+        <span className="text-left">{label}</span>
+        {count !== undefined && count > 0 && (
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${active ? (danger ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800') : 'bg-slate-200 text-slate-700'}`}>
+            {count}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="clean-card bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-4 sm:px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-[var(--accent)] text-white font-bold text-xs px-2 py-0.5 rounded">COMMAND</span>
-              <span className="text-xs text-[var(--text-secondary)] font-mono">PANEL PENGAWAS OPERASIONAL</span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] mt-1">Monitoring Presensi &amp; Audit Lapangan</h1>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} &bull; Zona Waktu: WIB
-            </p>
-          </div>
-          <button
-            onClick={handleExportCsv}
-            disabled={isExporting}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold transition-colors disabled:opacity-60"
-          >
-            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Unduh CSV
-          </button>
-        </div>
-      </div>
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
-        {isLoading && <div className="py-16 text-center text-sm text-[var(--text-muted)]">Memuat dashboard...</div>}
-
-        {loadError && !isLoading && (
-          <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
-            <p className="text-sm text-rose-800 font-medium">{loadError}</p>
-          </div>
+    <div className="flex flex-col h-screen bg-[var(--bg-primary)]">
+      <Header currentUser={user!} onLogout={logout} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />
+      
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
         )}
 
-        {!isLoading && (
-          <>
-            {/* KPI Strip (PRD Section 23) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="clean-card clean-card p-4">
-                <span className="text-xs font-medium text-[var(--text-secondary)] block">Total Penugasan (30 hari)</span>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.totalJobs}</span>
-                  <span className="text-xs text-[var(--text-muted)]">pekerjaan</span>
-                </div>
-              </div>
-              <div className="clean-card clean-card p-4">
-                <span className="text-xs font-medium text-emerald-700 block">Selesai Terverifikasi</span>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-2xl font-bold font-mono text-emerald-700">{kpi.completedJobs}</span>
-                  <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    {kpi.totalJobs > 0 ? Math.round((kpi.completedJobs / kpi.totalJobs) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-              <div className="clean-card clean-card p-4">
-                <span className="text-xs font-medium text-zinc-700 block">Sedang Berlangsung</span>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.workingJobs}</span>
-                  <span className="text-xs text-[var(--text-secondary)]">aktif di lapangan</span>
-                </div>
-              </div>
-              <div className="clean-card bg-[var(--bg-card)] p-4 rounded-lg border border-rose-200 bg-rose-50/20">
-                <span className="text-xs font-semibold text-rose-700 block flex items-center gap-1"><ShieldAlert size={14} /> Anomali Spasial</span>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="text-2xl font-bold font-mono text-rose-700">{kpi.flaggedJobs}</span>
-                  <span className="text-xs font-medium text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">{kpi.highRiskCount} Risiko Tinggi</span>
-                </div>
-              </div>
-            </div>
+        {/* Sidebar */}
+        <aside className={`absolute md:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-[var(--border-subtle)] flex flex-col transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+          <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">
+            <h2 className="text-sm font-bold tracking-tight text-[var(--text-primary)] leading-tight mb-1">
+              Monitoring Presensi &amp;<br/>Audit Lapangan
+            </h2>
+            <p className="text-[10px] text-[var(--text-secondary)]">
+              {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <SidebarItem tab="reports" label="Semua Laporan" count={reports.length} />
+            <SidebarItem tab="anomalies" label="Anomali" danger count={kpi.flaggedJobs} />
+            <SidebarItem tab="projects" label="Proyek" count={projects.length} />
+            <SidebarItem tab="executors" label="Pelaksana" />
+            <SidebarItem tab="approval" label="Manajemen Akun" count={adminUsers.length} />
+            <SidebarItem tab="tracking" label="GPS Tracker" />
+            <SidebarItem tab="audit" label="Audit Trail" />
+            <SidebarItem tab="risk-config" label="Konfigurasi Risiko" />
+          </div>
+          <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
+            <SidebarItem tab="profile" label="Setup Profile" />
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <span className="flex-1 text-left">Keluar</span>
+            </button>
+          </div>
+        </aside>
 
-            {kpi.flaggedJobs > 0 && (
-              <div className="bg-rose-50 border border-rose-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-900">
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className="w-8 h-8 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><ShieldAlert size={18} /></div>
-                  <div>
-                    <h3 className="font-semibold text-sm text-rose-950">Perhatian Audit — {kpi.flaggedJobs} Laporan Memerlukan Tinjauan</h3>
-                    <p className="text-xs text-rose-800 mt-0.5">Terdeteksi ketidaksesuaian koordinat geofence atau durasi pengerjaan di luar standar.</p>
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto flex flex-col w-full relative">
+        <div className="p-4 sm:p-6 space-y-5 max-w-6xl w-full mx-auto">
+          {isLoading && <div className="py-16 text-center text-sm text-[var(--text-muted)]">Memuat dashboard...</div>}
+
+          {loadError && !isLoading && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+              <p className="text-sm text-rose-800 font-medium">{loadError}</p>
+            </div>
+          )}
+
+          {!isLoading && (
+            <>
+              {/* KPI Strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="clean-card clean-card p-4">
+                  <span className="text-xs font-medium text-[var(--text-secondary)] block">Total Penugasan (30 hari)</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.totalJobs}</span>
+                    <span className="text-xs text-[var(--text-muted)]">pekerjaan</span>
                   </div>
                 </div>
-                <button onClick={() => setActiveTab('anomalies')} className="self-start sm:self-auto text-xs font-semibold px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-md transition-colors whitespace-nowrap">
-                  Tinjau Laporan Anomali
-                </button>
+                <div className="clean-card clean-card p-4">
+                  <span className="text-xs font-medium text-emerald-700 block">Selesai Terverifikasi</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-2xl font-bold font-mono text-emerald-700">{kpi.completedJobs}</span>
+                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      {kpi.totalJobs > 0 ? Math.round((kpi.completedJobs / kpi.totalJobs) * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+                <div className="clean-card clean-card p-4">
+                  <span className="text-xs font-medium text-zinc-700 block">Sedang Berlangsung</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.workingJobs}</span>
+                    <span className="text-xs text-[var(--text-secondary)]">aktif di lapangan</span>
+                  </div>
+                </div>
+                <div className="clean-card bg-[var(--bg-card)] p-4 rounded-lg border border-rose-200 bg-rose-50/20">
+                  <span className="text-xs font-semibold text-rose-700 block flex items-center gap-1"><ShieldAlert size={14} /> Anomali Spasial</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-2xl font-bold font-mono text-rose-700">{kpi.flaggedJobs}</span>
+                    <span className="text-xs font-medium text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">{kpi.highRiskCount} Risiko Tinggi</span>
+                  </div>
+                </div>
               </div>
-            )}
 
-            {/* Tabs */}
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-1 overflow-x-auto no-scrollbar">
-              <div className="flex gap-1 sm:gap-2 shrink-0">
-                <TabButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')}>Semua Laporan ({reports.length})</TabButton>
-                <TabButton active={activeTab === 'anomalies'} danger onClick={() => setActiveTab('anomalies')}>
-                  <AlertTriangle size={14} className="inline mr-1" /> Anomali ({kpi.flaggedJobs})
-                </TabButton>
-                <TabButton active={activeTab === 'projects'} onClick={() => setActiveTab('projects')}>Proyek ({projects.length})</TabButton>
-                <TabButton active={activeTab === 'executors'} onClick={() => setActiveTab('executors')}>
-                  <Users size={14} className="inline mr-1" /> Pelaksana
-                </TabButton>
-                <TabButton active={activeTab === 'approval'} onClick={() => setActiveTab('approval')}>
-                  <UserCheck size={14} className="inline mr-1" /> Manajemen Akun {adminUsers.length > 0 && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1">{adminUsers.length}</span>}
-                </TabButton>
-                <TabButton active={activeTab === 'tracking'} onClick={() => setActiveTab('tracking')}>
-                  <MapPin size={14} className="inline mr-1" /> GPS Tracker
-                </TabButton>
-                <TabButton active={activeTab === 'audit'} onClick={() => setActiveTab('audit')}>Audit Trail</TabButton>
-                <TabButton active={activeTab === 'risk-config'} onClick={() => setActiveTab('risk-config')}>
-                  <Settings2 size={14} className="inline mr-1" /> Konfigurasi Risiko
-                </TabButton>
-              </div>
-            </div>
+              {kpi.flaggedJobs > 0 && activeTab !== 'anomalies' && (
+                <div className="bg-rose-50 border border-rose-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-900">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><ShieldAlert size={18} /></div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-rose-950">Perhatian Audit — {kpi.flaggedJobs} Laporan Memerlukan Tinjauan</h3>
+                      <p className="text-xs text-rose-800 mt-0.5">Terdeteksi ketidaksesuaian koordinat geofence atau durasi pengerjaan di luar standar.</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setActiveTab('anomalies')} className="self-start sm:self-auto text-xs font-semibold px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-md transition-colors whitespace-nowrap">
+                    Tinjau Laporan Anomali
+                  </button>
+                </div>
+              )}
 
-            {(activeTab === 'reports' || activeTab === 'anomalies') && (
+              {(activeTab === 'reports' || activeTab === 'anomalies') && (
               <div className="space-y-4">
+                
+                {activeTab === 'anomalies' && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 mb-4">
+                    <h3 className="text-sm font-bold text-rose-900 mb-2">Informasi & Kriteria Anomali</h3>
+                    <p className="text-xs text-rose-800 leading-relaxed">
+                      Sistem mendeteksi sebuah penugasan sebagai <strong>Anomali</strong> apabila memenuhi salah satu dari kriteria berikut sesuai konfigurasi:
+                    </p>
+                    <ul className="list-disc list-inside text-xs text-rose-800 mt-2 space-y-1 ml-1">
+                      <li>Radius Check-In & Check-Out melebihi toleransi (maks. {riskConfig?.maxGpsDistance || 200} meter).</li>
+                      <li>Durasi pekerjaan terlalu singkat (kurang dari {riskConfig?.minDurationMinutes || 15} menit).</li>
+                      {riskConfig?.requireTimeMatch && <li>Pekerjaan dilakukan di luar jam operasional yang diizinkan (22:00 - 05:00).</li>}
+                      {riskConfig?.flagSuspiciousTags && <li>Sistem mendeteksi objek atau tag foto yang tidak relevan dengan layanan (berdasarkan AI).</li>}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Filter Bar */}
                 <div className="clean-card bg-[var(--bg-card)] p-4 rounded-xl border border-[var(--border-subtle)]/90  space-y-3">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -320,25 +360,29 @@ export const AdminDashboard: React.FC = () => {
                           showFilterDrawer ? 'bg-slate-800 text-white border-slate-800' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-slate-300 hover:bg-slate-200'
                         }`}
                       >
-                        <SlidersHorizontal size={14} /> Filter Lengkap
+                        Filter Lengkap
+                      </button>
+                      <button
+                        onClick={handleExportCsv}
+                        disabled={isExporting}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold transition-colors disabled:opacity-60"
+                        title="Unduh Laporan (CSV)"
+                      >
+                        {isExporting ? 'Mengunduh...' : 'Unduh CSV'}
                       </button>
                     </div>
                   </div>
 
                   {showFilterDrawer && (
                     <div className="pt-3 border-t border-[var(--border-subtle)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                      {datePreset === 'custom' && (
-                        <>
-                          <div>
-                            <label className="block text-[11px] font-bold text-[var(--text-secondary)] uppercase mb-1">Dari Tanggal</label>
-                            <input type="date" value={filters.startDate ?? ''} onChange={e => setFilters(prev => ({ ...prev, startDate: e.target.value }))} className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--border-subtle)] clean-card bg-[var(--bg-card)]" />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-[var(--text-secondary)] uppercase mb-1">Sampai Tanggal</label>
-                            <input type="date" value={filters.endDate ?? ''} onChange={e => setFilters(prev => ({ ...prev, endDate: e.target.value }))} className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--border-subtle)] clean-card bg-[var(--bg-card)]" />
-                          </div>
-                        </>
-                      )}
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--text-secondary)] uppercase mb-1">Dari Tanggal</label>
+                        <input type="date" value={filters.startDate ?? ''} onChange={e => { setFilters(prev => ({ ...prev, startDate: e.target.value })); setDatePreset('custom'); }} className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--border-subtle)] clean-card bg-[var(--bg-card)]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--text-secondary)] uppercase mb-1">Sampai Tanggal</label>
+                        <input type="date" value={filters.endDate ?? ''} onChange={e => { setFilters(prev => ({ ...prev, endDate: e.target.value })); setDatePreset('custom'); }} className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[var(--border-subtle)] clean-card bg-[var(--bg-card)]" />
+                      </div>
                       <div>
                         <label className="block text-[11px] font-bold text-[var(--text-secondary)] uppercase mb-1">Rentang Jam Check-In</label>
                         <div className="flex items-center gap-1">
@@ -408,7 +452,6 @@ export const AdminDashboard: React.FC = () => {
                         visibleReports.map(report => {
                           const durationMin = report.durationSeconds ? Math.round(report.durationSeconds / 60) : 0;
                           const svcMeta = getServiceTypeMeta(report.project.serviceType);
-                          const SvcIcon = svcMeta.icon;
                           return (
                             <tr key={report.id} className={`hover:bg-[var(--bg-tertiary)]/80 transition-colors ${report.riskScore >= 40 ? 'bg-red-50/20' : ''}`}>
                               <td className="px-4 py-3 font-mono font-medium text-[var(--text-secondary)] whitespace-nowrap">{new Date(report.createdAt).toLocaleDateString('id-ID')}</td>
@@ -419,7 +462,7 @@ export const AdminDashboard: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${svcMeta.badgeClass}`}>
-                                  <SvcIcon size={11} /> {svcMeta.shortLabel}
+                                  {svcMeta.shortLabel}
                                 </span>
                                 {report.treatmentSummary && (
                                   <span className="block text-[10px] text-[var(--text-muted)] mt-0.5">{report.treatmentSummary.chemicalName}</span>
@@ -474,7 +517,6 @@ export const AdminDashboard: React.FC = () => {
                     visibleReports.map(report => {
                       const durationMin = report.durationSeconds ? Math.round(report.durationSeconds / 60) : 0;
                       const svcMeta = getServiceTypeMeta(report.project.serviceType);
-                      const SvcIcon = svcMeta.icon;
                       return (
                         <div key={report.id} className={`clean-card bg-[var(--bg-card)] p-4 rounded-xl border  space-y-2.5 ${report.riskScore >= 40 ? 'border-red-300 bg-red-50/10' : 'border-[var(--border-subtle)]'}`}>
                           <div className="flex items-center justify-between">
@@ -483,7 +525,7 @@ export const AdminDashboard: React.FC = () => {
                           </div>
                           <div>
                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${svcMeta.badgeClass}`}>
-                              <SvcIcon size={11} /> {svcMeta.shortLabel}
+                              {svcMeta.shortLabel}
                             </span>
                             <h4 className="font-bold text-sm text-[var(--text-primary)]">{report.executor.name}</h4>
                             <p className="text-xs text-[var(--text-secondary)] font-semibold mt-0.5">{report.project.name}</p>
@@ -517,13 +559,12 @@ export const AdminDashboard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {projects.map(proj => {
                   const svcMeta = getServiceTypeMeta(proj.serviceType);
-                  const SvcIcon = svcMeta.icon;
                   return (
                     <div key={proj.id} className="clean-card bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border-subtle)]  space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
                           <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${svcMeta.badgeClass}`}>
-                            <SvcIcon size={11} /> {svcMeta.label}
+                            {svcMeta.label}
                           </span>
                           <h3 className="font-bold text-base text-[var(--text-primary)]">{proj.projectName}</h3>
                           <p className="text-xs text-[var(--text-muted)] font-medium">{proj.clientName}</p>
@@ -703,8 +744,41 @@ export const AdminDashboard: React.FC = () => {
                 <PhotoRetentionPanel />
               </div>
             )}
+
+            {activeTab === 'profile' && user && (
+              <div className="clean-card bg-[var(--bg-card)] max-w-2xl mx-auto p-6 space-y-6">
+                <h2 className="text-lg font-bold border-b border-[var(--border-subtle)] pb-3">Profil Anda</h2>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-[var(--text-muted)]">Nama Lengkap</span>
+                    <span className="font-semibold text-[var(--text-primary)]">{user.name}</span>
+                  </div>
+                  <div className="overflow-hidden">
+                    <span className="block text-[10px] font-semibold text-[var(--text-muted)]">Email</span>
+                    <span className="font-semibold text-[var(--text-primary)] truncate block" title={user.email}>{user.email}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-[var(--text-muted)]">NIP</span>
+                    <span className="font-semibold text-[var(--text-primary)]">{user.nip || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-[var(--text-muted)]">Peran</span>
+                    <span className="font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] border border-blue-200">{user.role}</span>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-[var(--border-subtle)]">
+                  <button
+                    onClick={() => setShowChangePassword(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-lg transition-colors"
+                  >
+                    Ubah Kata Sandi
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
+        </div>
       </main>
 
       {/* Detail Modal */}
@@ -969,6 +1043,8 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {viewingPhoto && <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />}
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      </div>
     </div>
   );
 };

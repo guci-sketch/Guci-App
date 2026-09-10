@@ -14,9 +14,10 @@ import { RiskBadge } from '../common/RiskBadge';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { getServiceTypeMeta } from '../../utils/serviceMeta';
 import { formatDistance } from '../../utils/geo';
+import { Header } from '../common/Header';
 import {
   Plus, Camera, CheckCircle2, Clock, MapPin, Briefcase, History, User as UserIcon,
-  Home, Check, Lock, Eye, LogOut, ChevronRight, Building, WifiOff, RefreshCw, AlertCircle, ImagePlus, ShieldCheck,
+  Home, Check, Lock, Eye, LogOut, ChevronRight, Building, WifiOff, RefreshCw, AlertCircle, ImagePlus, ShieldCheck, X,
 } from 'lucide-react';
 
 import { CustomerReviewFormModal } from './CustomerReviewFormModal';
@@ -25,37 +26,12 @@ import { postLocation } from '../../api/location';
 export const ExecutorHome: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'history' | 'profile'>('home');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // Background GPS Tracking
-  useEffect(() => {
-    const trackLocation = () => {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          postLocation({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          }).catch(err => {
-            if (err.status === 0) enqueueGps(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-          });
-        },
-        err => console.warn('Background GPS error:', err),
-        { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
-      );
-    };
-
-    // Track on initial load
-    trackLocation();
-    // Track every 45 minutes
-    const interval = setInterval(trackLocation, 45 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const [pendingCount, setPendingCount] = useState(0);
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
@@ -78,6 +54,57 @@ export const ExecutorHome: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [successFeedback, setSuccessFeedback] = useState<{ title: string; subtitle: string; stats?: string } | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showGpsPrompt, setShowGpsPrompt] = useState(false);
+  const [gpsPermissionStatus, setGpsPermissionStatus] = useState<string>('unknown');
+
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(result => {
+        setGpsPermissionStatus(result.state);
+        if (result.state === 'prompt') {
+          // Check if we've already prompted in this session
+          if (!sessionStorage.getItem('gps_prompted')) {
+            setShowGpsPrompt(true);
+            sessionStorage.setItem('gps_prompted', 'true');
+          }
+        }
+        result.onchange = () => {
+          setGpsPermissionStatus(result.state);
+          if (result.state === 'granted') {
+             setShowGpsPrompt(false);
+             // Trigger background track immediately on grant
+             trackLocation();
+          }
+        };
+      });
+    }
+  }, []);
+
+  const trackLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        postLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }).catch(err => {
+          if (err.status === 0) enqueueGps(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        });
+      },
+      err => console.warn('Background GPS error:', err),
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
+    );
+  }, []);
+
+  // Background GPS Tracking
+  useEffect(() => {
+    // Track on initial load
+    trackLocation();
+    // Track every 45 minutes
+    const interval = setInterval(trackLocation, 45 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [trackLocation]);
 
   const loadData = useCallback(async () => {
     setLoadError(null);
@@ -244,39 +271,60 @@ export const ExecutorHome: React.FC = () => {
 
   const initials = user.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 
-  return (
-    <div className="flex flex-col min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] pb-20">
-      <div className="bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-4 py-3.5 shadow-sm sticky top-0 z-30 flex items-center justify-between text-[var(--text-primary)]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold text-sm border border-[var(--accent-glow)]">FW</div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">FIELDWORK</h1>
-            <p className="text-[11px] text-[var(--accent)] font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" /> Pelaksana Lapangan
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {pendingCount > 0 && (
-            <button
-              onClick={attemptSync}
-              disabled={isSyncing}
-              className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold px-2.5 py-1.5 rounded-lg"
-              title="Data belum terkirim — tap untuk coba kirim sekarang"
-            >
-              {isSyncing ? <RefreshCw size={13} className="animate-spin" /> : <WifiOff size={13} />}
-              {pendingCount}
-            </button>
-          )}
-          <button
-            onClick={() => setShowCreateProject(true)}
-            className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all active:scale-95"
-          >
-            <Plus size={15} /> Proyek Baru
-          </button>
-        </div>
-      </div>
+  const SidebarItem: React.FC<{ tab: 'home' | 'jobs' | 'history' | 'profile'; label: React.ReactNode }> = ({ tab, label }) => {
+    const active = activeTab === tab;
+    return (
+      <button
+        onClick={() => { setActiveTab(tab); setMobileMenuOpen(false); }}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+          active
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        }`}
+      >
+        <span className="text-left">{label}</span>
+      </button>
+    );
+  };
 
+  return (
+    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={attemptSync} isSyncing={isSyncing} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />
+      
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
+        )}
+
+        {/* Sidebar */}
+        <aside className={`absolute md:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-[var(--border-subtle)] flex flex-col transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+          <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between md:hidden">
+            <div>
+              <h2 className="font-bold text-sm text-[var(--text-primary)] tracking-tight">Menu Utama</h2>
+            </div>
+            <button className="p-1 text-slate-400" onClick={() => setMobileMenuOpen(false)}>
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <SidebarItem tab="home" label="Home" />
+            <SidebarItem tab="jobs" label="Proyek Lapangan" />
+            <SidebarItem tab="history" label="Riwayat Pekerjaan" />
+          </div>
+          <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
+            <SidebarItem tab="profile" label="Setup Profile" />
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <span className="flex-1 text-left">Keluar</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto flex flex-col w-full relative pb-20">
       {successFeedback && (
         <div className="m-4 p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl shadow-sm text-emerald-900 flex items-start justify-between">
           <div className="flex items-start gap-3">
@@ -358,10 +406,9 @@ export const ExecutorHome: React.FC = () => {
                 <div className="flex items-center gap-1.5 mb-1.5">
                   {(() => {
                     const meta = getServiceTypeMeta(ongoingJob.serviceType);
-                    const Icon = meta.icon;
                     return (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700">
-                        <Icon size={12} /> {meta.shortLabel}
+                        {meta.shortLabel}
                       </span>
                     );
                   })()}
@@ -419,10 +466,9 @@ export const ExecutorHome: React.FC = () => {
                 <div className="flex items-center gap-1.5 mb-1">
                   {(() => {
                     const meta = getServiceTypeMeta(readyJob.serviceType);
-                    const Icon = meta.icon;
                     return (
                       <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${meta.badgeClass}`}>
-                        <Icon size={12} /> {meta.shortLabel}
+                        {meta.shortLabel}
                       </span>
                     );
                   })()}
@@ -531,13 +577,12 @@ export const ExecutorHome: React.FC = () => {
               const report = reports.find(r => r.projectId === proj.id);
               const isLocked = !!proj.lockedAt;
               const meta = getServiceTypeMeta(proj.serviceType);
-              const Icon = meta.icon;
               return (
                 <div key={proj.id} className="clean-card p-4 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border mb-1 ${meta.badgeClass}`}>
-                        <Icon size={11} /> {meta.shortLabel}
+                        {meta.shortLabel}
                       </span>
                       <h3 className="font-bold text-sm text-[var(--text-primary)]">{proj.projectName}</h3>
                     </div>
@@ -653,23 +698,7 @@ export const ExecutorHome: React.FC = () => {
         )}
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border-subtle)] z-40 max-w-xl mx-auto flex items-center justify-around h-16 px-2 shadow-sm">
-        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${activeTab === 'home' ? 'text-emerald-600 font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-          <Home size={20} /><span className="text-[10px] mt-0.5">Home</span>
-        </button>
-        <button onClick={() => setActiveTab('jobs')} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${activeTab === 'jobs' ? 'text-emerald-600 font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-          <Briefcase size={20} /><span className="text-[10px] mt-0.5">Proyek</span>
-        </button>
-        <button onClick={() => setShowCreateProject(true)} className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 active:scale-95 transition-all -mt-5 border-2 border-white" title="Tambah Proyek Baru">
-          <Plus size={24} />
-        </button>
-        <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${activeTab === 'history' ? 'text-emerald-600 font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-          <History size={20} /><span className="text-[10px] mt-0.5">Riwayat</span>
-        </button>
-        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${activeTab === 'profile' ? 'text-emerald-600 font-bold' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-          <UserIcon size={20} /><span className="text-[10px] mt-0.5">Profil</span>
-        </button>
-      </div>
+      </main>
 
       {activeCameraAction && (
         <CameraCaptureModal
@@ -704,6 +733,38 @@ export const ExecutorHome: React.FC = () => {
       {showCreateProject && <CreateProjectModal onClose={() => setShowCreateProject(false)} onSubmit={handleCreateProjectSubmit} />}
       {viewingPhoto && <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />}
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      
+      {showGpsPrompt && gpsPermissionStatus !== 'granted' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <MapPin size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Aktivasi GPS Diperlukan</h3>
+            <p className="text-sm text-slate-600 text-center mb-6 leading-relaxed">
+              Sistem Fieldwork membutuhkan akses lokasi (GPS) untuk mendeteksi radius check-in ke lokasi proyek dan melacak presensi secara real-time.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  trackLocation();
+                  setShowGpsPrompt(false);
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                Izinkan Akses GPS
+              </button>
+              <button
+                onClick={() => setShowGpsPrompt(false)}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                Nanti Saja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 };

@@ -14,7 +14,7 @@ const signupSchema = z.object({
   nip: z.string().optional(),
   password: z.string().min(6, 'Password minimal 6 karakter.'),
   role: z.enum(['ADMIN', 'TEKNISI']).optional().default('TEKNISI'),
-  captchaToken: z.string({ required_error: 'Captcha wajib diisi.' }).min(1, 'Captcha wajib diisi.')
+  honeypot: z.string().optional()
 });
 
 authRouter.post(
@@ -23,12 +23,11 @@ authRouter.post(
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message || 'Data tidak valid.');
 
-    // Verify reCAPTCHA token
-    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe&response=${parsed.data.captchaToken}`;
-    const captchaRes = await fetch(verifyUrl, { method: 'POST' });
-    const captchaJson = await captchaRes.json();
-    if (!captchaJson.success) {
-      throw new HttpError(400, 'Verifikasi captcha gagal. Anda terdeteksi sebagai robot atau token kedaluwarsa.');
+    // Honeypot check for bots
+    if (parsed.data.honeypot && parsed.data.honeypot.trim() !== '') {
+      // Intentionally delay to stall bots before throwing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      throw new HttpError(400, 'Aktivitas robotik terdeteksi.');
     }
 
     const existing = await query('select id from users where email = $1', [parsed.data.email.toLowerCase()]);
@@ -51,6 +50,7 @@ authRouter.post(
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Masukkan ID Pegawai atau email.'),
   password: z.string().min(1, 'Masukkan kata sandi.'),
+  honeypot: z.string().optional()
 });
 
 interface UserRow {
@@ -70,6 +70,13 @@ authRouter.post(
     if (!parsed.success) {
       throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data tidak valid.');
     }
+    
+    // Honeypot check for bots
+    if (parsed.data.honeypot && parsed.data.honeypot.trim() !== '') {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      throw new HttpError(400, 'Aktivitas robotik terdeteksi.');
+    }
+
     const identifier = parsed.data.identifier.trim().toLowerCase();
 
     const rows = await query<UserRow>(

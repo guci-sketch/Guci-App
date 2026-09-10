@@ -6,7 +6,7 @@ import { fetchCurrentUser, login as loginRequest, logout as logoutRequest } from
 interface AuthContextValue {
   user: AuthUser | null;
   status: 'checking' | 'authenticated' | 'unauthenticated';
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string, captchaToken: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -33,8 +33,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
-  const login = useCallback(async (identifier: string, password: string) => {
-    const u = await loginRequest(identifier, password);
+  const login = useCallback(async (identifier: string, password: string, captchaToken: string) => {
+    const u = await loginRequest(identifier, password, captchaToken);
     setUser(u);
     setStatus('authenticated');
   }, []);

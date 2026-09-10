@@ -43,8 +43,7 @@ const Shell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col font-sans">
-      <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={handleSync} isSyncing={isSyncing} />
-      <div className="flex-1">
+      <div className="flex-1 flex flex-col">
         {user.role === 'ADMIN' ? <AdminDashboard /> : <ExecutorHome />}
       </div>
     </div>

@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../context/AuthContext';
 import { signup, resetPassword } from '../../api/auth';
 import { Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight, FileCheck, ChevronDown, User, Hash, KeyRound } from 'lucide-react';
-
-const DEMO_ACCOUNTS = [
-  { name: 'Ahmad Fauzi (Admin)', identifier: 'admin.fauzi@fieldwork.id', password: 'admin123' },
-  { name: 'Budi Santoso (Pelaksana — pekerjaan aktif)', identifier: 'budi.santoso@fieldwork.id', password: 'lapangan123' },
-  { name: 'Sinta Maharani (Pelaksana — skenario anomali)', identifier: 'sinta.maharani@fieldwork.id', password: 'lapangan123' },
-  { name: 'Andi Pratama (Pelaksana — siap check-in)', identifier: 'andi.pratama@fieldwork.id', password: 'lapangan123' },
-];
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -23,8 +15,7 @@ export const LoginForm: React.FC = () => {
   const [nip, setNip] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'TEKNISI'>('TEKNISI');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [showDemoHints, setShowDemoHints] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState('');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,21 +24,18 @@ export const LoginForm: React.FC = () => {
     setIsLoading(true);
     try {
       if (mode === 'signup') {
-        if (!captchaToken) {
-            throw new Error("Harap lengkapi verifikasi captcha untuk membuktikan Anda bukan robot.");
-        }
-        const msg = await signup(name.trim(), identifier.trim(), nip.trim(), password, role, captchaToken);
+        const msg = await signup(name.trim(), identifier.trim(), nip.trim(), password, role, honeypot);
         setSuccessMsg(msg);
         setMode('login');
         setPassword('');
-        setCaptchaToken(null);
+        setHoneypot('');
       } else if (mode === 'forgot') {
         const msg = await resetPassword(identifier.trim());
         setSuccessMsg(msg);
         setMode('login');
         setPassword('');
       } else {
-        await login(identifier.trim(), password);
+        await login(identifier.trim(), password, honeypot);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Terjadi kesalahan.');
@@ -198,12 +186,10 @@ export const LoginForm: React.FC = () => {
                 </div>
               )}
 
-              {mode === 'signup' && (
-                <div className="flex justify-center mt-2 mb-2">
-                  <ReCAPTCHA
-                    sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-                    onChange={(token) => setCaptchaToken(token)}
-                  />
+              {mode !== 'forgot' && (
+                <div className="absolute opacity-0 -z-10 w-0 h-0 overflow-hidden" aria-hidden="true">
+                  <label htmlFor="bot-check">Biarkan kosong jika Anda manusia</label>
+                  <input id="bot-check" type="text" name="url" tabIndex={-1} autoComplete="off" value={honeypot} onChange={e => setHoneypot(e.target.value)} />
                 </div>
               )}
 
@@ -236,41 +222,6 @@ export const LoginForm: React.FC = () => {
             </div>
 
 
-            {import.meta.env.DEV && (
-              <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoHints(v => !v)}
-                  className="flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                >
-                  <ChevronDown size={14} className={`transition-transform ${showDemoHints ? 'rotate-180' : ''}`} />
-                  Kredensial demo (development only)
-                </button>
-                {showDemoHints && (
-                  <ul className="mt-3 space-y-2">
-                    {DEMO_ACCOUNTS.map(acc => (
-                      <li key={acc.identifier} className="text-[11px] text-[var(--text-secondary)] font-mono bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-2.5 flex justify-between items-center gap-2">
-                        <div>
-                          <span className="text-[var(--text-primary)] font-semibold font-sans">{acc.name}</span><br />
-                          {acc.identifier} / {acc.password}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={() => {
-                            setIdentifier(acc.identifier);
-                            setPassword(acc.password);
-                          }}
-                          className="bg-white border border-[var(--border-subtle)] hover:bg-slate-50 text-[var(--text-secondary)] px-2.5 py-1.5 rounded-md text-[10px] font-bold transition-colors whitespace-nowrap"
-                        >
-                          Isi Form
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
 
             <div className="mt-6 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-muted)]">
               <span className="flex items-center gap-1.5">

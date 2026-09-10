@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AuthUser } from '../../types';
-import { Shield, HardHat, LogOut, WifiOff, RefreshCw, Menu, X, KeyRound } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 
 interface HeaderProps {
@@ -9,9 +9,11 @@ interface HeaderProps {
   pendingCount?: number;
   onSync?: () => void;
   isSyncing?: boolean;
+  onMenuToggle?: () => void;
+  mobileMenuOpen?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCount = 0, onSync, isSyncing }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCount = 0, onSync, isSyncing, onMenuToggle, mobileMenuOpen }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -19,7 +21,21 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
     <header className="bg-white border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-4 sm:px-6 py-3 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold text-sm tracking-tight border border-[var(--accent-glow)]">
+          {/* Mobile Toggle */}
+          <button
+            className="md:hidden p-2 -ml-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            onClick={() => {
+              if (onMenuToggle) {
+                onMenuToggle();
+              } else {
+                setMenuOpen(!menuOpen);
+              }
+            }}
+          >
+            {(mobileMenuOpen ?? menuOpen) ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          
+          <div className="w-9 h-9 rounded-xl bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold text-sm tracking-tight border border-[var(--accent-glow)] hidden sm:flex">
             FW
           </div>
           <div>
@@ -39,19 +55,13 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
             <button
               onClick={onSync}
               disabled={isSyncing}
-              className="flex items-center gap-1.5 text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-xl hover:bg-amber-100 transition-colors"
+              className="flex items-center gap-1 text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-xl hover:bg-amber-100 transition-colors"
               title="Data belum tersinkron"
             >
-              {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <WifiOff size={14} />}
-              {pendingCount} tertunda
+              {isSyncing ? "Menyinkronkan..." : `${pendingCount} Tertunda`}
             </button>
           )}
           <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs">
-            {currentUser.role === 'ADMIN' ? (
-              <Shield size={16} className="text-[var(--accent)] shrink-0" />
-            ) : (
-              <HardHat size={16} className="text-[var(--accent)] shrink-0" />
-            )}
             <div className="flex flex-col text-left">
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-[var(--text-primary)] leading-tight">{currentUser.name}</span>
@@ -70,39 +80,24 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
           <button
             onClick={() => setShowChangePassword(true)}
             title="Ubah Kata Sandi"
-            className="flex items-center justify-center p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold border border-[var(--border-subtle)] hover:border-slate-300 transition-colors"
+            className="flex items-center justify-center px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold border border-[var(--border-subtle)] hover:border-slate-300 transition-colors"
           >
-            <KeyRound size={16} />
+            Ubah Sandi
           </button>
-
           <button
             onClick={onLogout}
             title="Keluar dari Akun"
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-700 text-[var(--text-secondary)] text-xs font-semibold border border-[var(--border-subtle)] hover:border-rose-200 transition-colors"
           >
-            <LogOut size={16} />
-            <span>Keluar</span>
+            Keluar
           </button>
         </div>
-
-        {/* Mobile Toggle */}
-        <button
-          className="md:hidden p-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-          onClick={() => setMenuOpen(!menuOpen)}
-        >
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
       </div>
 
       {/* Mobile Menu */}
-      {menuOpen && (
+      {!onMenuToggle && menuOpen && (
         <div className="md:hidden pt-4 pb-2 mt-2 border-t border-[var(--border-subtle)] space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-subtle)]">
-             {currentUser.role === 'ADMIN' ? (
-              <Shield size={20} className="text-[var(--accent)] shrink-0" />
-            ) : (
-              <HardHat size={20} className="text-[var(--accent)] shrink-0" />
-            )}
+          <div className="flex items-center gap-3 p-3 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-subtle)]"> 
             <div>
               <span className="font-semibold text-[var(--text-primary)] block text-sm">{currentUser.name}</span>
               <span className="text-xs text-[var(--text-muted)] font-mono">{currentUser.nip || currentUser.email}</span>
@@ -114,8 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
               disabled={isSyncing}
               className="w-full flex justify-center items-center gap-2 text-sm font-semibold bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl hover:bg-amber-100"
             >
-              {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <WifiOff size={16} />}
-              Sinkronisasi {pendingCount} Data
+              {isSyncing ? "Menyinkronkan..." : `Sinkronisasi ${pendingCount} Data`}
             </button>
           )}
           
@@ -123,15 +117,12 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, pendingCo
             onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
             className="w-full flex justify-center items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold border border-[var(--border-subtle)]"
           >
-            <KeyRound size={16} />
             Ubah Kata Sandi
           </button>
-
           <button
             onClick={onLogout}
             className="w-full flex justify-center items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-700 text-[var(--text-secondary)] text-sm font-semibold border border-[var(--border-subtle)]"
           >
-            <LogOut size={16} />
             Keluar
           </button>
         </div>

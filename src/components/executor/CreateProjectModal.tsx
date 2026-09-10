@@ -87,10 +87,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     setSubmitError(null);
     setIsSubmitting(true);
     try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 });
+      }).catch(() => null);
+
       await onSubmit({
         projectName,
         clientName: clientName || 'Klien Layanan Lapangan',
         address,
+        latitude: pos ? pos.coords.latitude : -6.200000,
+        longitude: pos ? pos.coords.longitude : 106.816666,
         radius: 100, // Hardcode default radius
         workDate,
         serviceType,
