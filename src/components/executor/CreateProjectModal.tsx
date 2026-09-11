@@ -54,19 +54,22 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
   // Debounce for geocoding
   React.useEffect(() => {
+    // Only auto-pan if the map is NOT locked, the address has some content, 
+    // AND the user hasn't explicitly picked a location from the map yet (or we want address to override)
     if (isMapLocked || !address || address.length < 5) return;
+    
     const timer = setTimeout(async () => {
       setIsGeocoding(true);
       const coords = await geocodeAddress(address);
       if (coords) {
         setLocationLat(coords.lat);
         setLocationLng(coords.lng);
-        setIsLocationPicked(true);
+        // We don't set location picked here, so the map panning doesn't get blocked
       }
       setIsGeocoding(false);
     }, 1500);
     return () => clearTimeout(timer);
-  }, [address, isMapLocked]);
+  }, [address]); // removed isMapLocked from deps so it doesn't retrigger when unlocking
 
   const handleLockLocation = async () => {
     setIsGeocoding(true);
@@ -334,13 +337,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               id="input-address"
               rows={2}
               placeholder="Jl. Pahlawan Seribu Kav. 1, BSD City, Serpong..."
-              disabled={isMapLocked}
+              
               value={address}
               onChange={e => {
                 setAddress(e.target.value);
                 if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
               }}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none disabled:bg-slate-50 disabled:text-slate-500"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none "
             />
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
@@ -382,18 +385,20 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               </button>
             </div>
             <div className={`h-48 w-full rounded-xl overflow-hidden border ${isMapLocked ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-slate-300'}`}>
+              
               <MapPicker 
                 latitude={locationLat} 
                 longitude={locationLng} 
-                onChange={(lat, lng) => { 
-                  if (!isMapLocked) {
-                    setLocationLat(lat); 
-                    setLocationLng(lng); 
-                    setIsLocationPicked(true); 
+                onChange={(lat, lng) => {
+                  if(!isMapLocked) {
+                     setLocationLat(lat);
+                     setLocationLng(lng);
+                     setIsLocationPicked(true);
                   }
                 }}
-                className="h-full w-full"
+                readOnly={isMapLocked}
               />
+
             </div>
             <p className="text-[10px] text-[var(--text-muted)] mt-1">
               {isMapLocked 
