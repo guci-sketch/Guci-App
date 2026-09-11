@@ -52,24 +52,40 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [isMapLocked, setIsMapLocked] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
+  // Prevent geocoding immediately upon unlocking
+  const prevIsMapLocked = React.useRef(isMapLocked);
+
   // Debounce for geocoding
   React.useEffect(() => {
+    let isActive = true;
+    
+    const justUnlocked = prevIsMapLocked.current === true && isMapLocked === false;
+    prevIsMapLocked.current = isMapLocked;
+
     // Only auto-pan if the map is NOT locked, the address has some content, 
-    // AND the user hasn't explicitly picked a location from the map yet (or we want address to override)
-    if (isMapLocked || !address || address.length < 5) return;
+    // AND it wasn't just unlocked
+    if (isMapLocked || !address || address.length < 5 || justUnlocked) {
+      setIsGeocoding(false);
+      return;
+    }
     
     const timer = setTimeout(async () => {
       setIsGeocoding(true);
       const coords = await geocodeAddress(address);
-      if (coords) {
-        setLocationLat(coords.lat);
-        setLocationLng(coords.lng);
-        // We don't set location picked here, so the map panning doesn't get blocked
+      if (isActive) {
+        if (coords) {
+          setLocationLat(coords.lat);
+          setLocationLng(coords.lng);
+        }
+        setIsGeocoding(false);
       }
-      setIsGeocoding(false);
     }, 1500);
-    return () => clearTimeout(timer);
-  }, [address]); // removed isMapLocked from deps so it doesn't retrigger when unlocking
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
+  }, [address, isMapLocked]);
 
   const handleLockLocation = async () => {
     setIsGeocoding(true);
