@@ -92,6 +92,8 @@ const filterSchema = z.object({
   status: z.string().optional(),
   serviceType: z.string().optional(),
   search: z.string().optional(),
+  page: z.coerce.number().min(1).optional(),
+  limit: z.coerce.number().min(1).max(5000).optional(),
 });
 
 /**
@@ -188,8 +190,23 @@ adminRouter.get(
     const parsed = filterSchema.safeParse(req.query);
     if (!parsed.success) throw new HttpError(400, 'Filter tidak valid.');
     const { where, params } = buildReportFilter(parsed.data);
-    const rows = await query(`${REPORT_LIST_SQL} ${where} order by wr.created_at desc limit 500`, params);
-    res.json({ reports: rows.map(mapListRow), count: rows.length });
+    
+    // Total count for pagination
+    const countResult = await query(`select count(*) as total from work_reports wr join projects p on p.id = wr.project_id join users u on u.id = wr.executor_id ${where}`, params);
+    const totalCount = parseInt(countResult[0].total, 10);
+    
+    // Pagination parameters
+    const page = parsed.data.page || 1;
+    const limit = parsed.data.limit || 20;
+    const offset = (page - 1) * limit;
+    
+    // Add offset and limit params
+    const queryParams = [...params, limit, offset];
+    const limitParamIdx = params.length + 1;
+    const offsetParamIdx = params.length + 2;
+
+    const rows = await query(`${REPORT_LIST_SQL} ${where} order by wr.created_at desc limit $${limitParamIdx} offset $${offsetParamIdx}`, queryParams);
+    res.json({ reports: rows.map(mapListRow), count: rows.length, totalCount, page, totalPages: Math.ceil(totalCount / limit) });
   })
 );
 
@@ -258,15 +275,58 @@ adminRouter.get(
   })
 );
 
+const projectFilterSchema = z.object({
+  search: z.string().optional(),
+  serviceType: z.string().optional(),
+  status: z.string().optional(),
+  page: z.coerce.number().min(1).optional(),
+  limit: z.coerce.number().min(1).max(500).optional(),
+});
+
 adminRouter.get(
   '/projects',
   asyncHandler(async (req, res) => {
-    const rows = await query(`
-      select p.*, u.name as created_by_name from projects p
-      join users u on u.id = p.created_by
-      order by p.created_at desc limit 200
-    `);
+    const parsed = projectFilterSchema.safeParse(req.query);
+    if (!parsed.success) throw new HttpError(400, 'Filter tidak valid.');
+    const q = parsed.data;
+    
+    let where = 'where 1=1';
+    const params = [];
+    let i = 1;
+    
+    if (q.search) {
+      where += " and (p.project_name ilike $" + i + " or p.client_name ilike $" + i + " or p.address ilike $" + i + " or u.name ilike $" + i + ")";
+      params.push("%" + q.search + "%");
+      i++;
+    }
+    if (q.serviceType && q.serviceType !== 'ALL') {
+      where += " and p.service_type = $" + i;
+      params.push(q.serviceType);
+      i++;
+    }
+    if (q.status === 'LOCKED') {
+      where += " and p.locked_at is not null";
+    } else if (q.status === 'OPEN') {
+      where += " and p.locked_at is null";
+    }
+    
+    const countResult = await query("select count(*) as total from projects p join users u on u.id = p.created_by " + where, params);
+    const totalCount = parseInt(countResult[0].total, 10);
+    
+    const page = q.page || 1;
+    const limit = q.limit || 8;
+    const offset = (page - 1) * limit;
+    
+    const queryParams = [...params, limit, offset];
+    const limitIdx = params.length + 1;
+    const offsetIdx = params.length + 2;
+
+    const rows = await query("select p.*, u.name as created_by_name from projects p join users u on u.id = p.created_by " + where + " order by p.created_at desc limit $" + limitIdx + " offset $" + offsetIdx, queryParams);
+    
     res.json({
+      totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
       projects: rows.map(r => ({
         id: r.id, projectName: r.project_name, clientName: r.client_name, address: r.address,
         latitude: Number(r.latitude), longitude: Number(r.longitude), radius: r.radius,
@@ -408,3 +468,5 @@ adminRouter.post(
     res.json(result);
   })
 );
+
+

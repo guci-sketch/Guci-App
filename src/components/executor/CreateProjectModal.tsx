@@ -5,6 +5,7 @@ import { SERVICE_TYPE_META } from '../../utils/serviceMeta';
 import { ContractType, ServiceType } from '../../types';
 import { MapPicker } from '../common/MapPicker';
 import { CreateProjectInput } from '../../api/projects';
+import { geocodeAddress, reverseGeocode } from '../../utils/geocoding';
 
 interface CreateProjectModalProps {
   onClose: () => void;
@@ -48,6 +49,35 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMapLocked, setIsMapLocked] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  // Debounce for geocoding
+  React.useEffect(() => {
+    if (isMapLocked || !address || address.length < 5) return;
+    const timer = setTimeout(async () => {
+      setIsGeocoding(true);
+      const coords = await geocodeAddress(address);
+      if (coords) {
+        setLocationLat(coords.lat);
+        setLocationLng(coords.lng);
+        setIsLocationPicked(true);
+      }
+      setIsGeocoding(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [address, isMapLocked]);
+
+  const handleLockLocation = async () => {
+    setIsGeocoding(true);
+    const resultAddress = await reverseGeocode(locationLat, locationLng);
+    if (resultAddress) {
+      setAddress(resultAddress);
+      if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+    }
+    setIsMapLocked(true);
+    setIsGeocoding(false);
+  };
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -301,6 +331,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               id="input-address"
               rows={2}
               placeholder="Jl. Pahlawan Seribu Kav. 1, BSD City, Serpong..."
+              disabled={isMapLocked}
               value={address}
               onChange={e => {
                 setAddress(e.target.value);

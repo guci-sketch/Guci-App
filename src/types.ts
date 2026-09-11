@@ -262,6 +262,8 @@ export interface ReportFilters {
   status: string; // 'ALL' or WorkReportStatus
   serviceType: string; // 'ALL' or ServiceType
   search: string;
+  page?: number;
+  limit?: number;
 }
 
 export const DEFAULT_FILTERS: ReportFilters = {

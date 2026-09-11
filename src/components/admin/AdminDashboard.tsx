@@ -62,6 +62,41 @@ export const AdminDashboard: React.FC = () => {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [reports, setReports] = useState<WorkReportListItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [projectServiceType, setProjectServiceType] = useState('ALL');
+  const [projectStatus, setProjectStatus] = useState('ALL');
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectTotalPages, setProjectTotalPages] = useState(1);
+  const [projectTotalCount, setProjectTotalCount] = useState(0);
+
+  const loadProjects = useCallback(async () => {
+    try {
+      const res = await fetchAdminProjects({
+        search: projectSearch,
+        serviceType: projectServiceType,
+        status: projectStatus,
+        page: projectPage,
+        limit: 8
+      });
+      setProjects(res.projects);
+      setProjectTotalPages(res.totalPages || 1);
+      setProjectTotalCount(res.totalCount || res.projects.length);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [projectSearch, projectServiceType, projectStatus, projectPage]);
+
+  useEffect(() => {
+    setProjectPage(1);
+  }, [projectSearch, projectServiceType, projectStatus]);
+
+  useEffect(() => {
+    if (activeTab === 'projects') {
+      const t = setTimeout(loadProjects, 250);
+      return () => clearTimeout(t);
+    }
+  }, [loadProjects, activeTab]);
+
   const [executors, setExecutors] = useState<ExecutorStats[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[] | null>(null);
@@ -84,13 +119,22 @@ export const AdminDashboard: React.FC = () => {
   const [adminReviewNotes, setAdminReviewNotes] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const effectiveFilters = useMemo<ReportFilters>(() => ({ ...filters, ...presetToRange(datePreset), search: searchInput }), [filters, datePreset, searchInput]);
+  useEffect(() => {
+    setPage(1);
+  }, [filters, datePreset, searchInput]);
+
+  const effectiveFilters = useMemo<ReportFilters>(() => ({ ...filters, ...presetToRange(datePreset), search: searchInput, page, limit: 20 }), [filters, datePreset, searchInput, page]);
 
   const loadReports = useCallback(async () => {
     try {
       const res = await fetchAdminReports(effectiveFilters);
       setReports(res.reports);
+      setTotalPages(res.totalPages || 1);
+      setTotalCount(res.totalCount || res.reports.length);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : 'Gagal memuat laporan.');
     }
@@ -106,9 +150,11 @@ export const AdminDashboard: React.FC = () => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const [summary, projectList, executorList] = await Promise.all([fetchAdminSummary(), fetchAdminProjects(), fetchExecutors()]);
+        const [summary, projectRes, executorList] = await Promise.all([fetchAdminSummary(), fetchAdminProjects({ limit: 8, page: 1 }), fetchExecutors()]);
         setKpi(summary);
-        setProjects(projectList);
+        setProjects(projectRes.projects);
+        setProjectTotalPages(projectRes.totalPages || 1);
+        setProjectTotalCount(projectRes.totalCount || projectRes.projects.length);
         setExecutors(executorList);
         await loadReports();
       } catch (err) {
@@ -582,12 +628,74 @@ export const AdminDashboard: React.FC = () => {
                     })
                   )}
                 </div>
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                    <span className="text-xs font-semibold text-[var(--text-muted)]">
+                      Menampilkan halaman {page} dari {totalPages} (Total: {totalCount} Laporan)
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-slate-200 text-[var(--text-secondary)] text-xs font-bold transition-colors disabled:opacity-50"
+                      >
+                        Sebelumnya
+                      </button>
+                      <button 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-slate-200 text-[var(--text-secondary)] text-xs font-bold transition-colors disabled:opacity-50"
+                      >
+                        Selanjutnya
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === 'projects' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projects.map(proj => {
+              <div className="space-y-4">
+                <div className="flex flex-col md:flex-row gap-3 p-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Cari proyek, klien, alamat, pelaksana..." 
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      value={projectSearch}
+                      onChange={e => setProjectSearch(e.target.value)}
+                    />
+                  </div>
+                  <select 
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    value={projectServiceType}
+                    onChange={e => setProjectServiceType(e.target.value)}
+                  >
+                    <option value="ALL">Semua Layanan</option>
+                    {SERVICE_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select 
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    value={projectStatus}
+                    onChange={e => setProjectStatus(e.target.value)}
+                  >
+                    <option value="ALL">Semua Status</option>
+                    <option value="OPEN">Terbuka</option>
+                    <option value="LOCKED">Terkunci</option>
+                  </select>
+                </div>
+                
+                {projects.length === 0 ? (
+                  <div className="text-center py-10 bg-slate-50 rounded-xl border border-slate-200 border-dashed text-slate-500 text-sm font-semibold">Tidak ada proyek yang sesuai dengan pencarian Anda.</div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {projects.map(proj => {
                   const svcMeta = getServiceTypeMeta(proj.serviceType);
                   return (
                     <div key={proj.id} className="clean-card bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border-subtle)]  space-y-3">
@@ -633,7 +741,34 @@ export const AdminDashboard: React.FC = () => {
                   );
                 })}
               </div>
-            )}
+
+              {projectTotalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                  <span className="text-xs font-semibold text-[var(--text-muted)]">
+                    Menampilkan halaman {projectPage} dari {projectTotalPages} (Total: {projectTotalCount} Proyek)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setProjectPage(p => Math.max(1, p - 1))}
+                      disabled={projectPage === 1}
+                      className="px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-slate-200 text-[var(--text-secondary)] text-xs font-bold transition-colors disabled:opacity-50"
+                    >
+                      Sebelumnya
+                    </button>
+                    <button 
+                      onClick={() => setProjectPage(p => Math.min(projectTotalPages, p + 1))}
+                      disabled={projectPage === projectTotalPages}
+                      className="px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-slate-200 text-[var(--text-secondary)] text-xs font-bold transition-colors disabled:opacity-50"
+                    >
+                      Selanjutnya
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
             {activeTab === 'executors' && (
               <div className="clean-card bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]  overflow-hidden">

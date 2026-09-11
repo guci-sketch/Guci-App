@@ -1,4 +1,5 @@
-import pg from 'pg';
+const fs = require('fs');
+const newCode = `import pg from 'pg';
 import 'dotenv/config';
 
 const { Pool } = pg;
@@ -14,8 +15,8 @@ function getPool(): pg.Pool {
       
     const requiresSsl =
       process.env.DB_SSL === 'true' ||
-      /supabase\.(co|com)/.test(connectionString) ||
-      (!/localhost|127\.0\.0\.1/.test(connectionString) && process.env.DB_SSL !== 'false');
+      /supabase\\.(co|com)/.test(connectionString) ||
+      (!/localhost|127\\.0\\.0\\.1/.test(connectionString) && process.env.DB_SSL !== 'false');
     
     pool = new Pool({
       connectionString,
@@ -58,3 +59,6 @@ export async function withTransaction<T>(
     client.release();
   }
 }
+`;
+
+fs.writeFileSync('backend-src/db/pool.ts', newCode);
