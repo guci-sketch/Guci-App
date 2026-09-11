@@ -3,6 +3,7 @@ import { Camera, RefreshCw, X, Check, MapPin, ShieldCheck, AlertTriangle, Crossh
 import { applyWatermarkToCanvas, canvasToJpegBlob } from '../../utils/watermark';
 import { calculateDistanceMeters, formatDistance } from '../../utils/geo';
 import { PhotoType } from '../../types';
+import { MapPicker } from '../common/MapPicker';
 
 interface CameraCaptureModalProps {
   photoType: PhotoType;
@@ -58,8 +59,15 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     }
     navigator.geolocation.getCurrentPosition(
       pos => setGps({ status: 'ready', latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy || 15 }),
-      err => setGps({ status: 'denied', message: err.code === err.PERMISSION_DENIED ? 'Izin lokasi ditolak. Aktifkan GPS dan izinkan akses lokasi untuk melanjutkan.' : 'Lokasi belum tersedia. Pastikan GPS aktif dan coba lagi.' }),
-      { enableHighAccuracy: true, timeout: 10000 }
+      err => {
+        console.warn('High accuracy GPS failed, falling back to low accuracy...', err);
+        navigator.geolocation.getCurrentPosition(
+          pos2 => setGps({ status: 'ready', latitude: pos2.coords.latitude, longitude: pos2.coords.longitude, accuracy: pos2.coords.accuracy || 50 }),
+          err2 => setGps({ status: 'denied', message: err2.code === err2.PERMISSION_DENIED ? 'Izin lokasi ditolak. Aktifkan GPS peramban.' : 'Sinyal GPS lemah atau tidak tersedia. Pastikan fitur Lokasi HP menyala.' }),
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
 
@@ -72,10 +80,19 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('Kamera tidak didukung oleh peramban ini.');
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+          });
+        } catch (initialErr) {
+          console.warn('Initial camera constraints failed, falling back:', initialErr);
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode } },
+            audio: false,
+          });
+        }
         if (cancelled) {
           stream.getTracks().forEach(t => t.stop());
           return;
@@ -272,23 +289,34 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             )}
 
             {gps.status === 'denied' && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/90 px-6 backdrop-blur-sm">
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm text-center shadow-2xl pointer-events-auto">
-                  <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400 mx-auto mb-4 border border-rose-500/30">
-                    <AlertTriangle size={32} />
+              <div className="absolute inset-0 z-50 flex flex-col bg-slate-950 p-4">
+                <div className="flex-1 rounded-xl overflow-hidden relative border border-slate-700">
+                  <MapPicker 
+                    latitude={projectLat} 
+                    longitude={projectLng} 
+                    onChange={(lat, lng) => {
+                      // Silently update the GPS state to ready using the map's pinned location
+                      setGps({ status: 'ready', latitude: lat, longitude: lng, accuracy: 50 });
+                    }}
+                  />
+                  <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/80 to-transparent p-4 z-[400] pointer-events-none">
+                    <h3 className="text-white font-bold text-sm flex items-center gap-2"><MapPin size={16} className="text-rose-400" /> Sinyal GPS Lemah</h3>
+                    <p className="text-slate-300 text-[10px] mt-1">Geser peta untuk menentukan posisi akurat Anda saat ini secara manual.</p>
                   </div>
-                  <h3 className="text-base font-bold text-white mb-2">Akses Lokasi Ditolak</h3>
-                  <p className="text-xs text-slate-300 mb-6 leading-relaxed">
-                    {gps.message}
-                  </p>
-                  <div className="flex gap-3">
-                    <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold text-sm transition-colors hover:bg-slate-700">
-                      Tutup
-                    </button>
-                    <button onClick={requestGps} className="flex-1 py-3 rounded-xl bg-rose-600 text-white font-bold text-sm transition-colors hover:bg-rose-500 shadow-lg shadow-rose-900/50">
-                      Coba Lagi
-                    </button>
-                  </div>
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <button onClick={onClose} className="py-3 px-4 rounded-xl bg-slate-800 text-white font-semibold text-sm transition-colors hover:bg-slate-700">
+                    Batal
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // It updates onChange, so we just dismiss the overlay if they are happy
+                      setGps(prev => prev.status === 'ready' ? prev : { status: 'ready', latitude: projectLat, longitude: projectLng, accuracy: 50 });
+                    }} 
+                    className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm transition-colors hover:bg-emerald-500 shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"
+                  >
+                    <Check size={18} /> Konfirmasi Posisi
+                  </button>
                 </div>
               </div>
             )}

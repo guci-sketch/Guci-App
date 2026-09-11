@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const code = `import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { signup, resetPassword } from '../../api/auth';
 import { Lock, Mail, Eye, EyeOff, AlertCircle, ArrowRight, FileCheck, ChevronDown, User, Hash, KeyRound, Bug } from 'lucide-react';
@@ -72,8 +74,8 @@ export const LoginForm: React.FC = () => {
       <header className="bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-6 py-3.5 shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold text-sm tracking-tight border border-[var(--accent-glow)]">
-              FW
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-md">
+              <Bug size={18} />
             </div>
             <span className="font-extrabold text-[var(--text-primary)] tracking-tight">FIELDWORK</span>
           </div>
@@ -165,8 +167,11 @@ export const LoginForm: React.FC = () => {
       </main>
 
       <footer className="bg-[var(--bg-card)] border-t border-[var(--border-subtle)] text-[var(--text-muted)] py-4 px-6 text-center text-xs">
-        Documentation &amp; Digital Reporting System
+        Documentation &amp; Digital Reporting System &bull; Waktu Acuan Server: WIB
       </footer>
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/auth/LoginForm.tsx', code);

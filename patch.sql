@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS user_invitations (
+    token VARCHAR(255) PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'EXECUTOR',
+    created_by UUID REFERENCES users(id) ON DELETE CASCADE
+);

@@ -111,8 +111,8 @@ export const CustomerReviewFormModal: React.FC<CustomerReviewFormModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-[var(--accent)]/80  animate-in fade-in duration-200">
-      <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh] shadow-2xl animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center  justify-center pt-10 sm:pt-0 pb-10 sm:pb-0  p-4 sm:p-6 bg-[var(--accent)]/80  animate-in fade-in duration-200">
+      <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-lg overflow-hidden flex flex-col rounded-t-2xl sm:rounded-b-2xl sm:rounded-2xl h-[95dvh] sm:h-auto sm:max-h-[85dvh] shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)]">Serah Terima Pekerjaan</h2>
@@ -123,7 +123,7 @@ export const CustomerReviewFormModal: React.FC<CustomerReviewFormModalProps> = (
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 space-y-4 pb-32 sm:pb-4">
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-xl flex items-start gap-3">
             <CheckCircle2 className="shrink-0 mt-0.5 text-emerald-600" size={18} />
             <p className="text-xs font-semibold leading-relaxed">

@@ -86,8 +86,8 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--accent)]/60 p-4 sm:p-6 " onClick={onClose}>
-      <div className="relative w-full max-w-lg bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center  justify-center pt-10 sm:pt-0 pb-10 sm:pb-0  bg-[var(--accent)]/60 p-4 sm:p-6 " onClick={onClose}>
+      <div className="relative w-full max-w-lg bg-[var(--bg-card)] rounded-t-2xl sm:rounded-b-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[95dvh] sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70">
           <div>
             <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
@@ -100,7 +100,7 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto pb-32 sm:pb-5">
           {isFumigation && (
             <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 text-xs text-rose-800">
               <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-600" />

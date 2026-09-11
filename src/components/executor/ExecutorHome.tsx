@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WorkReport, Project, DocumentationPhoto, PhotoType, PhotoTag } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut, submitTreatment, TreatmentInput } from '../../api/workReports';
@@ -13,7 +13,7 @@ import { AuthedImage } from '../common/AuthedImage';
 import { RiskBadge } from '../common/RiskBadge';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { getServiceTypeMeta } from '../../utils/serviceMeta';
-import { formatDistance } from '../../utils/geo';
+import { formatDistance, calculateDistanceMeters } from '../../utils/geo';
 import { Header } from '../common/Header';
 import {
   Plus, Camera, CheckCircle2, Clock, MapPin, Briefcase, History, User as UserIcon,
@@ -80,10 +80,39 @@ export const ExecutorHome: React.FC = () => {
     }
   }, []);
 
+  const lastLocationRef = useRef<{ latitude: number; longitude: number; timestamp: number } | null>(null);
+
   const trackLocation = useCallback(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       pos => {
+        // Validation step 1: Ensure accuracy radius is reasonable (e.g. within 150 meters)
+        if (pos.coords.accuracy > 150) {
+          console.warn('GPS rejected: Accuracy too poor (', pos.coords.accuracy, 'm)');
+          return;
+        }
+
+        // Validation step 2: Prevent unreasonable distance jumps
+        const now = Date.now();
+        if (lastLocationRef.current) {
+          const dist = calculateDistanceMeters(
+            { latitude: lastLocationRef.current.latitude, longitude: lastLocationRef.current.longitude },
+            { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+          );
+          
+          // E.g., reject jump > 50km
+          if (dist > 50000) {
+            console.warn('GPS rejected: Unreasonable distance jump detected (', dist, 'm)');
+            return;
+          }
+        }
+
+        lastLocationRef.current = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          timestamp: now
+        };
+
         postLocation({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -93,7 +122,7 @@ export const ExecutorHome: React.FC = () => {
         });
       },
       err => console.warn('Background GPS error:', err),
-      { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
   }, []);
 

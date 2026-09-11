@@ -3,6 +3,7 @@ import { X, MapPin, Calendar, Building, FileText, CheckCircle2, Crosshair, Spark
 import { PRESET_PROJECT_LOCATIONS } from '../../utils/geo';
 import { SERVICE_TYPE_META } from '../../utils/serviceMeta';
 import { ContractType, ServiceType } from '../../types';
+import { MapPicker } from '../common/MapPicker';
 import { CreateProjectInput } from '../../api/projects';
 
 interface CreateProjectModalProps {
@@ -28,6 +29,20 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [projectName, setProjectName] = useState('');
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
+  const [locationLat, setLocationLat] = useState<number>(-6.200000);
+  const [locationLng, setLocationLng] = useState<number>(106.816666);
+  const [isLocationPicked, setIsLocationPicked] = useState(false);
+
+  // Try to get user's location initially for the map center
+  React.useEffect(() => {
+    if (navigator.geolocation && !isLocationPicked) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        setLocationLat(pos.coords.latitude);
+        setLocationLng(pos.coords.longitude);
+      }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
+    }
+  }, []);
+
   const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
   const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
@@ -87,16 +102,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 });
-      }).catch(() => null);
-
       await onSubmit({
         projectName,
         clientName: clientName || 'Klien Layanan Lapangan',
         address,
-        latitude: pos ? pos.coords.latitude : -6.200000,
-        longitude: pos ? pos.coords.longitude : 106.816666,
+        latitude: locationLat,
+        longitude: locationLng,
         radius: 100, // Hardcode default radius
         workDate,
         serviceType,
@@ -117,12 +128,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   return (
     <div
       id="create-project-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--accent)]/60 p-4 sm:p-6 "
+      className="fixed inset-0 z-50 flex items-end sm:items-center  justify-center pt-10 sm:pt-0 pb-10 sm:pb-0  bg-[var(--accent)]/60 p-4 sm:p-6 "
       onClick={onClose}
     >
       <div
         id="create-project-modal-card"
-        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-t-2xl sm:rounded-b-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[95dvh] sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -142,7 +153,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto pb-32 sm:pb-5">
           {/* Service Type Selector */}
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
@@ -300,6 +311,22 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
             )}
+          </div>
+          
+          {/* Map Location Picker */}
+          <div>
+            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+              Titik Kordinat Proyek (Geser Pin)
+            </label>
+            <div className="h-48 w-full rounded-xl overflow-hidden border border-slate-300">
+              <MapPicker 
+                latitude={locationLat} 
+                longitude={locationLng} 
+                onChange={(lat, lng) => { setLocationLat(lat); setLocationLng(lng); setIsLocationPicked(true); }}
+                className="h-full w-full"
+              />
+            </div>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">Geser peta untuk menentukan titik akurat yang akan menjadi pusat radius check-in teknisi.</p>
           </div>
 
           {/* Notes */}

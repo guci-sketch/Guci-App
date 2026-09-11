@@ -13,6 +13,7 @@ import { AllProjectsMap } from '../maps/AllProjectsMap';
 import {  PhotoViewerModal } from '../common/PhotoViewerModal';
 import {  AuthedImage } from '../common/AuthedImage';
 import {  RISK_LEVEL_OPTIONS, STATUS_OPTIONS } from '../../utils/riskMeta';
+import { exportReportToPdf } from '../../utils/pdfExport';
 import {  SERVICE_TYPE_OPTIONS, getServiceTypeMeta, APPLICATION_METHOD_LABELS } from '../../utils/serviceMeta';
 import { 
   RefreshCw, ShieldAlert, Search, Download, Clock, MapPin, UserCheck, CheckCircle2, AlertTriangle, Eye,
@@ -21,6 +22,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
+import { generateInvite } from '../../api/auth';
 
 type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile';
 
@@ -56,6 +58,8 @@ export const AdminDashboard: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [inviteLink, setInviteLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [reports, setReports] = useState<WorkReportListItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [executors, setExecutors] = useState<ExecutorStats[]>([]);
@@ -149,6 +153,20 @@ export const AdminDashboard: React.FC = () => {
   }, [reports, activeTab]);
 
   
+  
+  const handleGenerateInvite = async (role: 'ADMIN' | 'TEKNISI') => {
+    try {
+      setIsGeneratingInvite(true);
+      const res = await generateInvite(role);
+      const url = `${window.location.origin}?invite=${res.token}`;
+      setInviteLink({ url, expiresAt: new Date(res.expiresAt).toLocaleString('id-ID') });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Gagal membuat link undangan');
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
   const handleActivate = async (id: string) => {
     await activateUser(id);
     setAdminUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: true } : u));
@@ -735,6 +753,50 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'approval' && (
               <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)] shadow-sm overflow-hidden p-4">
                 <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">Manajemen Akun Pengguna</h3>
+                
+                <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <h4 className="font-bold text-sm text-emerald-800 mb-2">Buat Link Undangan (Berlaku 24 Jam)</h4>
+                  <p className="text-xs text-emerald-600 mb-3">
+                    Pendaftaran kini dibatasi hanya melalui link undangan. Buat link di bawah ini dan bagikan ke teknisi atau admin baru untuk mendaftar.
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <button 
+                      onClick={() => handleGenerateInvite('TEKNISI')}
+                      disabled={isGeneratingInvite}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Buat Undangan Teknisi
+                    </button>
+                    <button 
+                      onClick={() => handleGenerateInvite('ADMIN')}
+                      disabled={isGeneratingInvite}
+                      className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Buat Undangan Admin
+                    </button>
+                  </div>
+                  
+                  {inviteLink && (
+                    <div className="mt-4 p-3 bg-white rounded-lg border border-emerald-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                      <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase mb-1">Link Undangan (Kedaluwarsa: {inviteLink.expiresAt})</p>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={inviteLink.url} 
+                          className="flex-1 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-emerald-400"
+                        />
+                        <button 
+                          onClick={() => { navigator.clipboard.writeText(inviteLink.url); alert('Disalin!'); }}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded transition-colors"
+                        >
+                          Salin
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {adminUsers.length === 0 ? (
                   <div className="py-8 text-center text-xs text-[var(--text-muted)]">Tidak ada data pengguna.</div>
                 ) : (
@@ -988,7 +1050,7 @@ export const AdminDashboard: React.FC = () => {
                   )}
 
                   <div>
-                    <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><Eye size={15} className="text-emerald-600" /> Galeri Bukti Foto ({selectedReport.photos.length})</h4>
+                    <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><Eye size={15} className="text-emerald-600" /> Tinjauan Bukti Foto (Photo Review) - ({selectedReport.photos.length})</h4>
                     {selectedReport.photos.length === 0 ? (
                       <p className="text-xs text-[var(--text-muted)]">Belum ada foto.</p>
                     ) : (
