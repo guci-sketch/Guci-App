@@ -274,3 +274,11 @@ export const DEFAULT_FILTERS: ReportFilters = {
   serviceType: 'ALL',
   search: '',
 };
+
+export interface UserLocation {
+  userId: string;
+  userName: string;
+  latitude: number;
+  longitude: number;
+  trackedAt: string;
+}

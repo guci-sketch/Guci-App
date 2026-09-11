@@ -9,7 +9,7 @@ export async function exportReportToPdf(report: WorkReport, project: Project) {
   doc.text('Laporan Hasil Pekerjaan (Fieldwork Report)', 14, 22);
   
   doc.setFontSize(11);
-  doc.text(`Proyek: ${project.name}`, 14, 32);
+  doc.text(`Proyek: ${project.projectName}`, 14, 32);
   doc.text(`Klien: ${project.clientName}`, 14, 38);
   doc.text(`Pelaksana: ${report.executorName || '-'}`, 14, 44);
   doc.text(`Waktu Mulai: ${report.checkInAt ? new Date(report.checkInAt).toLocaleString('id-ID') : '-'}`, 14, 50);
@@ -32,7 +32,7 @@ export async function exportReportToPdf(report: WorkReport, project: Project) {
 
   let finalY = (doc as any).lastAutoTable.finalY || 75;
 
-  if (report.treatment) {
+  if (report.treatmentRecord) {
     doc.setFontSize(14);
     doc.text('Data Treatment (Perlakuan)', 14, finalY + 15);
     autoTable(doc, {
@@ -40,10 +40,10 @@ export async function exportReportToPdf(report: WorkReport, project: Project) {
       head: [['Metode', 'Bahan Kimia', 'Dosis', 'Area (m2)']],
       body: [
         [
-          report.treatment.applicationMethod.replace(/_/g, ' '),
-          report.treatment.chemicalName,
-          report.treatment.dosage,
-          report.treatment.treatmentAreaSqm?.toString() || '-'
+          report.treatmentRecord.applicationMethod.replace(/_/g, ' '),
+          report.treatmentRecord.chemicalName,
+          report.treatmentRecord.dosage,
+          report.treatmentRecord.treatmentAreaSqm?.toString() || '-'
         ]
       ],
     });
@@ -63,5 +63,5 @@ export async function exportReportToPdf(report: WorkReport, project: Project) {
     finalY = (doc as any).lastAutoTable.finalY;
   }
 
-  doc.save(`Report_${project.name.replace(/\\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`Report_${project.projectName.replace(/\\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }

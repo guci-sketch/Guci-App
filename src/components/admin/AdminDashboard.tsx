@@ -392,10 +392,9 @@ export const AdminDashboard: React.FC = () => {
                       Sistem mendeteksi sebuah penugasan sebagai <strong>Anomali</strong> apabila memenuhi salah satu dari kriteria berikut sesuai konfigurasi:
                     </p>
                     <ul className="list-disc list-inside text-xs text-rose-800 mt-2 space-y-1 ml-1">
-                      <li>Radius Check-In & Check-Out melebihi toleransi (maks. {riskConfig?.maxGpsDistance || 200} meter).</li>
-                      <li>Durasi pekerjaan terlalu singkat (kurang dari {riskConfig?.minDurationMinutes || 15} menit).</li>
-                      {riskConfig?.requireTimeMatch && <li>Pekerjaan dilakukan di luar jam operasional yang diizinkan (22:00 - 05:00).</li>}
-                      {riskConfig?.flagSuspiciousTags && <li>Sistem mendeteksi objek atau tag foto yang tidak relevan dengan layanan (berdasarkan AI).</li>}
+                      <li>Radius Check-In & Check-Out melebihi toleransi (maks. {riskConfig?.locationDriftThresholdMeters || 200} meter).</li>
+                      <li>Durasi pekerjaan terlalu singkat (kurang dari {riskConfig?.shortDurationCriticalMinutes || 15} menit).</li>
+                      <li>Pekerjaan tidak memiliki foto progres pekerjaan.</li>
                     </ul>
                   </div>
                 )}
@@ -804,7 +803,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'tracking' && (
               <div className="clean-card bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]  overflow-hidden p-4">
                 <div className="mb-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                  <AllProjectsMap projects={projects.filter(p => p.status === "ACTIVE" || p.status === "PENDING")} userLocations={userLocations} height="400px" />
+                  <AllProjectsMap projects={projects.filter(p => !p.lockedAt)} userLocations={userLocations} height="400px" />
                 </div>
 
                 <div className="flex items-center justify-between mb-3">
@@ -858,7 +857,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'audit' && (
               <div className="clean-card bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)]  overflow-hidden p-4">
                 <div className="mb-6 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                  <AllProjectsMap projects={projects.filter(p => p.status === "ACTIVE" || p.status === "PENDING")} userLocations={userLocations} height="400px" />
+                  <AllProjectsMap projects={projects.filter(p => !p.lockedAt)} userLocations={userLocations} height="400px" />
                 </div>
 
                 <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">Histori &amp; Rekam Jejak Audit Sistem</h3>
@@ -1309,21 +1308,21 @@ export const AdminDashboard: React.FC = () => {
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Histori Laporan Pekerjaan</h4>
                 <div className="space-y-2">
-                  {reports.filter(r => r.projectId === selectedProject.id).length === 0 ? (
+                  {reports.filter(r => r.project.id === selectedProject.id).length === 0 ? (
                     <div className="text-sm text-[var(--text-muted)] text-center py-6 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-subtle)]">
                       Belum ada laporan untuk proyek ini.
                     </div>
                   ) : (
-                    reports.filter(r => r.projectId === selectedProject.id).map(r => (
+                    reports.filter(r => r.project.id === selectedProject.id).map(r => (
                       <div key={r.id} className="clean-card bg-[var(--bg-card)] p-3 sm:p-4 rounded-xl border border-[var(--border-subtle)] flex flex-col sm:flex-row gap-3 sm:items-center justify-between hover:border-slate-300 transition-colors">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${STATUS_OPTIONS.find(s => s.value === r.status)?.colorClass || "bg-slate-50 text-slate-700 border-slate-200"}`}>
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${(r.status === "COMPLETED" || r.status === "REVIEWED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : r.status === "WORKING" ? "bg-blue-50 text-blue-700 border-blue-200" : r.status === "FLAGGED" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-slate-50 text-slate-700 border-slate-200")}`}>
                               {STATUS_OPTIONS.find(s => s.value === r.status)?.label || r.status}
                             </span>
                             <span className="text-xs font-bold text-[var(--text-secondary)]">{new Date(r.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
                           </div>
-                          <div className="text-sm font-semibold text-[var(--text-primary)]">{r.executorName}</div>
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">{r.executor.name}</div>
                           <div className="text-xs text-[var(--text-muted)]">Check-in: {r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</div>
                         </div>
                         <button 
