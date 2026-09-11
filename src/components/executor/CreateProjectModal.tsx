@@ -324,9 +324,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
           {/* Address */}
           <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-              Alamat Lengkap Lokasi *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                Alamat Lengkap Lokasi *
+              </label>
+              {isGeocoding && <span className="text-[10px] text-emerald-600 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Mencari lokasi...</span>}
+            </div>
             <textarea
               id="input-address"
               rows={2}
@@ -337,7 +340,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 setAddress(e.target.value);
                 if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
               }}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none disabled:bg-slate-50 disabled:text-slate-500"
             />
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
@@ -346,18 +349,57 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           
           {/* Map Location Picker */}
           <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-              Titik Kordinat Proyek (Geser Pin)
-            </label>
-            <div className="h-48 w-full rounded-xl overflow-hidden border border-slate-300">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                Titik Kordinat Proyek (Geser Pin)
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMapLocked) {
+                    setIsMapLocked(false);
+                  } else {
+                    handleLockLocation();
+                  }
+                }}
+                className={`text-[10px] px-2 py-1 rounded border flex items-center gap-1 font-bold ${
+                  isMapLocked 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {isMapLocked ? (
+                  <>
+                    <CheckCircle2 size={12} />
+                    Titik &amp; Alamat Terkunci
+                  </>
+                ) : (
+                  <>
+                    <MapPin size={12} />
+                    Lock Titik Peta &amp; Auto Alamat
+                  </>
+                )}
+              </button>
+            </div>
+            <div className={`h-48 w-full rounded-xl overflow-hidden border ${isMapLocked ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-slate-300'}`}>
               <MapPicker 
                 latitude={locationLat} 
                 longitude={locationLng} 
-                onChange={(lat, lng) => { setLocationLat(lat); setLocationLng(lng); setIsLocationPicked(true); }}
+                onChange={(lat, lng) => { 
+                  if (!isMapLocked) {
+                    setLocationLat(lat); 
+                    setLocationLng(lng); 
+                    setIsLocationPicked(true); 
+                  }
+                }}
                 className="h-full w-full"
               />
             </div>
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">Geser peta untuk menentukan titik akurat yang akan menjadi pusat radius check-in teknisi.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              {isMapLocked 
+                ? 'Titik peta telah dikunci. Buka kunci untuk menggeser pin kembali.'
+                : 'Geser peta untuk menentukan titik akurat yang akan menjadi pusat radius check-in teknisi.'}
+            </p>
           </div>
 
           {/* Notes */}

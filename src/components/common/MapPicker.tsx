@@ -53,6 +53,22 @@ function MapCenterTracker({ onCenterChanged, readOnly }: { onCenterChanged: (lat
   return null;
 }
 
+// 3. Sinkronisasi Kordinat Eksternal:
+// Pindahkan map view ketika props latitude/longitude diubah dari luar (misalnya dari hasil geocoding)
+function MapPanner({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    // Only pan if the map's current center is significantly different
+    const currentCenter = map.getCenter();
+    const distance = map.distance(currentCenter, [lat, lng]);
+    // If distance > 10 meters, pan to new location
+    if (distance > 10) {
+      map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+    }
+  }, [map, lat, lng]);
+  return null;
+}
+
 export const MapPicker: React.FC<MapPickerProps> = ({ 
   latitude, 
   longitude, 
@@ -83,6 +99,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
         />
         <MapResizer />
         <MapCenterTracker onCenterChanged={handleCenterChanged} readOnly={readOnly} />
+        <MapPanner lat={latitude || -6.200000} lng={longitude || 106.816666} />
       </MapContainer>
       
       {/* 3. PIN Statis di Tengah Layar:
