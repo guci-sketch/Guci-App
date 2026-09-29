@@ -1,0 +1,58 @@
+[
+  {
+    "id": "u6_20260303030118",
+    "no_surat": "GP-AR/U/2026/03/0001",
+    "kategori": "AR",
+    "tipe": "U",
+    "tipe_label": "Umum",
+    "layanan": "anti_rayap_injeksi",
+    "kepada": "PT Topindo Atlas Asia",
+    "by_uid": "u6",
+    "by_name": "Jono Prasetyo",
+    "dibuat": "2026-03-03T03:01:18.094889",
+    "status": "draft",
+    "quo_id": null
+  },
+  {
+    "id": "u4_20260303030118",
+    "no_surat": "GP-PCO/K/2026/03/0001",
+    "kategori": "PCO",
+    "tipe": "K",
+    "tipe_label": "Kontrak",
+    "layanan": "pest_umum",
+    "kepada": "PT PLN (Persero) UP3 Bulungan",
+    "by_uid": "u4",
+    "by_name": "Siti Rahayu",
+    "dibuat": "2026-03-03T03:01:18.116645",
+    "status": "draft",
+    "quo_id": null
+  },
+  {
+    "id": "u5_20260303030118",
+    "no_surat": "GP-AR/U/2026/03/0002",
+    "kategori": "AR",
+    "tipe": "U",
+    "tipe_label": "Umum",
+    "layanan": "anti_rayap_pra",
+    "kepada": "PT Oreka Solusi Kreatif",
+    "by_uid": "u5",
+    "by_name": "Andi Firmansyah",
+    "dibuat": "2026-03-03T03:01:18.132918",
+    "status": "draft",
+    "quo_id": null
+  },
+  {
+    "id": "u6_20260303030118",
+    "no_surat": "GP-PCO/U/2026/03/0001",
+    "kategori": "PCO",
+    "tipe": "U",
+    "tipe_label": "Umum",
+    "layanan": "pest_fogging",
+    "kepada": "Ibu Dita",
+    "by_uid": "u6",
+    "by_name": "Jono Prasetyo",
+    "dibuat": "2026-03-03T03:01:18.159017",
+    "status": "draft",
+    "quo_id": null
+  }
+]

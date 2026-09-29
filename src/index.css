@@ -1,65 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-@theme {
-  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
-  
-  --color-primary: #059669;
-  --color-primary-hover: #047857;
-  --color-primary-light: rgba(5, 150, 105, 0.08);
-  --color-cream: #FDFBF7;
-  --color-warm-white: #FAFAF8;
-  --color-tertiary: #825100;
-  --color-tertiary-light: #ffddb8;
-  --color-accent: #ffb95f;
-  --color-surface-dim: #191c1e;
-  --color-surface-text: #eff1f3;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --bg-primary: #faf9f7;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f5f3ef;
-  --bg-card: #ffffff;
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+  }
 
-  --text-primary: #2d2a26;
-  --text-secondary: #5a554f;
-  --text-muted: #8a8580;
-  --text-inverse: #ffffff;
+  * { border-color: hsl(var(--border)); box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-  --accent: #059669;
-  --accent-glow: rgba(5, 150, 105, 0.08);
-  --accent-hover: #047857;
-  --accent-text: #047857;
-  
-  --border-subtle: #e5e3db;
-  --border-focus: #c2c0b8;
-  
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: 'Outfit', sans-serif;
+  /* Thin scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* Prevent horizontal overflow on small screens */
+  #root { overflow-x: hidden; }
 }
 
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .glass-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  }
-  
-  .clean-card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-  }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+  .pt-safe { padding-top: env(safe-area-inset-top, 0); }
+  .touch-target { min-height: 44px; min-width: 44px; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
