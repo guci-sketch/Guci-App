@@ -1,7 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-primary-light: rgba(5, 150, 105, 0.08);
+  --color-cream: #FDFBF7;
+  --color-warm-white: #FAFAF8;
+  --color-tertiary: #825100;
+  --color-tertiary-light: #ffddb8;
+  --color-accent: #ffb95f;
+  --color-surface-dim: #191c1e;
+  --color-surface-text: #eff1f3;
+}
 
 :root {
   --bg-primary: #faf9f7;
@@ -22,13 +35,6 @@
   --border-subtle: #e5e3db;
   --border-focus: #c2c0b8;
   
-  --background: 44 20% 97%; /* #faf9f7 approx */
-  --foreground: 30 9% 16%; /* #2d2a26 approx */
-  --primary: 161 94% 30%; /* #059669 approx */
-  --primary-foreground: 0 0% 100%;
-}
-
-body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Outfit', sans-serif;

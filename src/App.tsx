@@ -1,0 +1,41 @@
+import React, { useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
+import { ExecutorHome } from "./components/executor/ExecutorHome";
+import { LoginPage as LoginForm } from "./components/auth/LoginForm";
+
+const Shell = () => {
+    const { user, status } = useAuth();
+    if (status === 'checking') {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+                <span className="w-8 h-8 border-2 border-[var(--border-subtle)] border-t-[var(--accent)] rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (status === 'unauthenticated' || !user) {
+        return <LoginForm />;
+    }
+
+    // Role mapping
+    const role = user.role;
+    if (role === 'ADMIN' || role === 'SUPERADMIN' || role === 'MARKETING') {
+        return <AdminDashboard />;
+    } else {
+        return <ExecutorHome />;
+    }
+};
+
+export default function App() {
+    return (
+        <BrowserRouter>
+            <AuthProvider>
+                <Routes>
+                    <Route path="/*" element={<Shell />} />
+                </Routes>
+            </AuthProvider>
+        </BrowserRouter>
+    );
+}

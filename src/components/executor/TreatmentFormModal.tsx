@@ -37,7 +37,6 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
   const [chemicalName, setChemicalName] = useState(existing?.chemicalName ?? '');
   const [activeIngredient, setActiveIngredient] = useState(existing?.activeIngredient ?? '');
   const [dosage, setDosage] = useState(existing?.dosage ?? '');
-  const [areaPlafon, setAreaPlafon] = useState(existing?.areaPlafon ?? '');
   const [treatmentAreaSqm, setTreatmentAreaSqm] = useState(existing?.treatmentAreaSqm ? String(existing.treatmentAreaSqm) : '');
   const [drillingPointsCount, setDrillingPointsCount] = useState(existing?.drillingPointsCount ? String(existing.drillingPointsCount) : '');
   const [fumigantType, setFumigantType] = useState(existing?.fumigantType ?? '');
@@ -73,7 +72,6 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
         dosage: dosage.trim(),
         treatmentAreaSqm: treatmentAreaSqm ? Number(treatmentAreaSqm) : undefined,
         drillingPointsCount: drillingPointsCount ? Number(drillingPointsCount) : undefined,
-        areaPlafon: areaPlafon.trim() || undefined,
         fumigantType: fumigantType.trim() || undefined,
         gasConcentrationPpm: gasConcentrationPpm ? Number(gasConcentrationPpm) : undefined,
         sealingStartedAt: sealingStartedAt ? new Date(sealingStartedAt).toISOString() : undefined,
@@ -168,20 +166,10 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
                   value={treatmentAreaSqm}
                   onChange={e => setTreatmentAreaSqm(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
-                  />
-                </div>
-              </div>
-              <div className="col-span-1">
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Area Plafon</label>
-                <input
-                  type="text"
-                  placeholder="Misal: Ruang Tamu (Opsional)"
-                  value={areaPlafon}
-                  onChange={e => setAreaPlafon(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
                 />
               </div>
             </div>
+          </div>
 
           {isTermite && (
             <div>

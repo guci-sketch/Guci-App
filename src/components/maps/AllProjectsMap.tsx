@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { Project, UserLocation } from '../../types';
-import { Navigation } from 'lucide-react';
+import { MapPin, User, Navigation } from 'lucide-react';
 
 interface AllProjectsMapProps {
   projects: Project[];

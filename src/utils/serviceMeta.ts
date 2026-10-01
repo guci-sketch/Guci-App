@@ -1,4 +1,4 @@
-import { Bug, Home, Wind, type LucideIcon } from 'lucide-react';
+import { Bug, Home, Wind, Rat, Bird, ShieldAlert, Sparkles, type LucideIcon } from 'lucide-react';
 import { ApplicationMethod, ServiceType } from '../types';
 
 interface ServiceTypeMeta {

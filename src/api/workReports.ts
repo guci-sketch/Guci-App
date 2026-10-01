@@ -61,7 +61,6 @@ export interface TreatmentInput {
   dosage: string;
   treatmentAreaSqm?: number;
   drillingPointsCount?: number;
-  areaPlafon?: string;
   fumigantType?: string;
   gasConcentrationPpm?: number;
   sealingStartedAt?: string;

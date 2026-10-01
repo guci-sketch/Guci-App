@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WorkReport, Project, DocumentationPhoto, PhotoType, PhotoTag } from '../../types';
-import { useAuthStore } from '../../store/authStore';
+import { useAuth } from '../../context/AuthContext';
 import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut, submitTreatment, TreatmentInput } from '../../api/workReports';
 import { createProject, fetchMyProjects, CreateProjectInput } from '../../api/projects';
 import { ApiError } from '../../api/client';
@@ -21,18 +21,10 @@ import {
 } from 'lucide-react';
 
 import { CustomerReviewFormModal } from './CustomerReviewFormModal';
-import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
-const postLocation = async (l: any) => {};
+import { postLocation } from '../../api/location';
 
 export const ExecutorHome: React.FC = () => {
-  const { user, setUser } = useAuthStore();
-  const navigate = useNavigate();
-  const logout = async () => {
-      await supabase.auth.signOut();
-      setUser(null);
-      navigate("/login");
-  };
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'jobs' | 'history' | 'profile'>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

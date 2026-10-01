@@ -103,7 +103,7 @@ export async function enqueue(action: QueuedAction, reportId: string, evidence: 
     latitude: evidence.latitude,
     longitude: evidence.longitude,
     accuracy: evidence.accuracy,
-    photoTag: evidence.photoTag as string | undefined,
+    photoTag: evidence.photoTag,
     notes: evidence.notes,
     customerName: evidence.customerName,
     customerPhone: evidence.customerPhone,
