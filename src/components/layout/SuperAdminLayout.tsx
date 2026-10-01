@@ -20,7 +20,7 @@ export function SuperAdminLayout() {
     }
 
     if (!user) return <Navigate to="/login" replace />;
-    if (user.role !== "super_admin") return <Navigate to="/dashboard" replace />;
+    if (user.role !== "SUPERADMIN") return <Navigate to="/dashboard" replace />;
 
     const handleLogout = async () => {
         await signOut(auth);

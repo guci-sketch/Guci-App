@@ -10,6 +10,8 @@ import { collection, query, where, getDocs, doc, setDoc, Timestamp } from "../..
 import { db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/authStore";
 import { getQuotations } from "../../services/quotationService";
+import * as XLSX from "xlsx";
+import { UploadCloud, Download } from "lucide-react";
 import { formatDate } from "../../lib/utils";
 import { LAYANAN_CONFIG } from "../../lib/quotationConfig";
 import type { Quotation } from "../../types";
@@ -391,8 +393,34 @@ export function CustomersPage() {
     const [filterWarranty, setFilterWarranty] = useState(false);
     const [checklistTarget, setChecklistTarget] = useState<DerivedCustomer | null>(null);
 
+    const downloadTemplate = () => {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([
+            ["Nama", "Kontak", "Alamat", "Proyek", "KategoriProyek"]
+        ]);
+        XLSX.utils.book_append_sheet(wb, ws, "Template_Klien");
+        XLSX.writeFile(wb, "Template_Import_Klien.xlsx");
+    };
+
+    const handleImportBulk = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            const bstr = evt.target?.result;
+            const wb = XLSX.read(bstr, { type: "binary" });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws);
+            // In a real app we'd batch insert these to Supabase.
+            // For now, alert success.
+            alert(`Berhasil membaca ${data.length} baris! (Integrasi API Supabase untuk Bulk Import bisa dilakukan di sini)`);
+        };
+        reader.readAsBinaryString(file);
+    };
+
     const debouncedSearch = useDebounce(searchQ, 350);
-    const canSeeAll = user?.role !== "marketing";
+    const canSeeAll = user?.role !== "MARKETING";
 
     const load = async () => {
         if (!user) return;
@@ -532,13 +560,24 @@ export function CustomersPage() {
 
     return (
         <div className="p-4 md:p-6 max-w-screen-lg mx-auto space-y-5">
-            <div>
-                <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    <Users size={20} className="text-blue-600" /> Pelanggan
-                </h1>
-                <p className="text-sm text-slate-500 mt-0.5">
-                    {canSeeAll ? "Database klien perusahaan" : "Klien dari quotation kamu"}
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <Users size={20} className="text-blue-600" /> Pelanggan
+                    </h1>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                        {canSeeAll ? "Database klien perusahaan" : "Klien dari quotation kamu"}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                        <Download size={13} /> Template Excel
+                    </button>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] cursor-pointer transition-colors shadow-sm">
+                        <UploadCloud size={13} /> Import Bulk
+                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImportBulk} />
+                    </label>
+                </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">

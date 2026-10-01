@@ -4,8 +4,7 @@ import { db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/authStore";
 import { formatRupiah } from "../../lib/utils";
 import {
-    DollarSign, TrendingUp, TrendingDown, FileText,
-    RefreshCw, Loader2, ChevronDown, BarChart3,
+    DollarSign, TrendingDown, RefreshCw, Loader2, ChevronDown, BarChart3,
     ArrowUpRight, Minus, CheckCircle2, Target,
 } from "lucide-react";
 

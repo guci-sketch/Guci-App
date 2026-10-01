@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { RoleGuard } from "./RoleGuard";
 import { AppLayout } from "../components/layout/AppLayout";
 import { SuperAdminLayout } from "../components/layout/SuperAdminLayout";
+import { ExecutorHome } from "../components/executor/ExecutorHome";
 
 // Auth
 import { LoginPage } from "../pages/auth/LoginPage";
@@ -16,15 +17,15 @@ import { QuotationEditPage } from "../pages/quotation/QuotationEditPage";
 import { NomorSuratLogPage } from "../pages/nomor-surat/NomorSuratLogPage";
 import { TeamPage } from "../pages/team/TeamPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
-import { ComingSoonPage } from "../pages/ComingSoonPage";
 import { CashflowPage } from "../pages/cashflow/CashflowPage";
 import { PerformaPage } from "../pages/performance/PerformaPage";
 import { CustomersPage } from "../pages/customers/CustomersPage";
+import { KontrolRayapPage } from "../pages/customers/KontrolRayapPage";
+import { InventoryPage } from "../pages/inventory/InventoryPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { StatusPHPage } from "../pages/status-ph/StatusPHPage";
-import { TrackingPage } from "../pages/tracking/TrackingPage";
 
-// Pages — super_admin
+// Pages — SUPERADMIN
 import { CompaniesPage } from "../pages/super-admin/CompaniesPage";
 import { CompanyUsersPage } from "../pages/super-admin/CompanyUsersPage";
 
@@ -58,7 +59,7 @@ export const router = createBrowserRouter([
             {
                 path: "companies",
                 element: (
-                    <RoleGuard allowedRoles={["super_admin"]}>
+                    <RoleGuard allowedRoles={["SUPERADMIN"]}>
                         <CompaniesPage />
                     </RoleGuard>
                 ),
@@ -66,7 +67,7 @@ export const router = createBrowserRouter([
             {
                 path: "companies/:companyId/users",
                 element: (
-                    <RoleGuard allowedRoles={["super_admin"]}>
+                    <RoleGuard allowedRoles={["SUPERADMIN"]}>
                         <CompanyUsersPage />
                     </RoleGuard>
                 ),
@@ -86,7 +87,7 @@ export const router = createBrowserRouter([
             {
                 path: "dashboard",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops", "marketing", "teknisi"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING", "TEKNISI_LAPANGAN"]}>
                         <DashboardPage />
                     </RoleGuard>
                 ),
@@ -94,7 +95,7 @@ export const router = createBrowserRouter([
             {
                 path: "quotations",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops", "marketing"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING"]}>
                         <QuotationPage />
                     </RoleGuard>
                 ),
@@ -102,7 +103,7 @@ export const router = createBrowserRouter([
             {
                 path: "quotations/new",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "marketing"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING"]}>
                         <QuotationFormPage />
                     </RoleGuard>
                 ),
@@ -110,7 +111,7 @@ export const router = createBrowserRouter([
             {
                 path: "quotations/:id/edit",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "marketing", "admin_ops"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING", "ADMIN"]}>
                         <QuotationEditPage />
                     </RoleGuard>
                 ),
@@ -118,7 +119,7 @@ export const router = createBrowserRouter([
             {
                 path: "nomor-surat-log",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <NomorSuratLogPage />
                     </RoleGuard>
                 ),
@@ -126,7 +127,7 @@ export const router = createBrowserRouter([
             {
                 path: "team",
                 element: (
-                    <RoleGuard allowedRoles={["administrator"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <TeamPage />
                     </RoleGuard>
                 ),
@@ -134,7 +135,7 @@ export const router = createBrowserRouter([
             {
                 path: "profile",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops", "marketing", "teknisi"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING", "TEKNISI_LAPANGAN"]}>
                         <ProfilePage />
                     </RoleGuard>
                 ),
@@ -142,15 +143,31 @@ export const router = createBrowserRouter([
             {
                 path: "customers",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops", "marketing"]}>
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING"]}>
                         <CustomersPage />
+                    </RoleGuard>
+                ),
+            },
+            {
+                path: "kontrol-rayap",
+                element: (
+                    <RoleGuard allowedRoles={["ADMIN", "MARKETING"]}>
+                        <KontrolRayapPage />
+                    </RoleGuard>
+                ),
+            },
+            {
+                path: "inventory",
+                element: (
+                    <RoleGuard allowedRoles={["ADMIN"]}>
+                        <InventoryPage />
                     </RoleGuard>
                 ),
             },
             {
                 path: "cashflow",
                 element: (
-                    <RoleGuard allowedRoles={["administrator"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <CashflowPage />
                     </RoleGuard>
                 ),
@@ -158,23 +175,23 @@ export const router = createBrowserRouter([
             {
                 path: "performance",
                 element: (
-                    <RoleGuard allowedRoles={["administrator"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <PerformaPage />
                     </RoleGuard>
                 ),
             },
             {
-                path: "tracking",
+                path: "executor",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops"]}>
-                        <TrackingPage />
+                    <RoleGuard allowedRoles={["TEKNISI_LAPANGAN", "ADMIN"]}>
+                        <ExecutorHome />
                     </RoleGuard>
                 ),
             },
             {
                 path: "status-ph",
                 element: (
-                    <RoleGuard allowedRoles={["administrator", "admin_ops"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <StatusPHPage />
                     </RoleGuard>
                 ),
@@ -182,7 +199,7 @@ export const router = createBrowserRouter([
             {
                 path: "settings",
                 element: (
-                    <RoleGuard allowedRoles={["administrator"]}>
+                    <RoleGuard allowedRoles={["ADMIN"]}>
                         <SettingsPage />
                     </RoleGuard>
                 ),
@@ -192,7 +209,7 @@ export const router = createBrowserRouter([
     {
         path: "/field",
         element: (
-            <RoleGuard allowedRoles={["teknisi", "administrator", "super_admin"]}>
+            <RoleGuard allowedRoles={["TEKNISI_LAPANGAN", "ADMIN", "SUPERADMIN"]}>
                 <FieldLayout />
             </RoleGuard>
         ),
@@ -205,7 +222,7 @@ export const router = createBrowserRouter([
     {
         path: "/field/ar-measure",
         element: (
-            <RoleGuard allowedRoles={["teknisi", "administrator", "super_admin"]}>
+            <RoleGuard allowedRoles={["TEKNISI_LAPANGAN", "ADMIN", "SUPERADMIN"]}>
                 <ARMeasureTool />
             </RoleGuard>
         )

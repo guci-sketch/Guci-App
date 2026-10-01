@@ -23,14 +23,14 @@ export function useAuth() {
                 }
 
                 // Map Postgres roles to the AppUser roles expected by the frontend
-                let role: UserRole = "teknisi"; // Default
+                let role: UserRole = "TEKNISI_LAPANGAN"; // Default
                 switch (userData.role) {
-                    case "SUPERADMIN": role = "super_admin"; break;
-                    case "ADMIN_PERUSAHAAN": role = "administrator"; break;
-                    case "MARKETING": role = "marketing"; break;
-                    case "TEKNISI": role = "teknisi"; break;
-                    case "SPV": role = "admin_ops"; break; // mapping SPV to admin_ops for now
-                    case "GUDANG": role = "admin_ops"; break; // mapping GUDANG
+                    case "SUPERADMIN": role = "SUPERADMIN"; break;
+                    case "ADMIN_PERUSAHAAN": role = "ADMIN"; break;
+                    case "MARKETING": role = "MARKETING"; break;
+                    case "TEKNISI": role = "TEKNISI_LAPANGAN"; break;
+                    case "SPV": role = "ADMIN"; break; // mapping SPV to admin_ops for now
+                    case "GUDANG": role = "ADMIN"; break; // mapping GUDANG
                 }
 
                 const appUser: AppUser = {

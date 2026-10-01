@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import {
     ArrowLeft, ArrowRight, Check, FileText,
     Plus, Trash2, Loader2, AlertCircle,
-    Clock, ExternalLink, Hash,
+    Clock, Hash,
     FileCheck2, Database, ShieldCheck,
     Camera, X, FlaskConical, ChevronDown, ChevronUp, MessageCircle, MapPin,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { commitNomorSurat, previewNomorSurat } from "../../services/nomorSuratService";
 import { saveQuotationDraft, getQuotations } from "../../services/quotationService";
-import { LAYANAN_CONFIG, calcTotals, fmtIDR, TIPE_LABELS, KONDISI_BANGUNAN_LABELS } from "../../lib/quotationConfig";
+import { LAYANAN_CONFIG, calcTotals, fmtIDR, TIPE_LABELS } from "../../lib/quotationConfig";
 import type { JenisLayanan, TipeKontrak, KategoriSurat, QuotationItem, BiayaTambahan, SurveyPhoto, ChemicalItem, KondisiBangunan } from "../../types";
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
@@ -69,13 +69,14 @@ const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg fo
 
 // ─── STEP 1 ───────────────────────────────────────────────────────────────────
 
-function Step1({ jenisLayanan, tipe, kepada, noPreview, kondisiBangunan,
-    onLayanan, onTipe, onKepada, onKondisi, errors }: {
+function Step1({ jenisLayanan, tipe, kepada, noPreview, kondisiBangunan, kategoriProyek,
+    onLayanan, onTipe, onKepada, onKondisi, onKategoriProyek, errors }: {
     jenisLayanan: JenisLayanan; tipe: TipeKontrak; kepada: string; noPreview: string;
-    kondisiBangunan: KondisiBangunan;
+    kondisiBangunan: KondisiBangunan; kategoriProyek: any;
     onLayanan: (v: JenisLayanan) => void; onTipe: (v: TipeKontrak) => void;
     onKepada: (v: string) => void;
     onKondisi: (v: KondisiBangunan) => void;
+    onKategoriProyek: (v: any) => void;
     errors: Record<string, string>;
 }) {
     const kategori = LAYANAN_CONFIG[jenisLayanan]?.kategori ?? "PCO";
@@ -158,6 +159,17 @@ function Step1({ jenisLayanan, tipe, kepada, noPreview, kondisiBangunan,
                     )}
                 </Field>
             )}
+
+                <Field label="Kategori Proyek" required>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {["Residensial", "Komersial", "Korporat", "Instansi", "Industri", "Lainnya"].map(kat => (
+                            <button key={kat} type="button" onClick={() => onKategoriProyek(kat)}
+                                className={`px-4 py-2 border rounded-xl text-left transition-all ${kategoriProyek === kat ? "border-blue-500 bg-blue-50 text-blue-700 font-bold" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}>
+                                {kat}
+                            </button>
+                        ))}
+                    </div>
+                </Field>
 
             {/* Tipe Surat */}
             <Field label="Tipe Surat" required>
@@ -557,7 +569,7 @@ function Step2({ nama, alamatLines, up, wa, knownCustomers, onNama, onAlamat, on
                             onChange={e => updateLine(i, e.target.value)}
                             placeholder={`Baris alamat ${i + 1}`} />
                         {i > 0 && (
-                            <button type="button" onClick={() => onAlamat(alamatLines.filter((_, idx) => idx !== i))}
+                            <button type="button" onClick={() => onAlamat(alamatLines.filter((_, filterIdx) => filterIdx !== i))}
                                 className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors border border-slate-200">
                                 <Trash2 size={14} />
                             </button>
@@ -608,16 +620,16 @@ function Step2({ nama, alamatLines, up, wa, knownCustomers, onNama, onAlamat, on
 
 // ─── STEP 3 ───────────────────────────────────────────────────────────────────
 
-function Step3({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor, garansiTahun, jenisGaransi,
+function Step3({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor, garansiTahun, jenisGaransi, estimasiHari,
     pembulatanRp,
-    onItems, onBiaya, onDiskon, onPpn, onPpnDpp, onGaransi, onJenisGaransi, onPembulatan, jenisLayanan }: {
+    onItems, onBiaya, onDiskon, onPpn, onPpnDpp, onGaransi, onJenisGaransi, onEstimasiHari, onPembulatan, jenisLayanan }: {
     items: QuotationItem[]; biayaTambahan: BiayaTambahan[];
     diskonPct: number; ppn: boolean; ppnDppFaktor: number;
-    garansiTahun: number; jenisGaransi: string;
+    garansiTahun: number; jenisGaransi: string; estimasiHari: number;
     pembulatanRp: number;
     onItems: (v: QuotationItem[]) => void; onBiaya: (v: BiayaTambahan[]) => void;
     onDiskon: (v: number) => void; onPpn: (v: boolean) => void; onPpnDpp: (v: number) => void;
-    onGaransi: (v: number) => void; onJenisGaransi: (v: string) => void;
+    onGaransi: (v: number) => void; onJenisGaransi: (v: string) => void; onEstimasiHari: (v: number) => void;
     onPembulatan: (v: number) => void;
     jenisLayanan: JenisLayanan;
 }) {
@@ -661,7 +673,7 @@ function Step3({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor, garansiTahu
                             <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Item {i + 1}</span>
                                 {items.length > 1 && (
-                                    <button type="button" onClick={() => onItems(items.filter((_, idx) => idx !== i))}
+                                    <button type="button" onClick={() => onItems(items.filter((_, filterIdx) => filterIdx !== i))}
                                         className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                                         <Trash2 size={13} />
                                     </button>
@@ -738,7 +750,7 @@ function Step3({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor, garansiTahu
                         <input type="number" min={0} className="w-36 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-300"
                             value={b.amount} placeholder="Nominal"
                             onChange={e => updateBiaya(i, "amount", parseInt(e.target.value) || 0)} />
-                        <button type="button" onClick={() => onBiaya(biayaTambahan.filter((_, idx) => idx !== i))}
+                        <button type="button" onClick={() => onBiaya(biayaTambahan.filter((_, filterIdx) => filterIdx !== i))}
                             className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 border border-slate-200 transition-colors">
                             <Trash2 size={14} />
                         </button>
@@ -785,6 +797,15 @@ function Step3({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor, garansiTahu
                             placeholder="Anti Rayap / Anti Rayap Pra-Konstruksi" />
                     </Field>
                 )}
+                
+                <Field label="Estimasi Hari Pengerjaan">
+                    <div className="relative">
+                        <input type="number" min={1} className={inputCls}
+                            value={estimasiHari} onChange={e => onEstimasiHari(parseInt(e.target.value) || 1)}
+                            placeholder="Misal: 2" />
+                        <span className="absolute right-3 top-2.5 text-xs text-slate-400">Hari</span>
+                    </div>
+                </Field>
 
                 {/* Pembulatan harga */}
                 <Field
@@ -1271,7 +1292,7 @@ function GeneratingOverlay({ genState }: { genState: GenState }) {
 
                 {/* Steps */}
                 <div className="px-6 py-5 space-y-3">
-                    {GEN_STEPS.map((s, idx) => {
+                    {GEN_STEPS.map((s) => {
                         const sIdx = stepOrder.indexOf(s.key);
                         const isDone    = sIdx < currentIdx || genState.step === "done";
                         const isActive  = s.key === genState.step;
@@ -1439,6 +1460,7 @@ export function QuotationFormPage() {
     }, [user?.uid]);
 
     const [jenisLayanan, setJenisLayanan] = useState<JenisLayanan>("anti_rayap_injeksi");
+    const [kategoriProyek, setKategoriProyek] = useState<any>("Residensial");
     const [tipe, setTipe] = useState<TipeKontrak>("U");
     const [kepada, setKepada] = useState("");
     const [noPreview, setNoPreview] = useState("");
@@ -1455,10 +1477,11 @@ export function QuotationFormPage() {
     const [ppn, setPpn] = useState(false);
     const [ppnDppFaktor, setPpnDppFaktor] = useState(0);
     const [pembulatanRp, setPembulatanRp] = useState(0);
-    const [peralatan, setPeralatan] = useState<string[]>([]);
+    const [setPeralatan] = useState<string[]>([]);
     const [kondisiBangunan, setKondisiBangunan] = useState<KondisiBangunan>(null);
     const [garansiTahun, setGaransiTahun] = useState(0);
     const [jenisGaransi, setJenisGaransi] = useState("Anti Rayap");
+    const [estimasiHari, setEstimasiHari] = useState(1);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [genState, setGenState] = useState<GenState>({ step: "idle" });
@@ -1473,7 +1496,6 @@ export function QuotationFormPage() {
         const willAR = LAYANAN_CONFIG[v]?.isAR ?? false;
         if (wasAR !== willAR) {
             setItems([{ desc: "", qty: 1, unit: "m2", harga: 0 }]);
-            setPeralatan([]);
         }
         setKondisiBangunan(null);
         setJenisLayanan(v);
@@ -1509,7 +1531,7 @@ export function QuotationFormPage() {
 
     useEffect(() => {
         if (kepadaNama === "" && kepada) setKepadaNama(kepada);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [step, kepada, kepadaNama]);
 
     const calc = calcTotals({ items, biayaTambahan, diskonPct, ppn, ppnDppFaktor: ppnDppFaktor || undefined });
@@ -1561,6 +1583,7 @@ export function QuotationFormPage() {
             setGenState({ step: "db" });
             const saved = await saveQuotationDraft({
                 noSurat: nomorEntry.noSurat, kategori, tipeKontrak: tipe, jenisLayanan,
+                kategoriProyek: kategoriProyek,
                 perihal: LAYANAN_CONFIG[jenisLayanan]?.perihal ?? "",
                 kepadaNama: kepadaFinal,
                 kepadaAlamatLines: kepadaAlamat.filter(Boolean),
@@ -1570,6 +1593,7 @@ export function QuotationFormPage() {
                 ppnDppFaktor: ppnDppFaktor || undefined,
                 garansiTahun: garansiTahun || undefined,
                 jenisGaransi: jenisGaransi || undefined,
+                estimasiHari: estimasiHari || undefined,
                 subtotal: calc.subtotal, diskonRp: calc.diskonRp, ppnRp: calc.ppnRp, total: totalFinal,
                 marketingUid: user.uid, marketingNama: user.name, marketingWa: user.wa,
                 status: "pending", companyId: user.companyId,
@@ -1634,17 +1658,18 @@ export function QuotationFormPage() {
 
             <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 shadow-sm">
                 {step === 0 && <Step1 jenisLayanan={jenisLayanan} tipe={tipe} kepada={kepada} noPreview={noPreview}
-                    kondisiBangunan={kondisiBangunan}
-                    onLayanan={handleLayanan} onTipe={setTipe} onKepada={setKepada} onKondisi={setKondisiBangunan} errors={errors} />}
+                    kondisiBangunan={kondisiBangunan} kategoriProyek={kategoriProyek}
+                    onLayanan={handleLayanan} onTipe={setTipe} onKepada={setKepada} onKondisi={setKondisiBangunan} onKategoriProyek={setKategoriProyek} errors={errors} />}
                 {step === 1 && <Step2 nama={kepadaNama} alamatLines={kepadaAlamat} up={kepadaUp} wa={kepadaWa}
                     knownCustomers={knownCustomers}
                     onNama={setKepadaNama} onAlamat={setKepadaAlamat} onUp={setKepadaUp} onWa={setKepadaWa} errors={errors} />}
                 {step === 2 && <Step3 items={items} biayaTambahan={biayaTambahan} diskonPct={diskonPct}
                     ppn={ppn} ppnDppFaktor={ppnDppFaktor} garansiTahun={garansiTahun} jenisGaransi={jenisGaransi}
+                    estimasiHari={estimasiHari}
                     pembulatanRp={pembulatanRp}
                     jenisLayanan={jenisLayanan} onItems={setItems} onBiaya={setBiayaTambahan}
                     onDiskon={setDiskonPct} onPpn={setPpn} onPpnDpp={setPpnDppFaktor}
-                    onGaransi={setGaransiTahun} onJenisGaransi={setJenisGaransi}
+                    onGaransi={setGaransiTahun} onJenisGaransi={setJenisGaransi} onEstimasiHari={setEstimasiHari}
                     onPembulatan={setPembulatanRp} />}
                 {step === 3 && <Step3b
                     jenisLayanan={jenisLayanan}

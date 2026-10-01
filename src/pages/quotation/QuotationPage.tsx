@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { SignatureModal } from "../../components/SignatureModal";
 import { useNavigate } from "react-router-dom";
 import { useCompanyTemplate } from "../../hooks/useCompanyTemplate";
@@ -6,8 +6,7 @@ import {
     FileText, Plus, Search, RefreshCw,
     CheckCircle2, XCircle, Clock, FileX2,
     Eye, Download, Filter, ChevronLeft, ChevronRight,
-    PenLine, MessageSquare, AlertCircle, Trash2, Send, MessageCircle, Pencil, Loader2,
-} from "lucide-react";
+    PenLine, MessageSquare, AlertCircle, Trash2, Send, MessageCircle, Pencil, } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { getQuotations, updateQuotationStatus, deleteQuotation, attachPdfToQuotation } from "../../services/quotationService";
 import { generateQuotationPDF } from "../../lib/pdfGenerator";
@@ -443,10 +442,10 @@ export function QuotationPage() {
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-    const canSeeAll = user?.role !== "marketing";
-    const canApprove = user?.role === "super_admin" || user?.role === "administrator";
-    const canCreate = user?.role === "super_admin" || user?.role === "administrator" || user?.role === "marketing";
-    const canDelete = user?.role === "administrator";
+    const canSeeAll = user?.role !== "MARKETING";
+    const canApprove = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+    const canCreate = user?.role === "SUPERADMIN" || user?.role === "ADMIN" || user?.role === "MARKETING";
+    const canDelete = user?.role === "ADMIN";
 
     const load = async () => {
         if (!user) return;

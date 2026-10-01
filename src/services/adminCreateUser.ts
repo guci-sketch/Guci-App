@@ -11,7 +11,7 @@ export interface CreateUserParams {
     email: string;
     password: string;
     name: string;
-    role: Extract<UserRole, "administrator" | "marketing" | "admin_ops" | "teknisi">;
+    role: Extract<UserRole, "ADMIN" | "MARKETING" | "ADMIN" | "TEKNISI_LAPANGAN">;
     companyId: string;
     jabatan?: string;
     wa?: string;

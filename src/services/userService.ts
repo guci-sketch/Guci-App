@@ -8,13 +8,13 @@ const MAX_USERS_PER_COMPANY = 7; // Example limit
 
 function mapRoleToAppUser(role: string): UserRole {
     switch (role) {
-        case "SUPERADMIN": return "super_admin";
-        case "ADMIN_PERUSAHAAN": return "administrator";
-        case "MARKETING": return "marketing";
-        case "TEKNISI": return "teknisi";
-        case "SPV": return "admin_ops";
-        case "GUDANG": return "admin_ops";
-        default: return "teknisi";
+        case "SUPERADMIN": return "SUPERADMIN";
+        case "ADMIN_PERUSAHAAN": return "ADMIN";
+        case "MARKETING": return "MARKETING";
+        case "TEKNISI": return "TEKNISI_LAPANGAN";
+        case "SPV": return "ADMIN";
+        case "GUDANG": return "ADMIN";
+        default: return "TEKNISI_LAPANGAN";
     }
 }
 

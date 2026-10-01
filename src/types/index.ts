@@ -1,9 +1,4 @@
-export type UserRole =
-    | "super_admin"
-    | "administrator"
-    | "admin_ops"
-    | "marketing"
-    | "teknisi";
+export type UserRole = "SUPERADMIN" | "ADMIN" | "MARKETING" | "TEKNISI_LAPANGAN";
 
 export interface AppUser {
     uid: string;
@@ -15,6 +10,7 @@ export interface AppUser {
     isActive: boolean;
     wa?: string;
     jabatan?: string;
+    nip?: string | null;
 }
 
 export interface Company {
@@ -42,7 +38,7 @@ export interface Customer {
 }
 
 export type QuotationStatus = "draft" | "pending" | "approved" | "rejected" | "sent_to_client" | "deal" | "cancelled";
-export type ServiceType = "pest_control" | "anti_rayap";
+export type ServiceType = "pest_control" | "anti_rayap" | "pest_control" | "anti_rayap" | "fumigasi";
 export type ServiceMethod =
     | "spraying"
     | "fogging"
@@ -177,9 +173,12 @@ export interface NomorSuratLog {
     keteranganManual?: string;
 }
 
+export type KategoriProyek = "Residensial" | "Komersial" | "Korporat" | "Instansi" | "Industri" | "Lainnya";
+
 export interface Quotation {
     id: string;
     noSurat: string;
+    kategoriProyek: KategoriProyek;
     kategori: KategoriSurat;
     tipeKontrak: TipeKontrak;
     jenisLayanan: JenisLayanan;
@@ -196,6 +195,7 @@ export interface Quotation {
     ppnDppFaktor?: number;
     garansiTahun?: number;
     jenisGaransi?: string;
+    estimasiHari?: number;
     subtotal: number;
     diskonRp: number;
     ppnRp: number;
@@ -262,6 +262,7 @@ export interface SPK {
     perihal: string;
     lokasi: string;
     notes: string;
+    alatPekerjaan?: string[];
     companyId: string;
     createdAt: Date;
     createdBy: string;
@@ -285,4 +286,237 @@ export interface Report {
     sentToClient: boolean;
     sentAt?: Date;
     companyId: string;
+}
+
+export type WorkReportStatus = 'DRAFT' | 'READY' | 'WORKING' | 'COMPLETED' | 'FLAGGED' | 'REVIEWED';
+export type RiskLevel = 'NORMAL' | 'LOW_RISK' | 'REVIEW' | 'HIGH_RISK' | 'CRITICAL';
+export type PhotoType = 'CHECK_IN' | 'PROGRESS' | 'CHECK_OUT';
+export type PhotoTag = 'BEFORE' | 'AFTER' | null;
+
+export type ApplicationMethod = 'SPRAYING' | 'BAITING' | 'DRILLING' | 'TRENCHING' | 'FOGGING' | 'MISTING' | 'DUSTING' | 'GEL_INJECTION';
+export type ContractType = 'ONE_TIME' | 'RECURRING';
+
+export interface TreatmentRecord {
+  applicationMethod: ApplicationMethod;
+  chemicalName: string;
+  activeIngredient?: string | null;
+  dosage: string;
+  treatmentAreaSqm?: number | null;
+  drillingPointsCount?: number | null;
+  areaPlafon?: string | null;
+  fumigantType?: string | null;
+  gasConcentrationPpm?: number | null;
+  sealingStartedAt?: string | null;
+  aerationCompletedAt?: string | null;
+  safetyNotes?: string | null;
+  technicianNotes?: string | null;
+}
+
+export interface Project {
+  id: string;
+  projectName: string;
+  clientName: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  radius: number;
+  workDate: string;
+  workType: string;
+  serviceType: ServiceType;
+  pestTarget?: string | null;
+  targetPests: string[];
+  buildingAreaSqm?: number | null;
+  contractType: ContractType;
+  warrantyMonths: number;
+  nextServiceDate?: string | null;
+  scheduledStartTime: string;
+  notes?: string | null;
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+  lockedAt?: string | null;
+}
+
+export interface DocumentationPhoto {
+  id: string;
+  photoType: PhotoType;
+  photoTag?: PhotoTag;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  distanceToProject: number;
+  isWithinRadius: boolean;
+  capturedAt: string;
+  metadata: { projectName?: string; executorName?: string; caption?: string | null };
+  purgedAt?: string | null;
+  url: string;
+}
+
+export interface RiskEvent {
+  id: string;
+  eventType: string;
+  points: number;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  expectedValue?: string | null;
+  actualValue?: string | null;
+  createdAt: string;
+}
+
+export interface WorkReport {
+  id: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  projectAddress: string;
+  projectLatitude: number;
+  projectLongitude: number;
+  projectRadius: number;
+  scheduledStartTime: string;
+  serviceType: ServiceType;
+  pestTarget?: string | null;
+  targetPests: string[];
+  buildingAreaSqm?: number | null;
+  contractType: ContractType;
+  warrantyMonths: number;
+  nextServiceDate?: string | null;
+  executorId: string;
+  executorName: string;
+  executorEmail: string;
+  status: WorkReportStatus;
+  checkInAt?: string | null;
+  checkInLatitude?: number | null;
+  checkInLongitude?: number | null;
+  checkInAccuracy?: number | null;
+  checkInDistance?: number | null;
+  checkInValid?: boolean | null;
+  checkOutAt?: string | null;
+  checkOutLatitude?: number | null;
+  checkOutLongitude?: number | null;
+  checkOutAccuracy?: number | null;
+  checkOutDistance?: number | null;
+  checkOutValid?: boolean | null;
+  durationSeconds?: number | null;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  riskEvents: RiskEvent[];
+  treatmentRecord: TreatmentRecord | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerFeedback?: string | null;
+  customerSignature?: string | null;
+  notes?: string | null;
+  photos: DocumentationPhoto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkReportListItem {
+  id: string;
+  status: WorkReportStatus;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  durationSeconds: number | null;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  checkInValid: boolean | null;
+  checkOutValid: boolean | null;
+  checkInDistance: number | null;
+  checkOutDistance: number | null;
+  createdAt: string;
+  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; pestTarget: string | null; targetPests?: string[] };
+  executor: { id: string; name: string };
+  treatmentSummary: { applicationMethod: ApplicationMethod; chemicalName: string; dosage: string } | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  userName: string;
+  userRole: UserRole;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  details: string;
+  createdAt: string;
+}
+
+export interface KPIStats {
+  totalJobs: number;
+  completedJobs: number;
+  workingJobs: number;
+  flaggedJobs: number;
+  highRiskCount: number;
+  avgDurationMinutes: number;
+  avgRiskScore: number;
+}
+
+export interface ExecutorStats {
+  id: string;
+  name: string;
+  email: string;
+  nip: string | null;
+  phone: string | null;
+  isActive: boolean;
+  totalJobs: number;
+  completedJobs: number;
+  highRiskJobs: number;
+  avgDurationMinutes: number;
+}
+
+export interface RiskConfig {
+  lateCheckinThresholdMinutes: number;
+  lateCheckinPoints: number;
+  outsideRadiusPoints: number;
+  shortDurationCriticalMinutes: number;
+  shortDurationCriticalPoints: number;
+  shortDurationWarningMinutes: number;
+  shortDurationWarningPoints: number;
+  minTotalPhotos: number;
+  minTotalPhotosPoints: number;
+  requireProgressPhoto: boolean;
+  noProgressPhotoPoints: number;
+  locationDriftThresholdMeters: number;
+  locationDriftPoints: number;
+  missingTreatmentRecordPoints: number;
+  fumigationMissingAerationPoints: number;
+  reviewThreshold: number;
+  highRiskThreshold: number;
+  criticalThreshold: number;
+  lowRiskThreshold: number;
+}
+
+export interface ReportFilters {
+  startDate?: string;
+  endDate?: string;
+  timeStart?: string;
+  timeEnd?: string;
+  executorId: string;
+  projectId: string;
+  riskLevel: string;
+  status: string;
+  serviceType: string;
+  search: string;
+  page?: number;
+  limit?: number;
+}
+
+export const DEFAULT_FILTERS: ReportFilters = {
+  executorId: 'ALL',
+  projectId: 'ALL',
+  riskLevel: 'ALL',
+  status: 'ALL',
+  serviceType: 'ALL',
+  search: '',
+};
+
+export interface UserLocation {
+  userId: string;
+  userName: string;
+  latitude: number;
+  longitude: number;
+  trackedAt: string;
 }

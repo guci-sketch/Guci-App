@@ -101,7 +101,7 @@ function CreateSPKModal({
                     getDocs(query(
                         collection(db, "users"),
                         where("companyId", "==", companyId),
-                        where("role", "==", "teknisi"),
+                        where("role", "==", "TEKNISI_LAPANGAN"),
                         where("isActive", "==", true),
                     )),
                 ]);
@@ -405,7 +405,7 @@ function SPKDetailModal({
         getDocs(query(
             collection(db, "users"),
             where("companyId", "==", companyId),
-            where("role", "==", "teknisi"),
+            where("role", "==", "TEKNISI_LAPANGAN"),
             where("isActive", "==", true),
         )).then(snap => {
             setTeknisis(snap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
@@ -563,7 +563,7 @@ function InfoBlock({ icon, label, value }: { icon: React.ReactNode; label: strin
 export function SPKPage() {
     const { user } = useAuthStore();
     const companyId = user?.companyId ?? "";
-    const canCreate = user?.role !== "teknisi" && user?.role !== "super_admin";
+    const canCreate = user?.role !== "TEKNISI_LAPANGAN" && user?.role !== "SUPERADMIN";
 
     const [spkList, setSpkList] = useState<SPK[]>([]);
     const [loading, setLoading] = useState(true);

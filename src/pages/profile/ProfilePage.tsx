@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { doc, updateDoc } from "../../lib/firebase";
-import { auth, db } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/authStore";
 import {
     User, Lock, Phone, Briefcase, CheckCircle2,

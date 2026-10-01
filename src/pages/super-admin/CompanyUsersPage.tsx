@@ -67,7 +67,7 @@ function CreateAdminModal({
                 email: email.trim(),
                 password,
                 name: name.trim(),
-                role: "administrator",
+                role: "ADMIN",
                 companyId,
                 jabatan: jabatan.trim(),
             });
@@ -310,7 +310,7 @@ export function CompanyUsersPage() {
         }
     };
 
-    const hasAdmin = users.some(u => u.role === "administrator");
+    const hasAdmin = users.some(u => u.role === "ADMIN");
 
     return (
         <div className="p-4 md:p-6 max-w-screen-lg mx-auto space-y-5">

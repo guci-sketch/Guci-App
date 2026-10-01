@@ -1,19 +1,24 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx";
+import { fmtIDR } from "../../lib/quotationConfig";
 import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
 import { db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/authStore";
 import { ROLE_LABELS, formatRupiah } from "../../lib/utils";
 import { getTrackingByCompany } from "../../services/trackingService";
 import {
-    FileText, Clock, CheckCircle2, XCircle, TrendingUp,
+    FileText, Clock, CheckCircle2, TrendingUp,
     Send, ClipboardList, AlertCircle, ArrowRight,
     Banknote, Wrench, ChevronRight, RefreshCw, Users,
 } from "lucide-react";
+import {
+    PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from "recharts";
 import type { Quotation, QuotationStatus } from "../../types";
 import type { OrderTracking } from "../../services/trackingService";
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MONTHS_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
 
@@ -31,7 +36,7 @@ function fmtDate(d: Date) {
     return `${d.getDate()} ${MONTHS_ID[d.getMonth()]}`;
 }
 
-// ─── MINI SPARKLINE ───────────────────────────────────────────────────────────
+// â”€â”€â”€ MINI SPARKLINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
     if (data.length < 2) return null;
@@ -46,7 +51,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 
-// ─── REVENUE CHART ────────────────────────────────────────────────────────────
+// â”€â”€â”€ REVENUE CHART â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface MonthlyRevenue {
     label: string;
@@ -54,65 +59,75 @@ interface MonthlyRevenue {
     approved: number;
 }
 
-function RevenueChart({ data }: { data: MonthlyRevenue[] }) {
+function RevenueChart({ data, categoryData }: { data: MonthlyRevenue[], categoryData: any[] }) {
     const maxVal = Math.max(...data.map(d => d.deal + d.approved), 1);
     const fmtShort = (v: number) => {
         if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}M`;
         if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(0)}jt`;
-        if (v >= 1_000) return `${(v / 1_000).toFixed(0)}rb`;
+        if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
         return `${v}`;
     };
 
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-                <div>
-                    <p className="text-sm font-bold text-slate-800">Revenue per Bulan</p>
-                    <p className="text-xs text-slate-400 mt-0.5">6 bulan terakhir</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <p className="text-sm font-bold text-[var(--text-primary)]">Revenue per Bulan</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">6 bulan terakhir (Dalam Juta)</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-emerald-500" /> Deal</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-blue-300" /> Approved</span>
+                <div className="h-48 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data.map(d => ({ ...d, deal: d.deal / 1000000, approved: d.approved / 1000000 }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                            <Tooltip cursor={{ fill: 'var(--bg-tertiary)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
+                            <Bar dataKey="deal" name="Deal" stackId="a" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="approved" name="Approved" stackId="a" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
-            <div className="flex items-end gap-2 h-36">
-                {data.map((d, i) => {
-                    const dealPct = (d.deal / maxVal) * 100;
-                    const approvedPct = (d.approved / maxVal) * 100;
-                    const totalPct = dealPct + approvedPct;
-                    return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                            {/* Tooltip */}
-                            <div className="hidden group-hover:block absolute z-10 bg-slate-800 text-white text-[10px] rounded-lg px-2 py-1.5 -mt-16 whitespace-nowrap pointer-events-none shadow-lg">
-                                <p className="font-bold">{d.label}</p>
-                                {d.deal > 0 && <p>Deal: {fmtShort(d.deal)}</p>}
-                                {d.approved > 0 && <p>Approved: {fmtShort(d.approved)}</p>}
-                            </div>
-                            {/* Bar */}
-                            <div className="relative w-full flex flex-col justify-end" style={{ height: "120px" }}>
-                                <div className="w-full rounded-t-lg overflow-hidden flex flex-col justify-end"
-                                    style={{ height: `${Math.max(totalPct, totalPct > 0 ? 4 : 0)}%` }}>
-                                    <div className="w-full bg-blue-300 transition-all duration-700"
-                                        style={{ height: approvedPct > 0 ? `${(approvedPct / (dealPct + approvedPct)) * 100}%` : "0%" }} />
-                                    <div className="w-full bg-emerald-500 transition-all duration-700"
-                                        style={{ height: dealPct > 0 ? `${(dealPct / (dealPct + approvedPct)) * 100}%` : "0%" }} />
-                                </div>
-                                {totalPct > 0 && (
-                                    <p className="absolute -top-5 w-full text-center text-[9px] font-bold text-slate-600">
-                                        {fmtShort(d.deal + d.approved)}
-                                    </p>
-                                )}
-                            </div>
-                            <p className="text-[9px] text-slate-400 font-medium">{d.label}</p>
-                        </div>
-                    );
-                })}
+            
+            <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <p className="text-sm font-bold text-[var(--text-primary)]">Komposisi Proyek (Deal)</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">Berdasarkan Kategori Proyek</p>
+                    </div>
+                </div>
+                <div className="h-48 w-full">
+                    {categoryData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={categoryData}
+                                    cx="50%" cy="50%"
+                                    innerRadius={40} outerRadius={70}
+                                    paddingAngle={2}
+                                    dataKey="value"
+                                >
+                                    {categoryData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip formatter={(val: any) => fmtIDR(val || 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Legend iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-xs text-[var(--text-muted)]">Belum ada data Deal</div>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-// ─── STAT CARD ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ STAT CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatCard({ label, value, sub, icon, accent, spark, onClick }: {
     label: string; value: string | number; sub?: string;
@@ -137,7 +152,7 @@ function StatCard({ label, value, sub, icon, accent, spark, onClick }: {
     );
 }
 
-// ─── PIPELINE BAR ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ PIPELINE BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function PipelineBar({ counts }: { counts: Record<string, number> }) {
     const stages = [
@@ -176,7 +191,7 @@ function PipelineBar({ counts }: { counts: Record<string, number> }) {
     );
 }
 
-// ─── QUOTATION ROW ────────────────────────────────────────────────────────────
+// â”€â”€â”€ QUOTATION ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function QuoRow({ q, onClick }: { q: Quotation; onClick?: () => void }) {
     const cfg = STATUS_CFG[q.status] ?? STATUS_CFG.draft;
@@ -200,7 +215,7 @@ function QuoRow({ q, onClick }: { q: Quotation; onClick?: () => void }) {
     );
 }
 
-// ─── TRACKING ALERT ───────────────────────────────────────────────────────────
+// â”€â”€â”€ TRACKING ALERT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TrackingAlert({ trackings }: { trackings: OrderTracking[] }) {
     const nunggak = trackings.filter(t => t.statusPembayaran === "nunggak");
@@ -234,7 +249,7 @@ function TrackingAlert({ trackings }: { trackings: OrderTracking[] }) {
     );
 }
 
-// ─── ACTIVITY FEED ────────────────────────────────────────────────────────────
+// â”€â”€â”€ ACTIVITY FEED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ActivityFeed({ quotations }: { quotations: Quotation[] }) {
     const recent = [...quotations]
@@ -250,13 +265,13 @@ function ActivityFeed({ quotations }: { quotations: Quotation[] }) {
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
                             style={{ background: cfg.bg }}>
                             <span style={{ color: cfg.color, fontSize: 10 }}>
-                                {q.status === "deal" ? "✓" : q.status === "pending" ? "…" : q.status === "approved" ? "✓" : q.status === "rejected" ? "✗" : "→"}
+                                {q.status === "deal" ? "âœ“" : q.status === "pending" ? "â€¦" : q.status === "approved" ? "âœ“" : q.status === "rejected" ? "âœ—" : "â†’"}
                             </span>
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-slate-800 truncate">{q.kepadaNama}</p>
                             <p className="text-[10px] text-slate-400">
-                                <code className="font-mono">{q.noSurat}</code> · {q.marketingNama} · {fmtDate(q.tanggal)}
+                                <code className="font-mono">{q.noSurat}</code> Â· {q.marketingNama} Â· {fmtDate(q.tanggal)}
                             </p>
                         </div>
                         <span className="text-[10px] font-bold shrink-0 px-1.5 py-0.5 rounded"
@@ -268,7 +283,7 @@ function ActivityFeed({ quotations }: { quotations: Quotation[] }) {
     );
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ MAIN PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function DashboardPage() {
     const { user } = useAuthStore();
@@ -277,8 +292,8 @@ export function DashboardPage() {
     const [trackings, setTrackings] = useState<OrderTracking[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const isAdmin = user?.role === "administrator";
-    const isAdminOps = user?.role === "admin_ops";
+    const isAdmin = user?.role === "ADMIN";
+    const isAdminOps = user?.role === "ADMIN";
     const canSeeAll = isAdmin || isAdminOps;
 
     const load = async () => {
@@ -307,9 +322,41 @@ export function DashboardPage() {
         }
     };
 
+    const exportExcel = () => {
+        const wb = XLSX.utils.book_new();
+        const wsData = [
+            ["ID", "Tanggal", "Nama Pelanggan", "Status", "Layanan", "Total Pendapatan (Estimasi)"]
+        ];
+        quotations.forEach(q => {
+            wsData.push([
+                q.id,
+                q.tanggal.toLocaleDateString(),
+                q.kepadaNama,
+                q.status,
+                q.jenisLayanan,
+                q.total.toString()
+            ]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "Laporan Kinerja");
+        XLSX.writeFile(wb, "FieldWork_Export.xlsx");
+    };
+
     useEffect(() => { load(); }, [user?.uid]);
 
-    // ── Stats ──────────────────────────────────────────────────────────────────
+    // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const categoryData = useMemo(() => {
+        const catMap = new Map<string, number>();
+        quotations.filter(q => q.status === "deal").forEach(q => {
+            const cat = q.kategoriProyek || "Lainnya";
+            catMap.set(cat, (catMap.get(cat) || 0) + q.total);
+        });
+        const COLORS = ["#059669", "#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899", "#64748b"];
+        return Array.from(catMap.entries()).map(([name, value], idx) => ({
+            name, value, color: COLORS[idx % COLORS.length]
+        }));
+    }, [quotations]);
+
     const stats = useMemo(() => {
         const now = new Date();
         const thisMonth = quotations.filter(q =>
@@ -383,16 +430,16 @@ export function DashboardPage() {
     return (
         <div className="p-4 md:p-6 max-w-screen-xl mx-auto space-y-5 pb-10">
 
-            {/* ── Header ── */}
+            {/* â”€â”€ Header â”€â”€ */}
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="text-xs text-slate-400 font-medium">{greeting},</p>
                     <h1 className="text-xl font-bold text-slate-900 leading-tight">
-                        {user?.name?.split(" ")[0]} 👋
+                        {user?.name?.split(" ")[0]} ðŸ‘‹
                     </h1>
                     <p className="text-xs text-slate-400 mt-0.5">
                         <span className="font-semibold text-blue-600">{user ? ROLE_LABELS[user.role] : ""}</span>
-                        {canSeeAll ? " · semua data perusahaan" : " · data kamu saja"}
+                        {canSeeAll ? " Â· semua data perusahaan" : " Â· data kamu saja"}
                     </p>
                 </div>
                 <button onClick={load}
@@ -413,12 +460,12 @@ export function DashboardPage() {
                 </div>
             ) : (
                 <>
-                    {/* ── Alert pembayaran bermasalah ── */}
+                    {/* â”€â”€ Alert pembayaran bermasalah â”€â”€ */}
                     {isAdmin && alertTrackings.length > 0 && (
                         <TrackingAlert trackings={alertTrackings} />
                     )}
 
-                    {/* ── Stat cards ── */}
+                    {/* â”€â”€ Stat cards â”€â”€ */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <StatCard label="Menunggu Approval" value={stats.pendingList.length}
                             sub="Perlu ditinjau segera"
@@ -442,7 +489,7 @@ export function DashboardPage() {
                             onClick={isAdmin ? () => navigate("/cashflow") : undefined} />
                     </div>
 
-                    {/* ── Pipeline visual ── */}
+                    {/* â”€â”€ Pipeline visual â”€â”€ */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                         <div className="flex items-center justify-between mb-3">
                             <p className="text-sm font-bold text-slate-800">Pipeline Keseluruhan</p>
@@ -451,15 +498,15 @@ export function DashboardPage() {
                         <PipelineBar counts={stats.pipeline} />
                     </div>
 
-                    {/* ── Revenue Chart (admin only) ── */}
+                    {/* â”€â”€ Revenue Chart (admin only) â”€â”€ */}
                     {canSeeAll && (
-                        <RevenueChart data={stats.monthlyRevenue} />
+                        <RevenueChart data={stats.monthlyRevenue} categoryData={categoryData} />
                     )}
 
-                    {/* ── Main grid ── */}
+                    {/* â”€â”€ Main grid â”€â”€ */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                        {/* Pending approval — untuk admin/admin_ops */}
+                        {/* Pending approval â€” untuk admin/admin_ops */}
                         {canSeeAll && (
                             <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                 <div className="flex items-center gap-2 mb-3">
@@ -492,7 +539,7 @@ export function DashboardPage() {
                             </div>
                         )}
 
-                        {/* Tracking status — untuk admin */}
+                        {/* Tracking status â€” untuk admin */}
                         {isAdmin && (
                             <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                 <div className="flex items-center gap-2 mb-4">
@@ -522,7 +569,7 @@ export function DashboardPage() {
                             </div>
                         )}
 
-                        {/* Recent quotations — marketing view */}
+                        {/* Recent quotations â€” marketing view */}
                         {!canSeeAll && (
                             <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                 <div className="flex items-center gap-2 mb-3">
@@ -568,7 +615,7 @@ export function DashboardPage() {
                         )}
                     </div>
 
-                    {/* ── Activity feed ── */}
+                    {/* â”€â”€ Activity feed â”€â”€ */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 mb-3">
                             <p className="text-sm font-bold text-slate-800">Aktivitas Terbaru</p>
@@ -584,30 +631,30 @@ export function DashboardPage() {
                         )}
                     </div>
 
-                    {/* ── Quick actions ── */}
+                    {/* â”€â”€ Quick actions â”€â”€ */}
                     <div>
                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Akses Cepat</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {[
                                 {
                                     label: "Buat Quotation", to: "/quotations/new", icon: <FileText size={15} />, primary: true,
-                                    show: ["administrator", "marketing", "admin_ops"].includes(user?.role ?? "")
+                                    show: ["ADMIN", "MARKETING", "ADMIN"].includes(user?.role ?? "")
                                 },
                                 {
                                     label: "Pelanggan", to: "/customers", icon: <Users size={15} />, primary: false,
-                                    show: user?.role === "marketing"
+                                    show: user?.role === "MARKETING"
                                 },
                                 {
                                     label: "Status Penawaran", to: "/status-ph", icon: <Send size={15} />, primary: false,
-                                    show: ["administrator", "admin_ops"].includes(user?.role ?? "")
+                                    show: ["ADMIN", "ADMIN"].includes(user?.role ?? "")
                                 },
                                 {
                                     label: "Tracking Order", to: "/tracking", icon: <ClipboardList size={15} />, primary: false,
-                                    show: ["administrator", "admin_ops"].includes(user?.role ?? "")
+                                    show: ["ADMIN", "ADMIN"].includes(user?.role ?? "")
                                 },
                                 {
                                     label: "Cashflow", to: "/cashflow", icon: <TrendingUp size={15} />, primary: false,
-                                    show: user?.role === "administrator"
+                                    show: user?.role === "ADMIN"
                                 },
                             ].filter(l => l.show).map(link => (
                                 <button key={link.to} onClick={() => navigate(link.to)}

@@ -43,9 +43,8 @@ export const SERVICE_LABELS: Record<string, string> = {
 };
 
 export const ROLE_LABELS: Record<string, string> = {
-    super_admin: "Super Admin",
-    administrator: "Administrator",
-    admin_ops: "Admin Ops",
-    marketing: "Marketing",
-    teknisi: "Teknisi",
+    SUPERADMIN: "Super Admin",
+    ADMIN: "Admin",
+    MARKETING: "Marketing",
+    TEKNISI_LAPANGAN: "Teknisi Lapangan",
 };

@@ -18,7 +18,7 @@ export interface Invite {
     id: string;
     companyId: string;
     companyName: string;
-    role: Extract<UserRole, "administrator" | "marketing" | "admin_ops" | "teknisi">;
+    role: Extract<UserRole, "ADMIN" | "MARKETING" | "ADMIN" | "TEKNISI_LAPANGAN">;
     createdBy: string;
     createdAt: Date;
     expiresAt: Date;

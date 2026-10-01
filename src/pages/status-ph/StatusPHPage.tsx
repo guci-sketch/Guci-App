@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import {
     Send, CheckCircle2, XCircle, Clock, RefreshCw,
-    ChevronDown, Search, Building2, FileText,
-    CalendarDays, TrendingUp, AlertCircle, Filter, MessageCircle,
+    ChevronDown, Search, FileText,
+    TrendingUp, AlertCircle, Filter, MessageCircle,
 } from "lucide-react";
 import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
 import { db } from "../../lib/firebase";

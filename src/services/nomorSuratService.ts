@@ -40,7 +40,7 @@ export async function previewNomorSurat(
     kategori: KategoriSurat,
     tipe: TipeKontrak,
     companyId: string,
-    jenisLayanan?: string,
+    jenisLayanan?: string
 ): Promise<string> {
     const now = new Date();
     const yyyy = String(now.getFullYear());
@@ -64,8 +64,8 @@ export async function previewNomorSurat(
 }
 
 export async function generateNomorSurat(params: GenerateNomorParams): Promise<NomorSuratLog> {
-    const { kategori, tipe, jenisLayanan, kepada, byUid, byName, companyId, dryRun = false } = params;
-    const noSurat = await previewNomorSurat(kategori, tipe, companyId, jenisLayanan);
+    const { kategori, tipe, kepada, byUid, byName, companyId, dryRun = false } = params;
+    const noSurat = await previewNomorSurat(kategori, tipe, companyId);
     const now = new Date();
 
     const entry = {
@@ -73,7 +73,6 @@ export async function generateNomorSurat(params: GenerateNomorParams): Promise<N
         kategori,
         tipe,
         tipeLabel: TIPE_LABELS[tipe] ?? tipe,
-        jenisLayanan,
         kepada,
         byUid,
         byName,
@@ -94,7 +93,7 @@ export async function generateNomorSurat(params: GenerateNomorParams): Promise<N
 }
 
 export async function commitNomorSurat(params: GenerateNomorParams & { noSurat: string }): Promise<NomorSuratLog> {
-    const { kategori, tipe, jenisLayanan, kepada, byUid, byName, companyId, noSurat } = params;
+    const { kategori, tipe, kepada, byUid, byName, companyId, noSurat } = params;
     const now = new Date();
 
     const entry = {
@@ -102,7 +101,6 @@ export async function commitNomorSurat(params: GenerateNomorParams & { noSurat: 
         kategori,
         tipe,
         tipeLabel: TIPE_LABELS[tipe] ?? tipe,
-        jenisLayanan,
         kepada,
         byUid,
         byName,
@@ -174,7 +172,7 @@ export async function addManualNomorSurat(params: AddManualNomorParams): Promise
         kategori: params.kategori,
         tipe: params.tipe,
         tipeLabel: TIPE_LABELS[params.tipe] ?? params.tipe,
-        jenisLayanan: params.jenisLayanan,
+        jenisLayanan: params.jenisLayanan || "",
         kepada: params.kepada,
         byUid: params.byUid,
         byName: params.byName,

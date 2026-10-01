@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
     ClipboardList, RefreshCw, Search, CheckCircle2,
     Clock, XCircle, AlertCircle, ChevronDown, ChevronUp,
-    Banknote, Wrench, TrendingUp, Loader2, Save, Filter,
-    CalendarDays, Shield, Bug,
+    Banknote, Wrench, Loader2, Save, Filter,
+    Shield, Bug,
 } from "lucide-react";
 import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
 import { db } from "../../lib/firebase";
@@ -675,7 +675,7 @@ export function TrackingPage() {
     const [search, setSearch] = useState("");
     const [filterKategori, setFilterKategori] = useState<"all" | "AR" | "PCO">("all");
     const [filterPembayaran, setFilterPembayaran] = useState<StatusPembayaran | "all">("all");
-    const [filterPengerjaan, setFilterPengerjaan] = useState<StatusPengerjaan | "all">("all");
+    const [filterPengerjaan] = useState<StatusPengerjaan | "all">("all");
     const [editTarget, setEditTarget] = useState<Quotation | null>(null);
 
     const load = async () => {

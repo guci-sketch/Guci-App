@@ -35,7 +35,7 @@ function InviteModal({
     createdBy: string;
     onClose: () => void;
 }) {
-    const [role, setRole] = useState<"marketing" | "admin_ops" | "teknisi">("marketing");
+    const [role, setRole] = useState<"MARKETING" | "ADMIN" | "TEKNISI_LAPANGAN">("MARKETING");
     const [generating, setGenerating] = useState(false);
     const [link, setLink] = useState("");
     const [copied, setCopied] = useState(false);
@@ -71,7 +71,7 @@ function InviteModal({
                                 Role
                             </label>
                             <div className="space-y-2">
-                                {(["marketing", "admin_ops", "teknisi"] as const).map(r => (
+                                {(["MARKETING", "ADMIN", "TEKNISI_LAPANGAN"] as const).map(r => (
                                     <button key={r} type="button" onClick={() => setRole(r)}
                                         className={`w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left transition-all
                                             ${role === r ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white hover:border-slate-300"}`}>
@@ -81,9 +81,9 @@ function InviteModal({
                                                 {ROLE_LABELS[r]}
                                             </div>
                                             <div className="text-xs text-slate-400">
-                                                {r === "marketing" && "Buat & kelola quotation"}
-                                                {r === "admin_ops" && "Lihat quotation & laporan"}
-                                                {r === "teknisi" && "Laporan pekerjaan lapangan"}
+                                                {r === "MARKETING" && "Buat & kelola quotation"}
+                                                {r === "ADMIN" && "Lihat quotation & laporan"}
+                                                {r === "TEKNISI_LAPANGAN" && "Laporan pekerjaan lapangan"}
                                             </div>
                                         </div>
                                     </button>
@@ -172,7 +172,7 @@ function ConfirmToggleModal({
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
-const INVITE_ROLES: UserRole[] = ["marketing", "admin_ops", "teknisi"];
+const INVITE_ROLES: UserRole[] = ["MARKETING", "ADMIN", "TEKNISI_LAPANGAN"];
 
 export function TeamPage() {
     const { user } = useAuthStore();
@@ -193,8 +193,8 @@ export function TeamPage() {
             ]);
             // Sort: administrator first, then by name
             list.sort((a, b) => {
-                if (a.role === "administrator") return -1;
-                if (b.role === "administrator") return 1;
+                if (a.role === "ADMIN") return -1;
+                if (b.role === "ADMIN") return 1;
                 return a.name.localeCompare(b.name);
             });
             setMembers(list);
@@ -324,7 +324,7 @@ export function TeamPage() {
                                     </td>
                                     <td className="px-4 py-3">
                                         {/* Cannot deactivate yourself or administrator */}
-                                        {m.uid !== user?.uid && m.role !== "administrator" ? (
+                                        {m.uid !== user?.uid && m.role !== "ADMIN" ? (
                                             <button
                                                 onClick={() => setToggleTarget(m)}
                                                 disabled={toggling === m.uid}
@@ -370,7 +370,7 @@ export function TeamPage() {
                                         </span>
                                     </div>
                                 </div>
-                                {m.uid !== user?.uid && m.role !== "administrator" && (
+                                {m.uid !== user?.uid && m.role !== "ADMIN" && (
                                     <button onClick={() => setToggleTarget(m)} disabled={toggling === m.uid}
                                         className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40
                                             ${m.isActive ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>

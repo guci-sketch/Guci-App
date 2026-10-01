@@ -10,8 +10,7 @@ function toCompany(data: any): Company {
         id: data.id,
         name: data.company_name,
         isActive: data.status === "ACTIVE",
-        plan: data.subscription_plan === "FREE_TIER" ? "free" : "pro",
-        expiredAt: undefined // Optional, map if present in schema later
+        plan: data.subscription_plan === "FREE_TIER" ? "free" : "pro" // Optional, map if present in schema later
     };
 }
 
@@ -81,7 +80,7 @@ export async function setCompanyActive(id: string, isActive: boolean): Promise<v
 export async function updateCompanyPlan(
     id: string,
     plan: Company["plan"],
-    expiredAt?: Date,
+    expiredAt?: Date
 ): Promise<void> {
     const { error } = await supabase
         .from("companies")

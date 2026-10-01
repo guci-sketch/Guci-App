@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
     collection, query, where, getDocs, doc,
-    setDoc, getDoc, Timestamp,
+    setDoc, Timestamp,
 } from "../../lib/firebase";
 import { db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/authStore";
 import { formatRupiah } from "../../lib/utils";
 import {
-    TrendingUp, Target, Award, ChevronDown,
+    TrendingUp, Award, ChevronDown,
     RefreshCw, Loader2, Edit2, Check, X,
-    BarChart3, Users, FileText, Percent,
+    Users, FileText, Percent,
 } from "lucide-react";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────

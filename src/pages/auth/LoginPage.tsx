@@ -46,7 +46,7 @@ export function LoginPage() {
             }
 
             // 4. Cek company aktif (skip untuk super_admin)
-            if (userData.role !== "super_admin") {
+            if (userData.role !== "SUPERADMIN") {
                 const companyOk = await isCompanyActive(userData.companyId);
                 if (!companyOk) {
                     await signOut(auth);
@@ -58,7 +58,7 @@ export function LoginPage() {
             // 5. inject uid dari firebaseUser
             setUser({ ...userData, uid });
 
-            if (userData.role === "super_admin") {
+            if (userData.role === "SUPERADMIN") {
                 navigate("/super-admin/companies");
             } else {
                 navigate("/dashboard");

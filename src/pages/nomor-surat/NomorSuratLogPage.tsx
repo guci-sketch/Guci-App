@@ -236,8 +236,8 @@ export function NomorSuratLogPage() {
     // Debounce 350ms — filter di client, tidak trigger Firestore read
     const debouncedSearch = useDebounce(searchQ, 350);
 
-    const isAdmin   = user?.role === "administrator";
-    const canManage = user?.role === "administrator" || user?.role === "admin_ops";
+    const isAdmin   = user?.role === "ADMIN";
+    const canManage = user?.role === "ADMIN";
 
     const fetchLogs = async () => {
         if (!user?.companyId) return;
