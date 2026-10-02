@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WorkReport, Project, DocumentationPhoto, PhotoType, PhotoTag } from '../../types';
 import { useAuth } from '../../context/AuthContext';

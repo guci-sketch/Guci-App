@@ -63,3 +63,79 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
   }
 }
+
+/* Staggered Row Animation */
+.row-fade-in {
+  animation: rowFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+.row-fade-in:nth-child(1) { animation-delay: 0.02s; }
+.row-fade-in:nth-child(2) { animation-delay: 0.04s; }
+.row-fade-in:nth-child(3) { animation-delay: 0.06s; }
+.row-fade-in:nth-child(4) { animation-delay: 0.08s; }
+.row-fade-in:nth-child(5) { animation-delay: 0.10s; }
+.row-fade-in:nth-child(6) { animation-delay: 0.12s; }
+.row-fade-in:nth-child(7) { animation-delay: 0.14s; }
+.row-fade-in:nth-child(8) { animation-delay: 0.16s; }
+.row-fade-in:nth-child(9) { animation-delay: 0.18s; }
+.row-fade-in:nth-child(10) { animation-delay: 0.20s; }
+
+@keyframes rowFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page Content Animation */
+.page-fade-in {
+  animation: pageContentIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes pageContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Animation */
+.modal-overlay-in {
+  animation: modalOverlayIn 0.18s ease;
+}
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card-in {
+  animation: modalCardIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalCardIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Tactile Button Feedback */
+.btn-tactile {
+  transform: translateZ(0);
+  transition: transform 0.1s ease-out, background-color 0.15s ease;
+}
+.btn-tactile:active:not(:disabled) {
+  transform: scale(0.97) translateY(1px);
+}
+
+/* Interactive hover lift */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}

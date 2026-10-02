@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import React, { lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {  WorkReport, WorkReportListItem, Project, ExecutorStats, AuditLogEntry, RiskConfig, DocumentationPhoto, ReportFilters, DEFAULT_FILTERS } from '../../types';
 import { 
   fetchAdminReports, fetchAdminReportDetail, fetchAdminSummary, fetchExecutors, fetchAdminProjects,
@@ -13,24 +15,25 @@ import { AllProjectsMap } from '../maps/AllProjectsMap';
 import {  PhotoViewerModal } from '../common/PhotoViewerModal';
 import {  AuthedImage } from '../common/AuthedImage';
 import {  RISK_LEVEL_OPTIONS, STATUS_OPTIONS } from '../../utils/riskMeta';
+import { exportTableToExcel, exportTableToPDF } from '../../utils/exportUtils';
 import { exportReportToPdf } from '../../utils/pdfExport';
 import {  SERVICE_TYPE_OPTIONS, getServiceTypeMeta, APPLICATION_METHOD_LABELS } from '../../utils/serviceMeta';
 import { 
   RefreshCw, ShieldAlert, Search, Download, Clock, MapPin, UserCheck, CheckCircle2, AlertTriangle, Eye,
-  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical, Trash2, ImageOff, LogOut, Package, FileText, ShieldCheck
+  SlidersHorizontal, X, Check, ChevronRight, Loader2, Settings2, Users, FlaskConical, Trash2, ImageOff, LogOut, Briefcase, Package, FileText, ShieldCheck
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { generateInvite } from '../../api/auth';
-import { InventoryPage } from '../../pages/inventory/InventoryPage';
-import { KontrolRayapPage } from '../../pages/customers/KontrolRayapPage';
-import { QuotationPage } from '../../pages/quotation/QuotationPage';
-import { QuotationFormPage } from '../../pages/quotation/QuotationFormPage';
-import { DashboardPage } from '../../pages/dashboard/DashboardPage';
+const InventoryPage = lazy(() => import('../../pages/inventory/InventoryPage').then(m => ({ default: m.InventoryPage })));
+const KontrolRayapPage = lazy(() => import('../../pages/customers/KontrolRayapPage').then(m => ({ default: m.KontrolRayapPage })));
+const QuotationPage = lazy(() => import('../../pages/quotation/QuotationPage').then(m => ({ default: m.QuotationPage })));
+const QuotationFormPage = lazy(() => import('../../pages/quotation/QuotationFormPage').then(m => ({ default: m.QuotationFormPage })));
+const DashboardPage = lazy(() => import('../../pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 
 
-type Tab = 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile' | 'inventory' | 'quotation' | 'kontrol-rayap';
+type Tab = 'dashboard' | 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile' | 'inventory' | 'quotation' | 'kontrol-rayap';
 
 const DATE_PRESETS = [
   { id: 'all', label: 'Semua' },
@@ -58,9 +61,11 @@ function presetToRange(preset: string): { startDate?: string; endDate?: string }
 
 import { Header } from '../common/Header';
 
+const MotionDiv = motion.div as any;
+
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('reports');
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -239,6 +244,16 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  
+  const handleExportExcel = () => {
+    exportTableToExcel(reports, 'Laporan_FieldWork');
+  };
+
+  const handleExportPDF = () => {
+    const cols = ['projectName', 'clientName', 'executorName', 'status', 'riskScore'];
+    exportTableToPDF(reports, cols, 'Laporan Lapangan', 'Laporan_FieldWork');
+  };
+
   const handleExportCsv = async () => {
     setIsExporting(true);
     try {
@@ -264,18 +279,32 @@ export const AdminDashboard: React.FC = () => {
     setRiskConfig(updated);
   };
 
-  const SidebarItem: React.FC<{ tab: Tab; label: React.ReactNode; danger?: boolean; count?: number }> = ({ tab, label, danger, count }) => {
+  const SidebarItem: React.FC<{ tab: Tab; label: React.ReactNode; icon: React.ReactNode; danger?: boolean; count?: number }> = ({ tab, label, icon, danger, count }) => {
     const active = activeTab === tab;
     return (
       <button
         onClick={() => { setActiveTab(tab); setMobileMenuOpen(false); }}
-        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 relative group ${
           active
-            ? danger ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            ? danger ? 'bg-rose-50 text-rose-700' : 'bg-[var(--accent-glow)] text-[var(--accent)]'
+            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
         }`}
       >
-        <span className="text-left">{label}</span>
+        {active && (
+          <MotionDiv
+            layoutId="sidebar-active-indicator"
+            className={`absolute left-0 top-0 bottom-0 w-1 rounded-r-full ${danger ? 'bg-rose-500' : 'bg-[var(--accent)]'}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+        )}
+        <div className="flex items-center gap-3">
+          <div className={`p-1 rounded-md transition-colors ${active ? (danger ? 'bg-rose-100' : 'bg-white shadow-sm') : 'group-hover:bg-white group-hover:shadow-sm'}`}>
+            {icon}
+          </div>
+          <span className="text-left">{label}</span>
+        </div>
         {count !== undefined && count > 0 && (
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${active ? (danger ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800') : 'bg-slate-200 text-slate-700'}`}>
             {count}
@@ -305,18 +334,47 @@ export const AdminDashboard: React.FC = () => {
               {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            <SidebarItem tab="reports" label="Semua Laporan" count={reports.length} />
-            <SidebarItem tab="anomalies" label="Anomali" danger count={kpi.flaggedJobs} />
-            <SidebarItem tab="projects" label="Proyek" count={projects.length} />
-            <SidebarItem tab="executors" label="Pelaksana" />
-            <SidebarItem tab="approval" label="Manajemen Akun" count={adminUsers.length} />
-            <SidebarItem tab="tracking" label="GPS Tracker" />
-            <SidebarItem tab="audit" label="Audit Trail" />
-            <SidebarItem tab="risk-config" label="Konfigurasi Risiko" />
+          <div className="flex-1 overflow-y-auto p-3 space-y-5">
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Dashboard Utama</div>
+              <div className="space-y-1">
+                <SidebarItem tab="dashboard" icon={<ShieldCheck size={16} />} label="Ikhtisar (Dashboard)" />
+                <SidebarItem tab="projects" icon={<Briefcase size={16} />} label="Penugasan (SPK)" />
+                <SidebarItem tab="tracking" icon={<MapPin size={16} />} label="Peta Pelacakan GPS" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Komersial & Gudang</div>
+              <div className="space-y-1">
+                <SidebarItem tab="quotation" icon={<FileText size={16} />} label="Penawaran Harga" />
+                <SidebarItem tab="inventory" icon={<Package size={16} />} label="Gudang & Stok" />
+                <SidebarItem tab="kontrol-rayap" icon={<AlertTriangle size={16} />} label="Garansi Rayap" />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Audit & Eksekusi</div>
+              <div className="space-y-1">
+                <SidebarItem tab="reports" icon={<CheckCircle2 size={16} />} label="Laporan Lapangan" count={reports.length} />
+                <SidebarItem tab="anomalies" icon={<ShieldAlert size={16} />} label="Anomali & Pelanggaran" danger count={kpi.flaggedJobs} />
+                <SidebarItem tab="executors" icon={<Users size={16} />} label="Performa Teknisi" />
+              </div>
+            </div>
+
+            {user?.role === 'SUPERADMIN' && (
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Sistem & Konfigurasi</div>
+                <div className="space-y-1">
+                  <SidebarItem tab="approval" icon={<UserCheck size={16} />} label="Manajemen User" count={adminUsers.length} />
+                  <SidebarItem tab="risk-config" icon={<Settings2 size={16} />} label="Aturan Risiko" />
+                  <SidebarItem tab="audit" icon={<Clock size={16} />} label="Log Sistem" />
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
-            <SidebarItem tab="profile" label="Setup Profile" />
+            <SidebarItem tab="profile" icon={<UserCheck size={16} />} label="Setup Profile" />
             <button
               onClick={logout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-rose-50 hover:text-rose-700"
@@ -339,6 +397,7 @@ export const AdminDashboard: React.FC = () => {
 
           {!isLoading && (
             <>
+              {activeTab === 'dashboard' && (<>
               {/* KPI Strip */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="clean-card clean-card p-4">
@@ -373,7 +432,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {kpi.flaggedJobs > 0 && activeTab !== 'anomalies' && (
+              {kpi.flaggedJobs > 0 && (
                 <div className="bg-rose-50 border border-rose-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-900">
                   <div className="flex items-start sm:items-center gap-3">
                     <div className="w-8 h-8 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><ShieldAlert size={18} /></div>
@@ -387,8 +446,19 @@ export const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
               )}
+              </>)}
 
-              {(activeTab === 'reports' || activeTab === 'anomalies') && (
+              
+              <AnimatePresence mode="wait">
+                <MotionDiv
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-4"
+                >
+                  {(activeTab === 'reports' || activeTab === 'anomalies') && (
               <div className="space-y-4">
                 
                 {activeTab === 'anomalies' && (
@@ -442,6 +512,21 @@ export const AdminDashboard: React.FC = () => {
                         }`}
                       >
                         Filter Lengkap
+                      </button>
+
+                      <button
+                        onClick={handleExportPDF}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors btn-tactile"
+                        title="Unduh Laporan (PDF)"
+                      >
+                        Unduh PDF
+                      </button>
+                      <button
+                        onClick={handleExportExcel}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors btn-tactile"
+                        title="Unduh Laporan (Excel)"
+                      >
+                        Unduh Excel
                       </button>
                       <button
                         onClick={handleExportCsv}
@@ -534,7 +619,7 @@ export const AdminDashboard: React.FC = () => {
                           const durationMin = report.durationSeconds ? Math.round(report.durationSeconds / 60) : 0;
                           const svcMeta = getServiceTypeMeta(report.project.serviceType);
                           return (
-                            <tr key={report.id} className={`hover:bg-[var(--bg-tertiary)]/80 transition-colors ${report.riskScore >= 40 ? 'bg-red-50/20' : ''}`}>
+                            <tr key={report.id} className={`row-fade-in hover:bg-[var(--bg-tertiary)]/80 transition-colors ${report.riskScore >= 40 ? 'bg-red-50/20' : ''}`}>
                               <td className="px-4 py-3 font-mono font-medium text-[var(--text-secondary)] whitespace-nowrap">{new Date(report.createdAt).toLocaleDateString('id-ID')}</td>
                               <td className="px-4 py-3"><span className="font-bold text-[var(--text-primary)] block">{report.executor.name}</span></td>
                               <td className="px-4 py-3 max-w-xs">
@@ -770,6 +855,7 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               )}
+
             </>
           )}
         </div>
@@ -791,7 +877,7 @@ export const AdminDashboard: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {executors.map(ex => (
-                      <tr key={ex.id} className="hover:bg-[var(--bg-tertiary)]/80">
+                      <tr key={ex.id} className="row-fade-in hover:bg-[var(--bg-tertiary)]/80">
                         <td className="px-4 py-3"><span className="font-bold text-[var(--text-primary)] block">{ex.name}</span><span className="text-[11px] text-[var(--text-muted)]">{ex.email}</span></td>
                         <td className="px-4 py-3 font-mono">{ex.nip || '-'}</td>
                         <td className="px-4 py-3 text-center font-mono">{ex.totalJobs}</td>
@@ -835,7 +921,7 @@ export const AdminDashboard: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {userLocations.map(loc => (
-                          <tr key={loc.userId} className="hover:bg-[var(--bg-tertiary)]/50">
+                          <tr key={loc.userId} className="row-fade-in hover:bg-[var(--bg-tertiary)]/50">
                             <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{loc.userName}</td>
                             <td className="px-4 py-3">{new Date(loc.trackedAt).toLocaleString('id-ID')}</td>
                             <td className="px-4 py-3 font-mono">{loc.latitude}</td>
@@ -974,21 +1060,21 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'quotation' && (
                 <div className="clean-card p-4">
                   <h3 className="font-bold text-lg mb-4">Modul Penawaran & Kontrak</h3>
-                  <QuotationPage />
+                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat QuotationPage...</div>}><QuotationPage /></Suspense>
                 </div>
             )}
             
             {activeTab === 'inventory' && (
                 <div className="clean-card p-4">
                   <h3 className="font-bold text-lg mb-4">Modul Inventori & Gudang</h3>
-                  <InventoryPage />
+                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat InventoryPage...</div>}><InventoryPage /></Suspense>
                 </div>
             )}
 
             {activeTab === 'kontrol-rayap' && (
                 <div className="clean-card p-4">
                   <h3 className="font-bold text-lg mb-4">Modul Kontrol Garansi Rayap</h3>
-                  <KontrolRayapPage />
+                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat KontrolRayapPage...</div>}><KontrolRayapPage /></Suspense>
                 </div>
             )}
 
@@ -1030,6 +1116,8 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             )}
+            </MotionDiv>
+          </AnimatePresence>
           </>
         )}
         </div>
