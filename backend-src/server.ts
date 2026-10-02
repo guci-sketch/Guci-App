@@ -27,4 +27,11 @@ async function startServer() {
   });
 }
 
-startServer();
+
+// Only start the server if run directly (not imported as a module in serverless)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  startServer();
+}
+
+// Export for serverless environments
+export { createApp };
