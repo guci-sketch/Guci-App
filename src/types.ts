@@ -38,7 +38,7 @@ export interface Customer {
 }
 
 export type QuotationStatus = "draft" | "pending" | "approved" | "rejected" | "sent_to_client" | "deal" | "cancelled";
-export type ServiceType = "pest_control" | "anti_rayap" | "pest_control" | "anti_rayap" | "fumigasi";
+export type ServiceType = 'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL' | 'FUMIGATION' | 'RODENT_CONTROL' | 'MOSQUITO_CONTROL' | 'BIRD_CONTROL' | 'BED_BUG_CONTROL' | 'DISINFECTION';
 export type ServiceMethod =
     | "spraying"
     | "fogging"
@@ -102,8 +102,8 @@ export const DEFAULT_CHEMICALS_PCO: ChemicalItem[] = [
     { bahanAktif: "Brodifacum", merkDagang: "Klerat" },
 ];
 
-export const DEFAULT_HAMA_PCO =
-    "Nyamuk, Kecoa, Lalat, Tikus, Ngengat, Kaki Seribu dan Semut";
+export const DEFAULT_FOCUS_TARGET =
+    "Nyamuk, Serangga Merayap, Lalat, Rodentia, Ngengat, Myriapoda dan Semut";
 
 export const DEFAULT_TEKNIK_PCO = [
     "Penyemprotan pada seluruh area luar bangunan gedung dengan menggunakan swing fog.",
@@ -218,7 +218,7 @@ export interface Quotation {
     surveyPhotos?: SurveyPhoto[];
     chemicals?: ChemicalItem[];
     metode?: string[];          // AR: metode pelaksanaan
-    hamaDikendalikan?: string;  // PCO: hama yang dikendalikan
+    focusTarget?: string;  // PCO: hama yang dikendalikan
     teknikPelaksanaan?: string[];
     peralatan?: string[];
     kondisiBangunan?: KondisiBangunan; // PCO: teknik pelaksanaan
@@ -323,8 +323,8 @@ export interface Project {
   workDate: string;
   workType: string;
   serviceType: ServiceType;
-  pestTarget?: string | null;
-  targetPests: string[];
+  focusTarget?: string | null;
+  targetFocus: string[];
   buildingAreaSqm?: number | null;
   contractType: ContractType;
   warrantyMonths: number;
@@ -375,8 +375,8 @@ export interface WorkReport {
   projectRadius: number;
   scheduledStartTime: string;
   serviceType: ServiceType;
-  pestTarget?: string | null;
-  targetPests: string[];
+  focusTarget?: string | null;
+  targetFocus: string[];
   buildingAreaSqm?: number | null;
   contractType: ContractType;
   warrantyMonths: number;
@@ -428,7 +428,7 @@ export interface WorkReportListItem {
   checkInDistance: number | null;
   checkOutDistance: number | null;
   createdAt: string;
-  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; pestTarget: string | null; targetPests?: string[] };
+  project: { id: string; name: string; clientName: string; address: string; serviceType: ServiceType; focusTarget: string | null; targetFocus?: string[] };
   executor: { id: string; name: string };
   treatmentSummary: { applicationMethod: ApplicationMethod; chemicalName: string; dosage: string } | null;
 }

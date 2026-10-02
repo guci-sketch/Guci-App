@@ -1,123 +1,212 @@
 import { useState, useRef, useEffect } from "react";
-import { Ruler, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Save, TriangleAlert } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import * as THREE from "three";
+import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
+import { PhotoMeasureFallback } from "./PhotoMeasureFallback";
 
 export function ARMeasureTool() {
-    const [mode, setMode] = useState<"ar" | "fallback" | null>(null);
-    const [distance, setDistance] = useState<number>(0);
-    const [lubangBor, setLubangBor] = useState<number>(0);
-    const [kebutuhanObat, setKebutuhanObat] = useState<number>(0);
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const navigate = useNavigate();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [forceFallback, setForceFallback] = useState(false);
+    const [isSupported, setIsSupported] = useState<boolean | null>(null);
+    
+    const [totalDistance, setTotalDistance] = useState(0);
+    
+    // We use a ref to store state that needs to be accessed inside the render loop
+    const stateRef = useRef({
+        points: [] as THREE.Vector3[],
+        lines: [] as THREE.Line[],
+        markers: [] as THREE.Mesh[],
+        totalDistance: 0,
+        isLoopRunning: false
+    });
 
     useEffect(() => {
-        // Cek support WebXR
         if ('xr' in navigator) {
-            (navigator as any).xr.isSessionSupported('immersive-ar')
-                .then((supported: boolean) => {
-                    setMode(supported ? "ar" : "fallback");
-                });
+            (navigator as any).xr?.isSessionSupported?.('immersive-ar')
+                .then((supported: boolean) => setIsSupported(supported))
+                .catch(() => setIsSupported(false));
         } else {
-            setMode("fallback");
+            setIsSupported(false);
         }
     }, []);
 
-    const startCamera = async () => {
-        if (!videoRef.current) return;
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            videoRef.current.srcObject = stream;
-        } catch (err) {
-            console.error("Camera error:", err);
-        }
-    };
-
     useEffect(() => {
-        if (mode === "fallback") {
-            startCamera();
-        }
-        return () => {
-            if (videoRef.current && videoRef.current.srcObject) {
-                const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-                tracks.forEach(t => t.stop());
-            }
-        }
-    }, [mode]);
-
-    const handleMockMeasure = () => {
-        // MOCK measurement for demo (since real WebXR needs https & device)
-        const mockDistance = parseFloat((Math.random() * 15 + 2).toFixed(1)); // 2 to 17 meters
-        setDistance(mockDistance);
+        if (!isSupported || !containerRef.current) return;
+        const container = containerRef.current;
         
-        // Estimasi Lubang Bor Otomatis: Jarak / 0.35
-        const lubang = Math.round(mockDistance / 0.35);
-        setLubangBor(lubang);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        try {
+            container.appendChild(renderer.domElement);
+        } catch (e) { console.error(e); }
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+        scene.add(light);
 
-        // Estimasi Obat (SNI 2404: 5 L/m')
-        setKebutuhanObat(mockDistance * 5);
+        const reticle = new THREE.Mesh(
+            new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color: 0x10b981 })
+        );
+        reticle.matrixAutoUpdate = false;
+        reticle.visible = false;
+        scene.add(reticle);
+
+        const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
+        arButton.style.position = 'absolute';
+        arButton.style.bottom = '120px';
+        arButton.style.left = '50%';
+        arButton.style.transform = 'translateX(-50%)';
+        arButton.style.zIndex = '50';
+        try { container.appendChild(arButton); } catch(e){}
+
+        let hitTestSource: any = null;
+        let hitTestSourceRequested = false;
+
+        const controller = renderer.xr.getController(0);
+        scene.add(controller);
+
+        const onSelect = () => {
+            if (!reticle.visible) return;
+            
+            const position = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
+            const sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.02, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+            );
+            sphere.position.copy(position);
+            scene.add(sphere);
+            
+            const { points, lines, markers } = stateRef.current;
+            markers.push(sphere);
+            points.push(position);
+
+            if (points.length > 1) {
+                const p1 = points[points.length - 2];
+                const p2 = points[points.length - 1];
+                
+                const material = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 5 });
+                const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                lines.push(line);
+
+                const dist = p1.distanceTo(p2);
+                stateRef.current.totalDistance += dist;
+                setTotalDistance(stateRef.current.totalDistance);
+            }
+        };
+        controller.addEventListener('select', onSelect);
+        
+        if (stateRef.current.isLoopRunning) return;
+        stateRef.current.isLoopRunning = true;
+
+        renderer.setAnimationLoop((timestamp: number, frame: any) => {
+            if (frame) {
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                const session = renderer.xr.getSession();
+
+                if (hitTestSourceRequested === false && session) {
+                    session.requestReferenceSpace('viewer').then((refSpace) => {
+                        session.requestHitTestSource({ space: refSpace }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                    session.addEventListener('end', () => {
+                        hitTestSourceRequested = false;
+                        hitTestSource = null;
+                    });
+                    hitTestSourceRequested = true;
+                }
+
+                if (hitTestSource && referenceSpace) {
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        if (pose) {
+                            reticle.visible = true;
+                            reticle.matrix.fromArray(pose.transform.matrix);
+                        }
+                    } else {
+                        reticle.visible = false;
+                    }
+                }
+            }
+            renderer.render(scene, camera);
+        });
+
+        return () => {
+            renderer.setAnimationLoop(null);
+            container.removeChild(renderer.domElement);
+            stateRef.current.isLoopRunning = false;
+            try {
+                if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+                if (container.contains(arButton)) container.removeChild(arButton);
+            } catch(e) {}
+        };
+    }, [isSupported, forceFallback]);
+
+    const resetDraw = () => {
+        // Full reset by reloading to wipe WebGL state clearly
+        window.location.reload(); 
     };
+
+    const lubangBor = Math.round(totalDistance / 0.35);
+    const kebutuhanObat = totalDistance * 5;
+    if (isSupported === false || forceFallback) {
+        return <PhotoMeasureFallback onBack={() => navigate(-1)} />;
+    }
 
     return (
-        <div className="flex flex-col h-screen bg-black text-white relative">
+        <div className="flex flex-col h-screen bg-black text-white relative overflow-hidden">
             <div className="absolute top-0 w-full p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/70 to-transparent">
-                <h1 className="font-bold text-lg">Meteran Kamera</h1>
-                <div className="flex gap-2">
-                    <span className="bg-primary/80 px-2 py-1 rounded text-xs">
-                        {mode === "ar" ? "WebXR Active" : "Tile Scale Fallback"}
-                    </span>
-                </div>
+
+                <button onClick={() => navigate(-1)} className="p-2 bg-black/50 rounded-full text-white">
+                    <ArrowLeft size={20} />
+                </button>
+                <h1 className="font-bold text-lg text-white">Kamera AR (Estimasi)</h1>
+                <div className="w-9" />
             </div>
 
-            {/* Viewfinder */}
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-                {mode === "fallback" ? (
-                    <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                    <div className="absolute inset-0 w-full h-full object-cover bg-gray-900 flex items-center justify-center">
-                        <span className="text-gray-400">WebXR Session Will Render Here</span>
-                    </div>
-                )}
-                
-                {/* Crosshair */}
-                <div className="w-12 h-12 border-2 border-green-500 rounded-full z-10 flex items-center justify-center pointer-events-none">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
-
-                {/* Guide lines mock */}
-                {distance > 0 && (
-                    <div className="absolute bottom-1/3 w-3/4 h-1 bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)] z-10 rotate-3 flex items-center justify-center">
-                        <span className="bg-black/70 text-yellow-400 px-2 py-1 rounded font-bold text-sm -mt-8 border border-yellow-400">
-                            {distance} m'
-                        </span>
-                    </div>
-                )}
+            {/* 3D AR Viewfinder */}
+            <div ref={containerRef} className="flex-1 bg-gray-900 relative">
             </div>
-
+            
             {/* Bottom HUD */}
-            <div className="bg-gray-900 pb-safe z-10 rounded-t-2xl border-t border-gray-800">
+            <div className="bg-gray-900 pb-safe z-10 rounded-t-2xl border-t border-gray-800 absolute bottom-0 w-full">
                 <div className="p-4 flex gap-4">
                     <div className="flex-1 bg-gray-800 rounded-lg p-3">
-                        <div className="text-gray-400 text-xs">Panjang Tembok</div>
-                        <div className="font-mono text-2xl font-bold text-green-400">{distance > 0 ? distance : "--"} <span className="text-sm">m'</span></div>
+                        <div className="text-gray-400 text-[10px] uppercase font-bold tracking-wide">Total Panjang Tembok</div>
+                        <div className="font-mono text-2xl font-bold text-emerald-400">{totalDistance.toFixed(2)} <span className="text-sm">m'</span></div>
                     </div>
                     <div className="flex-1 bg-gray-800 rounded-lg p-3">
-                        <div className="text-gray-400 text-xs">Estimasi Lubang</div>
-                        <div className="font-mono text-2xl font-bold text-yellow-400">{lubangBor > 0 ? lubangBor : "--"} <span className="text-sm">titik</span></div>
+                        <div className="text-gray-400 text-[10px] uppercase font-bold tracking-wide">Estimasi Titik Bor</div>
+                        <div className="font-mono text-2xl font-bold text-amber-400">{lubangBor} <span className="text-xs">titik</span></div>
                     </div>
                 </div>
                 
                 <div className="px-4 pb-4">
-                    <div className="mb-3 text-xs text-center text-gray-500">
-                        {distance > 0 ? `Kebutuhan obat: ${kebutuhanObat.toFixed(1)} Liter (SNI 2404)` : "Arahkan kamera ke pangkal dinding, ketuk Titik A"}
+                    <div className="mb-3 text-xs text-center text-gray-400">
+                        {totalDistance > 0 
+                            ? `Kebutuhan Obat Kimia: ${kebutuhanObat.toFixed(1)} Liter. Ketuk layar untuk menambah garis.` 
+                            : "Ketuk tombol 'START AR' lalu arahkan kamera ke lantai hingga muncul cincin hijau. Ketuk layar untuk menaruh titik ukur."}
                     </div>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={handleMockMeasure}
-                            className="flex-1 bg-green-600 active:bg-green-700 py-4 rounded-xl flex items-center justify-center font-bold gap-2"
-                        >
-                            <Ruler size={20} />
-                            Ketuk Titik Ujung
+                    <div className="flex gap-2">
+                        <button onClick={resetDraw} className="p-4 bg-rose-900/50 text-rose-400 rounded-xl flex items-center justify-center">
+                            <Trash2 size={20} />
                         </button>
-                        <button className="bg-blue-600 active:bg-blue-700 p-4 rounded-xl flex items-center justify-center font-bold">
+                        <button onClick={() => setForceFallback(true)} className="flex-1 bg-amber-600 active:bg-amber-700 py-4 rounded-xl flex items-center justify-center font-bold text-white text-xs">
+                            Mode Foto
+                        </button>
+                        <button onClick={() => navigate(-1)} className="flex-1 bg-emerald-600 active:bg-emerald-700 py-4 rounded-xl flex items-center justify-center font-bold gap-2 text-white">
                             <Save size={20} />
+                            Simpan
                         </button>
                     </div>
                 </div>

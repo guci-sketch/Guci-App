@@ -65,7 +65,7 @@ async function seed() {
     const projTermite = await client.query(
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
-        service_type, pest_target, building_area_sqm, contract_type, warranty_months, scheduled_start_time, created_by, locked_at
+        service_type, focus_target, building_area_sqm, contract_type, warranty_months, scheduled_start_time, created_by, locked_at
       ) values ($1,$2,$3,$4,$5,$6,current_date,$7,'TERMITE_CONTROL',$8,$9,'ONE_TIME',24,'08:00',$10, now())
        returning id`,
       ['RS Hermina BSD', 'RS Hermina BSD', 'Jl. Pahlawan Seribu Kav. 1, BSD City, Serpong, Tangerang Selatan', -6.298144, 106.671342, 100,
@@ -88,7 +88,7 @@ async function seed() {
     const projFumigasi = await client.query(
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
-        service_type, pest_target, building_area_sqm, contract_type, warranty_months, scheduled_start_time, created_by, locked_at
+        service_type, focus_target, building_area_sqm, contract_type, warranty_months, scheduled_start_time, created_by, locked_at
       ) values ($1,$2,$3,$4,$5,$6,current_date,$7,'FUMIGATION',$8,$9,'ONE_TIME',0,'09:00',$10, now())
        returning id`,
       ['Gudang Logistik Cikupa', 'PT Logistik Cikupa', 'Jl. Raya Cikupa No. 22, Cikupa, Tangerang', -6.223, 106.531, 100,
@@ -151,7 +151,7 @@ async function seed() {
     const projRodent = await client.query(
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
-        service_type, pest_target, building_area_sqm, contract_type, warranty_months, next_service_date, scheduled_start_time, created_by
+        service_type, focus_target, building_area_sqm, contract_type, warranty_months, next_service_date, scheduled_start_time, created_by
       ) values ($1,$2,$3,$4,$5,$6,current_date,$7,'GENERAL_PEST_CONTROL',$8,$9,'RECURRING',6,current_date + interval '1 month','08:00',$10)
        returning id`,
       ['Kantor Cabang Sudirman', 'Bank Central Asia', 'Jl. Jend. Sudirman Kav. 22-23, Jakarta Selatan', -6.224, 106.809, 100,
@@ -169,7 +169,7 @@ async function seed() {
     const projPestControl = await client.query(
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
-        service_type, pest_target, building_area_sqm, contract_type, warranty_months, next_service_date, scheduled_start_time, created_by, locked_at
+        service_type, focus_target, building_area_sqm, contract_type, warranty_months, next_service_date, scheduled_start_time, created_by, locked_at
       ) values ($1,$2,$3,$4,$5,$6,$7,$8,'GENERAL_PEST_CONTROL',$9,$10,'RECURRING',3,current_date + interval '3 months','13:00',$11, now())
        returning id`,
       ['Ruko Cempaka Mas Blok C3', 'Toko Elektronik Cempaka', 'Jl. Cempaka Mas Raya Blok C3 No. 12, Jakarta Pusat', -6.166, 106.885, 80,

@@ -14,7 +14,7 @@ import { LAYANAN_CONFIG, calcTotals, fmtIDR, TIPE_LABELS } from "../../lib/quota
 import type { JenisLayanan, TipeKontrak, KategoriSurat, QuotationItem, BiayaTambahan, SurveyPhoto, ChemicalItem, KondisiBangunan } from "../../types";
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
-    DEFAULT_HAMA_PCO, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
+    DEFAULT_FOCUS_TARGET, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
 } from "../../types";
 
 const STEPS = [
@@ -922,14 +922,14 @@ function Step3b({
     surveyPhotos, onPhotos,
     chemicals, onChemicals,
     metode, onMetode,
-    hamaDikendalikan, onHama,
+    focusTarget, onHama,
     teknikPelaksanaan, onTeknik,
 }: {
     jenisLayanan: JenisLayanan;
     surveyPhotos: SurveyPhoto[]; onPhotos: (p: SurveyPhoto[]) => void;
     chemicals: ChemicalItem[]; onChemicals: (c: ChemicalItem[]) => void;
     metode: string[]; onMetode: (m: string[]) => void;
-    hamaDikendalikan: string; onHama: (h: string) => void;
+    focusTarget: string; onHama: (h: string) => void;
     teknikPelaksanaan: string[]; onTeknik: (t: string[]) => void;
 }) {
     const isAR = LAYANAN_CONFIG[jenisLayanan]?.isAR ?? false;
@@ -1069,10 +1069,10 @@ function Step3b({
             {!isAR && (
                 <>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-                        <p className="text-sm font-bold text-slate-700 mb-1">Hama yang Dikendalikan</p>
+                        <p className="text-sm font-bold text-slate-700 mb-1">Fokus Target</p>
                         <input
                             className={inputCls2}
-                            value={hamaDikendalikan}
+                            value={focusTarget}
                             onChange={e => onHama(e.target.value)}
                             placeholder="Nyamuk, Kecoa, Lalat, Tikus, ..."
                         />
@@ -1507,7 +1507,7 @@ export function QuotationFormPage() {
     const [metode, setMetode] = useState<string[]>(() =>
         (METODE_BY_LAYANAN[jenisLayanan] ?? METODE_BY_LAYANAN["anti_rayap_injeksi"]).map(m => m)
     );
-    const [hamaDikendalikan, setHamaDikendalikan] = useState(DEFAULT_HAMA_PCO);
+    const [focusTarget, setHamaDikendalikan] = useState(DEFAULT_FOCUS_TARGET);
     const [teknikPelaksanaan, setTeknikPelaksanaan] = useState<string[]>(DEFAULT_TEKNIK_PCO.map(t => t));
 
     // Reset technical data when jenisLayanan changes
@@ -1600,7 +1600,7 @@ export function QuotationFormPage() {
                 surveyPhotos: surveyPhotos.length > 0 ? surveyPhotos : undefined,
                 chemicals: chemicals.length > 0 ? chemicals : undefined,
                 metode: isAR && metode.length > 0 ? metode : undefined,
-                hamaDikendalikan: !isAR ? hamaDikendalikan : undefined,
+                focusTarget: !isAR ? focusTarget : undefined,
                 teknikPelaksanaan: !isAR && teknikPelaksanaan.length > 0 ? teknikPelaksanaan : undefined,
                 kondisiBangunan: kondisiBangunan || undefined,
             }, nomorEntry.id);
@@ -1676,7 +1676,7 @@ export function QuotationFormPage() {
                     surveyPhotos={surveyPhotos} onPhotos={setSurveyPhotos}
                     chemicals={chemicals} onChemicals={setChemicals}
                     metode={metode} onMetode={setMetode}
-                    hamaDikendalikan={hamaDikendalikan} onHama={setHamaDikendalikan}
+                    focusTarget={focusTarget} onHama={setHamaDikendalikan}
                     teknikPelaksanaan={teknikPelaksanaan} onTeknik={setTeknikPelaksanaan}
                 />}
                 {step === 4 && <Step5 noSurat={noPreview} jenisLayanan={jenisLayanan} tipe={tipe}

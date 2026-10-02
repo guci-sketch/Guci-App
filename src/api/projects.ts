@@ -11,8 +11,8 @@ export interface CreateProjectInput {
   workDate: string;
   workType?: string;
   serviceType: ServiceType;
-  targetPests?: string[];
-  pestTarget?: string;
+  targetFocus?: string[];
+  focusTarget?: string;
   buildingAreaSqm?: number;
   contractType: ContractType;
   warrantyMonths: number;

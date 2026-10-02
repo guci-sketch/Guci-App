@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Package, FileText, Search, Plus, Download, UploadCloud } from "lucide-react";
 import * as XLSX from "xlsx";
+import { supabase } from "../../lib/supabase";
 import { useAuthStore } from "../../store/authStore";
 
 const DUMMY_STOK = [
@@ -34,19 +35,44 @@ export function InventoryPage() {
         XLSX.writeFile(wb, "Template_Stok_Gudang.xlsx");
     };
 
+    const [isImporting, setIsImporting] = useState(false);
+
     const handleImportBulk = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || !user?.companyId) return;
+        
+        setIsImporting(true);
         const reader = new FileReader();
         reader.onload = async (evt) => {
-            const bstr = evt.target?.result;
-            const wb = XLSX.read(bstr, { type: "binary" });
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            alert(`Berhasil membaca ${data.length} baris master item! (Integrasi Supabase menyusul)`);
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: "binary" });
+                const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+                
+                const insertPayload = data.map(row => ({
+                    company_id: user.companyId,
+                    nama: String(row["Nama Item"] || "Tanpa Nama"),
+                    kategori: String(row["Kategori (Chemical/Alat/Perangkap)"] || "Lainnya"),
+                    satuan: String(row["Satuan"] || "Pcs"),
+                    stok: Number(row["Stok Awal"]) || 0,
+                    min_alert: Number(row["Min Alert"]) || 0
+                }));
+
+                const { error } = await supabase.from('inventory_items').insert(insertPayload);
+                if (error) throw error;
+
+                alert(`Berhasil mengimpor ${insertPayload.length} item stok ke database!`);
+                // Reload data here if there is a fetch function
+            } catch (err) {
+                console.error("Bulk Import Error:", err);
+                alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
+            } finally {
+                setIsImporting(false);
+                e.target.value = '';
+            }
         };
         reader.readAsBinaryString(file);
     };
-
     return (
         <div className="p-4 md:p-6 max-w-screen-xl mx-auto space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

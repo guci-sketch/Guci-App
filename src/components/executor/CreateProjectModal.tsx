@@ -14,16 +14,16 @@ interface CreateProjectModalProps {
 
 const SERVICE_TYPES = Object.keys(SERVICE_TYPE_META) as ServiceType[];
 
-const TARGET_PEST_OPTIONS: Record<ServiceType, string[]> = {
-  pest_control: ['Tikus (Rattus spp.)', 'Kucing Liar (Felis catus)', 'Kecoa (Periplaneta americana)', 'Nyamuk', 'Semut', 'Lalat'],
-  anti_rayap: ['Rayap Tanah (Coptotermes gestroi)', 'Rayap Kayu Kering (Cryptotermes spp.)', 'Rayap Kayu Basah (Glyptotermes spp.)'],
-  fumigasi: ['Kutu Beras (Sitophilus oryzae)', 'Kumbang Tepung (Tribolium castaneum)'],
+const TARGET_FOCUS_OPTIONS: Partial<Partial<Record<ServiceType, string[]>>> = {
+  GENERAL_PEST_CONTROL: ['Tikus (Rattus spp.)', 'Kucing Liar (Felis catus)', 'Serangga Merayap (Crawling Insects)', 'Nyamuk', 'Semut', 'Lalat'],
+  TERMITE_CONTROL: ['Rayap Tanah (Coptotermes gestroi)', 'Rayap Kayu Kering (Cryptotermes spp.)', 'Rayap Kayu Basah (Glyptotermes spp.)'],
+  FUMIGATION: ['Kutu Beras (Sitophilus oryzae)', 'Kumbang Tepung (Tribolium castaneum)'],
 };
 
-const DEFAULT_WORK_TYPE_BY_SERVICE: Record<ServiceType, string> = {
-  pest_control: 'Pest Control Umum Bulanan',
-  anti_rayap: 'Anti Rayap Pasca Konstruksi',
-  fumigasi: 'Fumigasi Gudang / Kontainer',
+const DEFAULT_WORK_TYPE_BY_SERVICE: Partial<Partial<Record<ServiceType, string>>> = {
+  GENERAL_PEST_CONTROL: 'Pest Control Umum Bulanan',
+  TERMITE_CONTROL: 'Anti Rayap Pasca Konstruksi',
+  FUMIGATION: 'Fumigasi Gudang / Kontainer',
 };
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onSubmit }) => {
@@ -45,7 +45,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   }, []);
 
   const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serviceType, setServiceType] = useState<ServiceType>('pest_control');
+  const [serviceType, setServiceType] = useState<ServiceType>('GENERAL_PEST_CONTROL');
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,13 +101,13 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const [targetPests, setTargetPests] = useState<string[]>([]);
-  const [otherPest, setOtherPest] = useState('');
+  const [targetFocus, setTargetFocus] = useState<string[]>([]);
+  const [otherFocus, setOtherFocus] = useState('');
 
   const handleSelectServiceType = (type: ServiceType) => {
     setServiceType(type);
-    setTargetPests([]);
-    setOtherPest('');
+    setTargetFocus([]);
+    setOtherFocus('');
     // Auto setup project name when service type is selected
     const serviceName = SERVICE_TYPE_META[type].label;
     if (clientName) {
@@ -140,8 +140,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     if (!address.trim()) newErrors.address = 'Alamat proyek wajib diisi';
     if (!workDate) newErrors.workDate = 'Tanggal pelaksanaan wajib diisi';
 
-    const finalPests = [...targetPests];
-    if (otherPest.trim()) finalPests.push(otherPest.trim());
+    const finalFocus = [...targetFocus];
+    if (otherFocus.trim()) finalFocus.push(otherFocus.trim());
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -160,7 +160,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         radius: 100, // Hardcode default radius
         workDate,
         serviceType,
-        targetPests: finalPests,
+        targetFocus: finalFocus,
         contractType: 'ONE_TIME',
         warrantyMonths: 0,
         scheduledStartTime,
@@ -171,8 +171,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       setIsSubmitting(false);
     }
   };
-  const isFumigation = serviceType === 'fumigasi';
-  const isTermite = serviceType === 'anti_rayap';
+  const isFumigation = serviceType === 'FUMIGATION';
+  const isTermite = serviceType === 'TERMITE_CONTROL';
 
   return (
     <div
@@ -279,30 +279,30 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           {/* Target Pests */}
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-              Jenis Hama Sasaran
+              Jenis Fokus Target
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {TARGET_PEST_OPTIONS[serviceType].map(pest => (
-                <label key={pest} className="flex items-center gap-2 p-2 border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">
+              {(TARGET_FOCUS_OPTIONS[serviceType] || []).map(focus => (
+                <label key={focus} className="flex items-center gap-2 p-2 border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={targetPests.includes(pest)}
+                    checked={targetFocus.includes(focus)}
                     onChange={(e) => {
-                      if (e.target.checked) setTargetPests(prev => [...prev, pest]);
-                      else setTargetPests(prev => prev.filter(p => p !== pest));
+                      if (e.target.checked) setTargetFocus(prev => [...prev, focus]);
+                      else setTargetFocus(prev => prev.filter(f => f !== focus));
                     }}
                     className="rounded border-slate-300 text-emerald-600 focus:ring-[var(--accent)]"
                   />
-                  <span className="text-xs text-[var(--text-secondary)]">{pest}</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{focus}</span>
                 </label>
               ))}
             </div>
             <div className="mt-2">
               <input
                 type="text"
-                placeholder="Lainnya (ketik jenis hama lain...)"
-                value={otherPest}
-                onChange={e => setOtherPest(e.target.value)}
+                placeholder="Lainnya (ketik target fokus lain...)"
+                value={otherFocus}
+                onChange={e => setOtherFocus(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
               />
             </div>

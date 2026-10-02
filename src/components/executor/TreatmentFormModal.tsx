@@ -12,10 +12,10 @@ interface TreatmentFormModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_METHOD_BY_SERVICE: Partial<Record<ServiceType, ApplicationMethod>> = {
-  pest_control: 'SPRAYING',
-  anti_rayap: 'DRILLING',
-  fumigasi: 'FOGGING',
+const DEFAULT_METHOD_BY_SERVICE: Partial<Partial<Record<ServiceType, ApplicationMethod>>> = {
+  GENERAL_PEST_CONTROL: 'SPRAYING',
+  TERMITE_CONTROL: 'DRILLING',
+  FUMIGATION: 'FOGGING',
 };
 
 function toLocalInputValue(iso?: string | null): string {
@@ -49,8 +49,8 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({ serviceT
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isFumigation = serviceType === 'fumigasi';
-  const isTermite = serviceType === 'anti_rayap';
+  const isFumigation = serviceType === 'FUMIGATION';
+  const isTermite = serviceType === 'TERMITE_CONTROL';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

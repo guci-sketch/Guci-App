@@ -165,7 +165,7 @@ function CreateSPKModal({
                 technicianId,
                 technicianName: teknisi.name,
                 scheduleDate: new Date(scheduleDate),
-                serviceType: selectedQuo.kategori === "AR" ? "anti_rayap" : "pest_control",
+                serviceType: selectedQuo.kategori === "AR" ? "TERMITE_CONTROL" : "GENERAL_PEST_CONTROL",
                 perihal: selectedQuo.perihal,
                 lokasi: lokasi.trim(),
                 notes: notes.trim(),
@@ -475,7 +475,7 @@ function SPKDetailModal({
                         <InfoBlock icon={<User size={13} />} label="Teknisi" value={spk.technicianName} />
                         <InfoBlock icon={<CalendarDays size={13} />} label="Jadwal" value={fmt(spk.scheduleDate)} />
                         <InfoBlock icon={<MapPin size={13} />} label="Lokasi" value={(spk as any).lokasi || "—"} />
-                        <InfoBlock icon={<Wrench size={13} />} label="Layanan" value={spk.serviceType === "anti_rayap" ? "Anti Rayap" : "Pest Control"} />
+                        <InfoBlock icon={<Wrench size={13} />} label="Layanan" value={spk.serviceType === "TERMITE_CONTROL" ? "Anti Rayap" : "Pest Control"} />
                         {spk.actualStart && (
                             <InfoBlock icon={<PlayCircle size={13} />} label="Mulai" value={fmtDatetime(spk.actualStart)} />
                         )}

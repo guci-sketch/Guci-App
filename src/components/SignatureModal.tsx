@@ -385,7 +385,7 @@ export function SignatureModal({ quotation, signerName, onClose, onSigned, templ
                 surveyPhotos: quotation.surveyPhotos,
                 chemicals: quotation.chemicals,
                 metode: quotation.metode,
-                hamaDikendalikan: quotation.hamaDikendalikan,
+                focusTarget: quotation.focusTarget,
                 teknikPelaksanaan: quotation.teknikPelaksanaan,
                 // Embed signature
                 signatureBase64: preview,
@@ -433,7 +433,7 @@ export function SignatureModal({ quotation, signerName, onClose, onSigned, templ
             surveyPhotos: quotation.surveyPhotos,
             chemicals: quotation.chemicals,
             metode: quotation.metode,
-            hamaDikendalikan: quotation.hamaDikendalikan,
+            focusTarget: quotation.focusTarget,
             teknikPelaksanaan: quotation.teknikPelaksanaan,
             signatureBase64: preview,
             templateConfig,

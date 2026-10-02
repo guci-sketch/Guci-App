@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from "../../lib/firebase";
 import { db } from "../../lib/firebase";
+import { supabase } from "../../lib/supabase";
 import { useAuthStore } from "../../store/authStore";
 import { getQuotations } from "../../services/quotationService";
 import * as XLSX from "xlsx";
@@ -402,19 +403,52 @@ export function CustomersPage() {
         XLSX.writeFile(wb, "Template_Import_Klien.xlsx");
     };
 
+    const [isImporting, setIsImporting] = useState(false);
+
     const handleImportBulk = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || !user?.companyId) return;
+        
+        setIsImporting(true);
         const reader = new FileReader();
         reader.onload = async (evt) => {
-            const bstr = evt.target?.result;
-            const wb = XLSX.read(bstr, { type: "binary" });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            const data = XLSX.utils.sheet_to_json(ws);
-            // In a real app we'd batch insert these to Supabase.
-            // For now, alert success.
-            alert(`Berhasil membaca ${data.length} baris! (Integrasi API Supabase untuk Bulk Import bisa dilakukan di sini)`);
+            try {
+                const bstr = evt.target?.result;
+                const wb = XLSX.read(bstr, { type: "binary" });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+                
+                const insertPayload = data.map(row => ({
+                    company_id: user.companyId,
+                    marketing_uid: user.uid,
+                    status: "draft",
+                    payload: {
+                        kepadaNama: String(row["Nama"] || "Klien Baru"),
+                        kepadaKontak: String(row["Kontak"] || ""),
+                        kepadaAlamat: String(row["Alamat"] || ""),
+                        perihal: String(row["Proyek"] || "Penawaran Harga"),
+                        kategori: (String(row["KategoriProyek"])?.toUpperCase() === "AR") ? "AR" : "PCO",
+                        tipeKontrak: "ONE_TIME",
+                        tanggal: new Date().toISOString(),
+                        companyId: user.companyId,
+                        marketingUid: user.uid,
+                        status: "draft"
+                    }
+                }));
+
+                const { error } = await supabase.from('quotations').insert(insertPayload);
+                if (error) throw error;
+
+                alert(`Berhasil mengimpor ${insertPayload.length} data klien ke database!`);
+                load();
+            } catch (err) {
+                console.error("Bulk Import Error:", err);
+                alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
+            } finally {
+                setIsImporting(false);
+                e.target.value = '';
+            }
         };
         reader.readAsBinaryString(file);
     };

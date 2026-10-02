@@ -31,13 +31,12 @@
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "framer-motion": "^13.2.0",
+    "framer-motion": "^11.18.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
     "multer": "^2.0.1",
     "pg": "^8.13.1",
     "postcss": "^8.5.28",
@@ -47,6 +46,7 @@
     "react-router-dom": "^6.22.3",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.7.0",
+    "three": "^0.186.1",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8",
     "zustand": "^5.0.15"
@@ -61,13 +61,14 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "@types/react-router-dom": "^5.3.3",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
-    "vite": "^6.2.3",
+    "vite": "^6.4.3",
     "vite-plugin-pwa": "^0.21.1"
   }
 }

@@ -22,10 +22,10 @@ import { getSupabaseClient, isSupabaseStorageConfigured, EVIDENCE_BUCKET } from 
  * exists and is selected automatically once the env vars are set.
  */
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const _dir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
 const UPLOAD_ROOT = process.env.UPLOAD_DIR
   ? join(process.cwd(), process.env.UPLOAD_DIR)
-  : join(__dirname, '../../../uploads');
+  : join(_dir, '../../../uploads');
 
 export async function savePhoto(buffer: Buffer, extension: string): Promise<string> {
   const folder = new Date().toISOString().slice(0, 7); // YYYY-MM, keeps one dir/prefix from growing unbounded

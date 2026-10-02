@@ -28,7 +28,7 @@ import type {
 } from "../../types";
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
-    DEFAULT_HAMA_PCO, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
+    DEFAULT_FOCUS_TARGET, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
 } from "../../types";
 import type { Quotation } from "../../types";
 
@@ -482,13 +482,13 @@ function Step2Edit({
 function Step3Edit({
     jenisLayanan, surveyPhotos, onPhotos,
     chemicals, onChemicals, metode, onMetode,
-    hamaDikendalikan, onHama, teknikPelaksanaan, onTeknik,
+    focusTarget, onHama, teknikPelaksanaan, onTeknik,
 }: {
     jenisLayanan: JenisLayanan;
     surveyPhotos: SurveyPhoto[];     onPhotos: (v: SurveyPhoto[]) => void;
     chemicals: ChemicalItem[];       onChemicals: (v: ChemicalItem[]) => void;
     metode: string[];                onMetode: (v: string[]) => void;
-    hamaDikendalikan: string;        onHama: (v: string) => void;
+    focusTarget: string;        onHama: (v: string) => void;
     teknikPelaksanaan: string[];     onTeknik: (v: string[]) => void;
 }) {
     const isAR = LAYANAN_CONFIG[jenisLayanan]?.isAR ?? false;
@@ -606,8 +606,8 @@ function Step3Edit({
             {!isAR && (
                 <>
                     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-                        <p className="text-sm font-bold text-slate-700 mb-1">Hama yang Dikendalikan</p>
-                        <input className={inputCls2} value={hamaDikendalikan}
+                        <p className="text-sm font-bold text-slate-700 mb-1">Fokus Target</p>
+                        <input className={inputCls2} value={focusTarget}
                             onChange={e => onHama(e.target.value)}
                             placeholder="Nyamuk, Kecoa, Lalat, Tikus, ..." />
                     </div>
@@ -718,7 +718,7 @@ export function QuotationEditPage() {
     const [surveyPhotos,      setSurveyPhotos]      = useState<SurveyPhoto[]>([]);
     const [chemicals,         setChemicals]         = useState<ChemicalItem[]>([]);
     const [metode,            setMetode]            = useState<string[]>([]);
-    const [hamaDikendalikan,  setHamaDikendalikan]  = useState(DEFAULT_HAMA_PCO);
+    const [focusTarget,  setHamaDikendalikan]  = useState(DEFAULT_FOCUS_TARGET);
     const [teknikPelaksanaan, setTeknikPelaksanaan] = useState<string[]>(DEFAULT_TEKNIK_PCO.map(t => t));
 
     // ── Load existing quotation ───────────────────────────────────────────────
@@ -765,7 +765,7 @@ export function QuotationEditPage() {
                     ? q.metode
                     : (METODE_BY_LAYANAN[q.jenisLayanan] ?? METODE_BY_LAYANAN["anti_rayap_injeksi"]).map(m => m)
                 );
-                setHamaDikendalikan(q.hamaDikendalikan ?? DEFAULT_HAMA_PCO);
+                setHamaDikendalikan(q.focusTarget ?? DEFAULT_FOCUS_TARGET);
                 setTeknikPelaksanaan(q.teknikPelaksanaan?.length ? q.teknikPelaksanaan : DEFAULT_TEKNIK_PCO.map(t => t));
             })
             .catch(() => navigate("/quotations"))
@@ -821,7 +821,7 @@ export function QuotationEditPage() {
                 surveyPhotos:      surveyPhotos.length > 0 ? surveyPhotos : undefined,
                 chemicals:         chemicals.length > 0 ? chemicals : undefined,
                 metode:            isAR && metode.length > 0 ? metode : undefined,
-                hamaDikendalikan:  !isAR ? hamaDikendalikan : undefined,
+                focusTarget:  !isAR ? focusTarget : undefined,
                 teknikPelaksanaan: !isAR && teknikPelaksanaan.length > 0 ? teknikPelaksanaan : undefined,
             });
             setSaved(true);
@@ -955,7 +955,7 @@ export function QuotationEditPage() {
                         surveyPhotos={surveyPhotos}    onPhotos={setSurveyPhotos}
                         chemicals={chemicals}          onChemicals={setChemicals}
                         metode={metode}                onMetode={setMetode}
-                        hamaDikendalikan={hamaDikendalikan} onHama={setHamaDikendalikan}
+                        focusTarget={focusTarget} onHama={setHamaDikendalikan}
                         teknikPelaksanaan={teknikPelaksanaan} onTeknik={setTeknikPelaksanaan}
                     />
                 )}

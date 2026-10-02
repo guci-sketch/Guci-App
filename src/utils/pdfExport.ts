@@ -24,7 +24,7 @@ export async function exportReportToPdf(report: WorkReport, project: Project) {
     head: [['Informasi', 'Detail']],
     body: [
       ['Jenis Layanan', project.serviceType.replace(/_/g, ' ')],
-      ['Hama Sasaran', project.pestTarget || '-'],
+      ['Fokus Target', project.focusTarget || '-'],
       ['Status', report.status],
       ['Skor Risiko', String(report.riskScore)],
     ],

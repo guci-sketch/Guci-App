@@ -155,7 +155,7 @@ const REPORT_LIST_SQL = `
   select wr.id, wr.status, wr.check_in_at, wr.check_out_at, wr.duration_seconds,
          wr.risk_score, wr.risk_level, wr.check_in_distance, wr.check_out_distance,
          wr.check_in_valid, wr.check_out_valid, wr.created_at,
-         p.id as project_id, p.project_name, p.client_name, p.address, p.service_type, p.pest_target, p.target_pests,
+         p.id as project_id, p.project_name, p.client_name, p.address, p.service_type, p.focus_target, p.target_focus,
          u.id as executor_id, u.name as executor_name,
          tr.application_method, tr.chemical_name, tr.dosage
   from work_reports wr
@@ -178,7 +178,7 @@ function mapListRow(r: any) {
     checkInDistance: r.check_in_distance,
     checkOutDistance: r.check_out_distance,
     createdAt: r.created_at,
-    project: { id: r.project_id, name: r.project_name, clientName: r.client_name, address: r.address, serviceType: r.service_type, pestTarget: r.pest_target, targetPests: typeof r.target_pests === 'string' ? JSON.parse(r.target_pests) : (r.target_pests || []) },
+    project: { id: r.project_id, name: r.project_name, clientName: r.client_name, address: r.address, serviceType: r.service_type, focusTarget: r.focus_target, targetFocus: typeof r.target_focus === 'string' ? JSON.parse(r.target_focus) : (r.target_focus || []) },
     executor: { id: r.executor_id, name: r.executor_name },
     treatmentSummary: r.chemical_name ? { applicationMethod: r.application_method, chemicalName: r.chemical_name, dosage: r.dosage } : null,
   };
@@ -330,7 +330,7 @@ adminRouter.get(
       projects: rows.map(r => ({
         id: r.id, projectName: r.project_name, clientName: r.client_name, address: r.address,
         latitude: Number(r.latitude), longitude: Number(r.longitude), radius: r.radius,
-        workDate: r.work_date, workType: r.work_type, serviceType: r.service_type, pestTarget: r.pest_target, targetPests: typeof r.target_pests === 'string' ? JSON.parse(r.target_pests) : (r.target_pests || []),
+        workDate: r.work_date, workType: r.work_type, serviceType: r.service_type, focusTarget: r.focus_target, targetFocus: typeof r.target_focus === 'string' ? JSON.parse(r.target_focus) : (r.target_focus || []),
         buildingAreaSqm: r.building_area_sqm !== null ? Number(r.building_area_sqm) : null,
         contractType: r.contract_type, warrantyMonths: r.warranty_months, nextServiceDate: r.next_service_date,
         createdByName: r.created_by_name, createdAt: r.created_at, lockedAt: r.locked_at,

@@ -23,8 +23,8 @@ const createProjectSchema = z.object({
   workDate: z.string().min(1, 'Tanggal kerja wajib diisi.'),
   workType: z.string().optional().default(''),
   serviceType: z.enum(SERVICE_TYPES).default('GENERAL_PEST_CONTROL'),
-  pestTarget: z.string().optional(),
-  targetPests: z.array(z.string()).default([]),
+  focusTarget: z.string().optional(),
+  targetFocus: z.array(z.string()).default([]),
   buildingAreaSqm: z.number().min(0).optional(),
   contractType: z.enum(['ONE_TIME', 'RECURRING']).default('ONE_TIME'),
   warrantyMonths: z.number().int().min(0).max(120).default(0),
@@ -45,8 +45,8 @@ function mapProject(row: any) {
     workDate: row.work_date,
     workType: row.work_type,
     serviceType: row.service_type,
-    pestTarget: row.pest_target,
-    targetPests: typeof row.target_pests === 'string' ? JSON.parse(row.target_pests) : (row.target_pests || []),
+    focusTarget: row.focus_target,
+    targetFocus: typeof row.target_focus === 'string' ? JSON.parse(row.target_focus) : (row.target_focus || []),
     buildingAreaSqm: row.building_area_sqm !== null ? Number(row.building_area_sqm) : null,
     contractType: row.contract_type,
     warrantyMonths: row.warranty_months,
@@ -81,13 +81,13 @@ projectRouter.post(
     const rows = await query(
       `insert into projects (
         project_name, client_name, address, latitude, longitude, radius, work_date, work_type,
-        service_type, pest_target, target_pests, building_area_sqm, contract_type, warranty_months, next_service_date,
+        service_type, focus_target, target_focus, building_area_sqm, contract_type, warranty_months, next_service_date,
         scheduled_start_time, notes, created_by
       ) 
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`,
       [
         d.projectName.trim(), d.clientName?.trim() || '', d.address.trim(), initialLatitude, initialLongitude, d.radius, d.workDate, d.workType?.trim() || '',
-        d.serviceType, d.pestTarget?.trim() || null, JSON.stringify(d.targetPests), d.buildingAreaSqm ?? null, d.contractType, d.warrantyMonths, d.nextServiceDate || null,
+        d.serviceType, d.focusTarget?.trim() || null, JSON.stringify(d.targetFocus), d.buildingAreaSqm ?? null, d.contractType, d.warrantyMonths, d.nextServiceDate || null,
         d.scheduledStartTime, d.notes?.trim() || null, req.user!.id,
       ]
     );

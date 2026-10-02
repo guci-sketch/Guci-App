@@ -517,7 +517,7 @@ export function QuotationPage() {
                     surveyPhotos:      q.surveyPhotos,
                     chemicals:         q.chemicals,
                     metode:            q.metode,
-                    hamaDikendalikan:  q.hamaDikendalikan,
+                    focusTarget:  q.focusTarget,
                     teknikPelaksanaan: q.teknikPelaksanaan,
                     templateConfig,
                 });

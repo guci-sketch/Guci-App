@@ -42,7 +42,7 @@ const evidenceSchema = z.object({
 const REPORT_JOIN_SELECT = `
   wr.*, p.project_name, p.client_name, p.address as project_address, p.latitude as project_latitude,
   p.longitude as project_longitude, p.radius as project_radius, p.scheduled_start_time,
-  p.service_type, p.pest_target, p.target_pests, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
+  p.service_type, p.focus_target, p.target_focus, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
   u.name as executor_name, u.email as executor_email
 `;
 

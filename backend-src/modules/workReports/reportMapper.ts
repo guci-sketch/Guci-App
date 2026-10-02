@@ -5,7 +5,7 @@ export async function getReportOrThrow(id: string) {
   const rows = await query(
     `select wr.*, p.project_name, p.client_name, p.address as project_address, p.latitude as project_latitude,
       p.longitude as project_longitude, p.radius as project_radius, p.scheduled_start_time,
-      p.service_type, p.pest_target, p.target_pests, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
+      p.service_type, p.focus_target, p.target_focus, p.building_area_sqm, p.contract_type, p.warranty_months, p.next_service_date,
       u.name as executor_name, u.email as executor_email
      from work_reports wr
      join projects p on p.id = wr.project_id
@@ -64,8 +64,8 @@ export async function mapReportFull(report: any, role?: string) {
     projectRadius: report.project_radius,
     scheduledStartTime: report.scheduled_start_time,
     serviceType: report.service_type,
-    pestTarget: report.pest_target,
-    targetPests: typeof report.target_pests === 'string' ? JSON.parse(report.target_pests) : (report.target_pests || []),
+    focusTarget: report.focus_target,
+    targetFocus: typeof report.target_focus === 'string' ? JSON.parse(report.target_focus) : (report.target_focus || []),
     buildingAreaSqm: report.building_area_sqm !== null ? Number(report.building_area_sqm) : null,
     contractType: report.contract_type,
     warrantyMonths: report.warranty_months,

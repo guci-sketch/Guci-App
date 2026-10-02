@@ -78,8 +78,8 @@ create table projects (
   work_date date not null,
   work_type varchar(120) not null default '', -- free-text job description, e.g. "Fumigasi Kontainer Ekspor 40ft"
   service_type service_type not null default 'GENERAL_PEST_CONTROL',
-  pest_target varchar(160), -- jenis hama sasaran, e.g. "Rayap Tanah (Subterranean Termite)"
-  target_pests jsonb not null default '[]'::jsonb, -- Array of pest targets, allowing multiple selections
+  focus_target varchar(160), -- fokus target / objek pengerjaan, e.g. "Rayap Tanah (Subterranean Termite)"
+  target_focus jsonb not null default '[]'::jsonb, -- Array of pest targets, allowing multiple selections
   building_area_sqm numeric(10, 2), -- luas area/bangunan yang ditangani
   contract_type contract_type not null default 'ONE_TIME',
   warranty_months integer not null default 0, -- 0 = tanpa garansi

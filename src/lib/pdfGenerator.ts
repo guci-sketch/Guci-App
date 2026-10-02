@@ -8,7 +8,7 @@ import jsPDF from "jspdf";
 import type { QuotationItem, BiayaTambahan, JenisLayanan, SurveyPhoto, ChemicalItem } from "../types";
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
-    DEFAULT_HAMA_PCO, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
+    DEFAULT_FOCUS_TARGET, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
 } from "../types";
 import {
     COMPANY, BRAND, LAYANAN_CONFIG,
@@ -42,7 +42,7 @@ export interface QuotationPDFData {
     surveyPhotos?: SurveyPhoto[];
     chemicals?: ChemicalItem[];
     metode?: string[];
-    hamaDikendalikan?: string;
+    focusTarget?: string;
     teknikPelaksanaan?: string[];
     // Signature embed (base64 PNG from canvas)
     signatureBase64?: string;
@@ -460,11 +460,11 @@ class QuotationRenderer {
     // ─── Hama & Teknik Pelaksanaan (Pest Control) ─────────────────────────────
 
     private buildHamaDanTeknikSection() {
-        const hama = this.data.hamaDikendalikan ?? DEFAULT_HAMA_PCO;
+        const hama = this.data.focusTarget ?? DEFAULT_FOCUS_TARGET;
         const teknik = this.data.teknikPelaksanaan ?? DEFAULT_TEKNIK_PCO;
 
         this.checkPage(15);
-        this.sectionTitle("HAMA YANG DIKENDALIKAN");
+        this.sectionTitle("FOKUS TARGET");
         this.set(9, false, BRAND.dark);
         this.text(hama, ML);
         this.nl(LINE_H + 5);
@@ -529,7 +529,7 @@ class QuotationRenderer {
     // ─── Biaya Section PCO (per bulan/periode) ────────────────────────────────
     //
     // Layout kolom:
-    //   Hama Sasaran | Metode | Kunjungan | Harga Satuan | Biaya per Bulan
+    //   Fokus Target | Metode | Kunjungan | Harga Satuan | Biaya per Bulan
     //   250 m2       | Spray  | 2x/bulan  | Rp 2.500/m2  | Rp 625.000
 
     private buildBiayaSectionPCO() {
@@ -570,7 +570,7 @@ class QuotationRenderer {
         d.setFontSize(8);
         d.setFont("helvetica", "bold");
         d.setTextColor(255, 255, 255);
-        d.text("Hama Sasaran",   xHama  + 2,           hdrY);
+        d.text("Fokus Target",   xHama  + 2,           hdrY);
         d.text("Metode",         xMet   + 2,            hdrY);
         d.text("Volume",         xVol   + COL_VOL / 2,  hdrY, { align: "center" });
         d.text("Harga Satuan",   xHS    + COL_HS / 2,   hdrY, { align: "center" });

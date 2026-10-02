@@ -804,8 +804,8 @@ export const AdminDashboard: React.FC = () => {
                         )}
                       </div>
                       <p className="text-xs text-[var(--text-secondary)] flex items-start gap-1.5"><MapPin size={14} className="text-[var(--text-muted)] shrink-0 mt-0.5" /><span>{proj.address}</span></p>
-                      {proj.targetPests?.length > 0 && <p className="text-xs text-[var(--text-muted)]">Sasaran: <span className="font-semibold text-[var(--text-secondary)]">{proj.targetPests.join(', ')}</span></p>}
-                      {proj.pestTarget && (!proj.targetPests || proj.targetPests.length === 0) && <p className="text-xs text-[var(--text-muted)]">Sasaran: <span className="font-semibold text-[var(--text-secondary)]">{proj.pestTarget}</span></p>}
+                      {proj.targetFocus?.length > 0 && <p className="text-xs text-[var(--text-muted)]">Sasaran: <span className="font-semibold text-[var(--text-secondary)]">{proj.targetFocus.join(', ')}</span></p>}
+                      {proj.focusTarget && (!proj.targetFocus || proj.targetFocus.length === 0) && <p className="text-xs text-[var(--text-muted)]">Sasaran: <span className="font-semibold text-[var(--text-secondary)]">{proj.focusTarget}</span></p>}
                       <div className="bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-subtle)] text-xs grid grid-cols-2 gap-2">
                         <div><span className="text-[var(--text-muted)] block text-[10px]">TANGGAL</span><span className="font-semibold text-[var(--text-secondary)]">{proj.workDate}</span></div>
                         <div><span className="text-[var(--text-muted)] block text-[10px]">RADIUS</span><span className="font-semibold text-[var(--text-secondary)]">{proj.radius} meter</span></div>
@@ -1149,10 +1149,10 @@ export const AdminDashboard: React.FC = () => {
                     <div><span className="text-[var(--text-muted)] block text-[10px]">LAYANAN</span><span className="font-bold text-[var(--text-primary)]">{getServiceTypeMeta(selectedReport.serviceType).label}</span></div>
                     <div><span className="text-[var(--text-muted)] block text-[10px]">STATUS</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.status}</span></div>
                     <div><span className="text-[var(--text-muted)] block text-[10px]">TOTAL DURASI</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.durationSeconds ? `${Math.round(selectedReport.durationSeconds / 60)} menit` : '-'}</span></div>
-                    {selectedReport.targetPests?.length > 0 ? (
-                      <div className="col-span-2"><span className="text-[var(--text-muted)] block text-[10px]">SASARAN HAMA</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.targetPests.join(', ')}</span></div>
-                    ) : selectedReport.pestTarget ? (
-                      <div className="col-span-2"><span className="text-[var(--text-muted)] block text-[10px]">SASARAN HAMA</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.pestTarget}</span></div>
+                    {selectedReport.targetFocus?.length > 0 ? (
+                      <div className="col-span-2"><span className="text-[var(--text-muted)] block text-[10px]">FOKUS TARGET</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.targetFocus.join(', ')}</span></div>
+                    ) : selectedReport.focusTarget ? (
+                      <div className="col-span-2"><span className="text-[var(--text-muted)] block text-[10px]">FOKUS TARGET</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.focusTarget}</span></div>
                     ) : null}
                     {selectedReport.warrantyMonths > 0 && (
                       <div><span className="text-[var(--text-muted)] block text-[10px]">GARANSI</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.warrantyMonths} bulan</span></div>
@@ -1233,7 +1233,7 @@ export const AdminDashboard: React.FC = () => {
                           )}
                         </div>
 
-                        {selectedReport.serviceType === 'fumigasi' && (
+                        {selectedReport.serviceType === 'FUMIGATION' && (
                           <div className={`rounded-lg p-3 border ${selectedReport.treatmentRecord.aerationCompletedAt ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
                             <div className="flex items-center gap-1.5 mb-2">
                               <ShieldAlert size={14} className={selectedReport.treatmentRecord.aerationCompletedAt ? 'text-emerald-700' : 'text-rose-700'} />
@@ -1403,7 +1403,7 @@ export const AdminDashboard: React.FC = () => {
                   <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Informasi Proyek</h4>
                   <div><span className="text-[var(--text-muted)] block text-[10px]">KLIEN</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.clientName}</span></div>
                   <div><span className="text-[var(--text-muted)] block text-[10px]">ALAMAT</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.address}</span></div>
-                  <div><span className="text-[var(--text-muted)] block text-[10px]">SASARAN HAMA</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.targetPests?.length ? selectedProject.targetPests.join(", ") : selectedProject.pestTarget || "-"}</span></div>
+                  <div><span className="text-[var(--text-muted)] block text-[10px]">FOKUS TARGET</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.targetFocus?.length ? selectedProject.targetFocus.join(", ") : selectedProject.focusTarget || "-"}</span></div>
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border-subtle)]">
                     <div><span className="text-[var(--text-muted)] block text-[10px]">KONTRAK</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.contractType === "RECURRING" ? "Berkala" : "Sekali Layanan"}</span></div>
                     <div><span className="text-[var(--text-muted)] block text-[10px]">TANGGAL / JADWAL</span><span className="font-bold text-[var(--text-primary)]">{selectedProject.workDate}</span></div>

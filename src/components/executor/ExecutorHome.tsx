@@ -417,8 +417,8 @@ export const ExecutorHome: React.FC = () => {
                       </span>
                     );
                   })()}
-                  {ongoingJob.targetPests?.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">• {ongoingJob.targetPests.join(', ')}</span>}
-                  {ongoingJob.pestTarget && ongoingJob.targetPests?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {ongoingJob.pestTarget}</span>}
+                  {ongoingJob.targetFocus?.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">• {ongoingJob.targetFocus.join(', ')}</span>}
+                  {ongoingJob.focusTarget && ongoingJob.targetFocus?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {ongoingJob.focusTarget}</span>}
                 </div>
                 <h3 className="text-base font-bold text-white tracking-tight">{ongoingJob.projectName}</h3>
                 <p className="text-xs text-[var(--text-muted)] mt-1 flex items-start gap-1">
@@ -477,8 +477,8 @@ export const ExecutorHome: React.FC = () => {
                       </span>
                     );
                   })()}
-                  {readyJob.targetPests?.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">• {readyJob.targetPests.join(', ')}</span>}
-                  {readyJob.pestTarget && readyJob.targetPests?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {readyJob.pestTarget}</span>}
+                  {readyJob.targetFocus?.length > 0 && <span className="text-[11px] text-[var(--text-muted)]">• {readyJob.targetFocus.join(', ')}</span>}
+                  {readyJob.focusTarget && readyJob.targetFocus?.length === 0 && <span className="text-[11px] text-[var(--text-muted)]">• {readyJob.focusTarget}</span>}
                 </div>
                 <h3 className="text-base font-bold text-[var(--text-primary)]">{readyJob.projectName}</h3>
                 <p className="text-xs text-[var(--text-muted)] mt-1 flex items-start gap-1">
