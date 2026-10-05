@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { SignatureModal } from "../../components/SignatureModal";
+import { SignatureModal } from '@/widgets/common/SignatureModal';
 import { useNavigate } from "react-router-dom";
-import { useCompanyTemplate } from "../../hooks/useCompanyTemplate";
+import { useCompanyTemplate } from '@/shared/hooks/useCompanyTemplate';
 import {
     FileText, Plus, Search, RefreshCw,
     CheckCircle2, XCircle, Clock, FileX2,
     Eye, Download, Filter, ChevronLeft, ChevronRight,
     PenLine, MessageSquare, AlertCircle, Trash2, Send, MessageCircle, Pencil, } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getQuotations, updateQuotationStatus, deleteQuotation, attachPdfToQuotation } from "../../services/quotationService";
-import { generateQuotationPDF } from "../../lib/pdfGenerator";
-import { blobToBase64 } from "../../services/quotationService";
-import { LAYANAN_CONFIG } from "../../lib/quotationConfig";
-import { formatDate, formatRupiah } from "../../lib/utils";
-import type { Quotation, QuotationStatus, KategoriSurat, TipeKontrak } from "../../types";
+import { useAuthStore } from '@/app/store/authStore';
+import { getQuotations, updateQuotationStatus, deleteQuotation, attachPdfToQuotation } from '@/shared/api/quotationService';
+import { generateQuotationPDF } from '@/shared/lib/pdfGenerator';
+import { blobToBase64 } from '@/shared/api/quotationService';
+import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
+import { formatDate, formatRupiah } from '@/shared/lib/utils';
+import type { Quotation, QuotationStatus, KategoriSurat, TipeKontrak } from '@/entities/types';
 
 // ─── STATUS CONFIG ────────────────────────────────────────────────────────────
 

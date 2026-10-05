@@ -6,8 +6,8 @@ import {
 } from "lucide-react";
 import {
     getCompanies, setCompanyActive, createCompany,
-} from "../../services/companyService";
-import type { Company } from "../../types";
+} from '@/shared/api/companyService';
+import type { Company } from '@/entities/types';
 
 // ─── BADGE ───────────────────────────────────────────────────────────────────
 

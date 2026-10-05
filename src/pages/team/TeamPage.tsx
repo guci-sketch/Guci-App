@@ -3,10 +3,10 @@ import {
     Users, UserPlus, RefreshCw, Loader2,
     CheckCircle2, XCircle, Copy, Check, AlertCircle,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getUsersByCompany, setUserActive, countActiveUsers, MAX_USERS_PER_COMPANY } from "../../services/userService";
-import { createInvite } from "../../services/inviteService";
-import type { AppUser, UserRole } from "../../types";
+import { useAuthStore } from '@/app/store/authStore';
+import { getUsersByCompany, setUserActive, countActiveUsers, MAX_USERS_PER_COMPANY } from '@/shared/api/userService';
+import { createInvite } from '@/shared/api/inviteService';
+import type { AppUser, UserRole } from '@/entities/types';
 
 const ROLE_LABELS: Record<string, string> = {
     marketing: "Marketing",

@@ -5,11 +5,11 @@ import {
     CheckCircle2, XCircle, Users, AlertCircle,
     Eye, EyeOff, Mail, Check, Link,
 } from "lucide-react";
-import { getCompanyById } from "../../services/companyService";
-import { getUsersByCompany, setUserActive } from "../../services/userService";
-import { createUserByAdmin, sendActivationEmail } from "../../services/adminCreateUser";
-import { useAuthStore } from "../../store/authStore";
-import type { Company, AppUser } from "../../types";
+import { getCompanyById } from '@/shared/api/companyService';
+import { getUsersByCompany, setUserActive } from '@/shared/api/userService';
+import { createUserByAdmin, sendActivationEmail } from '@/shared/api/adminCreateUser';
+import { useAuthStore } from '@/app/store/authStore';
+import type { Company, AppUser } from '@/entities/types';
 
 const ROLE_LABELS: Record<string, string> = {
     administrator: "Administrator",

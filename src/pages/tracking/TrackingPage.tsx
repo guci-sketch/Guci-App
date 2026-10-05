@@ -5,19 +5,19 @@ import {
     Banknote, Wrench, Loader2, Save, Filter,
     Shield, Bug,
 } from "lucide-react";
-import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { useAuthStore } from "../../store/authStore";
+import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { useAuthStore } from '@/app/store/authStore';
 import {
     getTrackingByCompany, upsertTracking, generateTerminAR,
     generateCicilanBulanan, computeStatusPembayaran,
     type OrderTracking,
     type StatusPembayaran, type StatusPengerjaan,
     type TerminAR, type CicilanPCO as CicilanBulanan,
-} from "../../services/trackingService";
-import type { Quotation } from "../../types";
-import { formatRupiah, formatDate } from "../../lib/utils";
-import { fmtIDR } from "../../lib/quotationConfig";
+} from '@/shared/api/trackingService';
+import type { Quotation } from '@/entities/types';
+import { formatRupiah, formatDate } from '@/shared/lib/utils';
+import { fmtIDR } from '@/shared/lib/quotationConfig';
 
 // ─── CONFIGS ──────────────────────────────────────────────────────────────────
 

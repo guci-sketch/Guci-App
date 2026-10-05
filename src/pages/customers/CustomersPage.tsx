@@ -6,16 +6,16 @@ import {
     MapPin, ClipboardCheck, Phone, Building2, Wrench,
     Navigation, ExternalLink,
 } from "lucide-react";
-import { collection, query, where, getDocs, doc, setDoc, Timestamp } from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { supabase } from "../../lib/supabase";
-import { useAuthStore } from "../../store/authStore";
-import { getQuotations } from "../../services/quotationService";
+import { collection, query, where, getDocs, doc, setDoc, Timestamp } from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { supabase } from '@/shared/lib/supabase';
+import { useAuthStore } from '@/app/store/authStore';
+import { getQuotations } from '@/shared/api/quotationService';
 import * as XLSX from "xlsx";
 import { UploadCloud, Download } from "lucide-react";
-import { formatDate } from "../../lib/utils";
-import { LAYANAN_CONFIG } from "../../lib/quotationConfig";
-import type { Quotation } from "../../types";
+import { formatDate } from '@/shared/lib/utils';
+import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
+import type { Quotation } from '@/entities/types';
 
 interface ControlChecklist {
     id: string; tanggal: Date; teknisi: string; catatan: string;

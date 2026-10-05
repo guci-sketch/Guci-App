@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Package, FileText, Search, Plus, Download, UploadCloud } from "lucide-react";
 import * as XLSX from "xlsx";
-import { supabase } from "../../lib/supabase";
-import { useAuthStore } from "../../store/authStore";
+import { supabase } from '@/shared/lib/supabase';
+import { useAuthStore } from '@/app/store/authStore';
 
 const DUMMY_STOK = [
     { id: "1", nama: "Cypergard 100 EC", kategori: "Chemical", satuan: "ml", stok: 70300, minAlert: 5000 },

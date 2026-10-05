@@ -4,13 +4,13 @@ import {
     ChevronDown, Search, FileText,
     TrendingUp, AlertCircle, Filter, MessageCircle,
 } from "lucide-react";
-import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { useAuthStore } from "../../store/authStore";
-import { updateQuotationStatus } from "../../services/quotationService";
-import { LAYANAN_CONFIG } from "../../lib/quotationConfig";
-import { formatRupiah, formatDate } from "../../lib/utils";
-import type { Quotation, QuotationStatus } from "../../types";
+import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { useAuthStore } from '@/app/store/authStore';
+import { updateQuotationStatus } from '@/shared/api/quotationService';
+import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
+import { formatRupiah, formatDate } from '@/shared/lib/utils';
+import type { Quotation, QuotationStatus } from '@/entities/types';
 
 // ─── STATUS PIPELINE ──────────────────────────────────────────────────────────
 

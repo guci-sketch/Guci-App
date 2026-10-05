@@ -5,10 +5,10 @@ import {
     CheckCircle2, Clock, XCircle, FileText,
     ChevronDown, X, PenLine, Search, Filter, RefreshCw, Trash2,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getNomorSuratLog, addManualNomorSurat, deleteNomorSurat } from "../../services/nomorSuratService";
-import { fmtDateID, TIPE_LABELS } from "../../lib/quotationConfig";
-import type { NomorSuratLog, KategoriSurat, TipeKontrak, QuotationStatus, JenisLayanan } from "../../types";
+import { useAuthStore } from '@/app/store/authStore';
+import { getNomorSuratLog, addManualNomorSurat, deleteNomorSurat } from '@/shared/api/nomorSuratService';
+import { fmtDateID, TIPE_LABELS } from '@/shared/lib/quotationConfig';
+import type { NomorSuratLog, KategoriSurat, TipeKontrak, QuotationStatus, JenisLayanan } from '@/entities/types';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -549,7 +549,7 @@ function DownloadPdfButton({ quoId, noSurat }: { quoId: string; noSurat: string 
     const handleClick = async () => {
         setLoading(true);
         try {
-            const { getQuotationById } = await import("../../services/quotationService");
+            const { getQuotationById } = await import("@/shared/api/quotationService");
             const quo = await getQuotationById(quoId);
             if (!quo?.pdfUrl) { alert("PDF tidak ditemukan."); return; }
             window.open(quo.pdfUrl, "_blank", "noopener,noreferrer");

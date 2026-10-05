@@ -7,15 +7,15 @@ import {
     FileCheck2, Database, ShieldCheck,
     Camera, X, FlaskConical, ChevronDown, ChevronUp, MessageCircle, MapPin,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { commitNomorSurat, previewNomorSurat } from "../../services/nomorSuratService";
-import { saveQuotationDraft, getQuotations } from "../../services/quotationService";
-import { LAYANAN_CONFIG, calcTotals, fmtIDR, TIPE_LABELS } from "../../lib/quotationConfig";
-import type { JenisLayanan, TipeKontrak, KategoriSurat, QuotationItem, BiayaTambahan, SurveyPhoto, ChemicalItem, KondisiBangunan } from "../../types";
+import { useAuthStore } from '@/app/store/authStore';
+import { commitNomorSurat, previewNomorSurat } from '@/shared/api/nomorSuratService';
+import { saveQuotationDraft, getQuotations } from '@/shared/api/quotationService';
+import { LAYANAN_CONFIG, calcTotals, fmtIDR, TIPE_LABELS } from '@/shared/lib/quotationConfig';
+import type { JenisLayanan, TipeKontrak, KategoriSurat, QuotationItem, BiayaTambahan, SurveyPhoto, ChemicalItem, KondisiBangunan } from '@/entities/types';
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
     DEFAULT_FOCUS_TARGET, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
-} from "../../types";
+} from '@/entities/types';
 
 const STEPS = [
     { label: "Jenis & Tipe" },

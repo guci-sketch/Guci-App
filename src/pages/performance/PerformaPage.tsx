@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
     collection, query, where, getDocs, doc,
     setDoc, Timestamp,
-} from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { useAuthStore } from "../../store/authStore";
-import { formatRupiah } from "../../lib/utils";
+} from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { useAuthStore } from '@/app/store/authStore';
+import { formatRupiah } from '@/shared/lib/utils';
 import {
     TrendingUp, Award, ChevronDown,
     RefreshCw, Loader2, Edit2, Check, X,

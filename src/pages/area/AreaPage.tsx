@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { MapPin, RefreshCw, Loader2, Search, X, ChevronDown, ChevronUp, Users, TrendingUp, CheckCircle2, Shield } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getQuotations } from "../../services/quotationService";
-import { formatRupiah } from "../../lib/utils";
-import type { Quotation } from "../../types";
+import { useAuthStore } from '@/app/store/authStore';
+import { getQuotations } from '@/shared/api/quotationService';
+import { formatRupiah } from '@/shared/lib/utils';
+import type { Quotation } from '@/entities/types';
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 

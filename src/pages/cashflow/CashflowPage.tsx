@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { useAuthStore } from "../../store/authStore";
-import { formatRupiah } from "../../lib/utils";
+import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { useAuthStore } from '@/app/store/authStore';
+import { formatRupiah } from '@/shared/lib/utils';
 import {
     DollarSign, TrendingDown, RefreshCw, Loader2, ChevronDown, BarChart3,
     ArrowUpRight, Minus, CheckCircle2, Target,

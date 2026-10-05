@@ -19,18 +19,18 @@ import {
     Camera, X, FlaskConical, ChevronDown, ChevronUp,
     MessageCircle, MapPin, Tag, Info,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getQuotationById, updateQuotationData } from "../../services/quotationService";
-import { calcTotals, fmtIDR, LAYANAN_CONFIG, TIPE_LABELS } from "../../lib/quotationConfig";
+import { useAuthStore } from '@/app/store/authStore';
+import { getQuotationById, updateQuotationData } from '@/shared/api/quotationService';
+import { calcTotals, fmtIDR, LAYANAN_CONFIG, TIPE_LABELS } from '@/shared/lib/quotationConfig';
 import type {
     JenisLayanan, QuotationItem, BiayaTambahan,
     SurveyPhoto, ChemicalItem,
-} from "../../types";
+} from '@/entities/types';
 import {
     DEFAULT_CHEMICALS_AR, DEFAULT_CHEMICALS_PCO,
     DEFAULT_FOCUS_TARGET, DEFAULT_TEKNIK_PCO, METODE_BY_LAYANAN,
-} from "../../types";
-import type { Quotation } from "../../types";
+} from '@/entities/types';
+import type { Quotation } from '@/entities/types';
 
 // ─── STEP DEFINITIONS ─────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
+import { supabase } from '@/shared/lib/supabase';
 import { AlertCircle, Loader2, Bug, Building, User, Mail, Lock } from "lucide-react";
 
 export function SignupPage() {

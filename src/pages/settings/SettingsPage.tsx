@@ -6,10 +6,10 @@ import {
     MapPin, RefreshCw, Palette, Upload, ImageOff,
     Eye, RotateCcw,
 } from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
-import { getCompanySettings, saveCompanySettings, TEMPLATE_DEFAULTS } from "../../services/settingsService";
-import type { CompanySettings, TemplateConfig } from "../../services/settingsService";
-import { fmtDateID } from "../../lib/quotationConfig";
+import { useAuthStore } from '@/app/store/authStore';
+import { getCompanySettings, saveCompanySettings, TEMPLATE_DEFAULTS } from '@/shared/api/settingsService';
+import type { CompanySettings, TemplateConfig } from '@/shared/api/settingsService';
+import { fmtDateID } from '@/shared/lib/quotationConfig';
 
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
 

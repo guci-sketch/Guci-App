@@ -1,12 +1,12 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { fmtIDR } from "../../lib/quotationConfig";
-import { collection, query, where, getDocs, Timestamp } from "../../lib/firebase";
-import { db } from "../../lib/firebase";
-import { useAuthStore } from "../../store/authStore";
-import { ROLE_LABELS, formatRupiah } from "../../lib/utils";
-import { getTrackingByCompany } from "../../services/trackingService";
+import { fmtIDR } from '@/shared/lib/quotationConfig';
+import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
+import { db } from '@/shared/lib/firebase';
+import { useAuthStore } from '@/app/store/authStore';
+import { ROLE_LABELS, formatRupiah } from '@/shared/lib/utils';
+import { getTrackingByCompany } from '@/shared/api/trackingService';
 import {
     FileText, Clock, CheckCircle2, TrendingUp,
     Send, ClipboardList, AlertCircle, ArrowRight,
@@ -15,8 +15,8 @@ import {
 import {
     PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
-import type { Quotation, QuotationStatus } from "../../types";
-import type { OrderTracking } from "../../services/trackingService";
+import type { Quotation, QuotationStatus } from '@/entities/types';
+import type { OrderTracking } from '@/shared/api/trackingService';
 
 // â”€â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
