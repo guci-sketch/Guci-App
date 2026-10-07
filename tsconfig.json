@@ -24,5 +24,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["vite/client"]
-  }
+  },
+  "exclude": [
+    "Styling-Reference",
+    "dist",
+    "node_modules"
+  ]
 }

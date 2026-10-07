@@ -34,29 +34,29 @@ async function seed() {
     const fieldPass = await bcrypt.hash('lapangan123', 10);
 
     const admin = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
-       values ($1,$2,$3,$4,'ADMIN',$5,'APPROVED',true) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, is_active)
+       values ($1,$2,$3,$4,'ADMIN',$5,true) returning id`,
       ['Ahmad Fauzi', 'admin.fauzi@fieldwork.id', 'OPS-198804-001', adminPass, '0812-1000-2001']
     );
     const adminId = admin.rows[0].id;
 
     const budi = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
-       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,true) returning id`,
       ['Budi Santoso', 'budi.santoso@fieldwork.id', 'TEK-202108-014', fieldPass, '0813-2000-3014']
     );
     const budiId = budi.rows[0].id;
 
     const sinta = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
-       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,true) returning id`,
       ['Sinta Maharani', 'sinta.maharani@fieldwork.id', 'TEK-202203-029', fieldPass, '0814-3000-4029']
     );
     const sintaId = sinta.rows[0].id;
 
     const andi = await client.query(
-      `insert into users (name, email, nip, password_hash, role, phone, approval_status, is_active)
-       values ($1,$2,$3,$4,'EXECUTOR',$5,'APPROVED',true) returning id`,
+      `insert into users (name, email, nip, password_hash, role, phone, is_active)
+       values ($1,$2,$3,$4,'EXECUTOR',$5,true) returning id`,
       ['Andi Pratama', 'andi.pratama@fieldwork.id', 'TEK-202301-042', fieldPass, '0815-4000-5042']
     );
     const andiId = andi.rows[0].id;
