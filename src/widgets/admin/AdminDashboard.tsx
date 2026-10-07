@@ -73,7 +73,7 @@ function presetToRange(preset: string): { startDate?: string; endDate?: string }
 import { Header } from '../common/Header';
 
 const MotionDiv = motion.div as any;
-
+import { AppLayout } from '../common/AppLayout';
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -324,79 +324,53 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  const sidebarItems = [
+    { id: 'dashboard', label: 'Ikhtisar (Dashboard)', icon: <ShieldCheck size={18} /> },
+    { id: 'projects', label: 'Penugasan (SPK)', icon: <Briefcase size={18} /> },
+    { id: 'tracking', label: 'Peta Pelacakan GPS', icon: <MapPin size={18} /> },
+    { id: 'quotation', label: 'Penawaran Harga', icon: <FileText size={18} /> },
+    { id: 'inventory', label: 'Gudang & Stok', icon: <Package size={18} /> },
+    { id: 'kontrol-rayap', label: 'Garansi Rayap', icon: <AlertTriangle size={18} /> },
+    { id: 'reports', label: 'Laporan Lapangan', icon: <CheckCircle2 size={18} /> },
+    { id: 'anomalies', label: 'Anomali & Pelanggaran', icon: <ShieldAlert size={18} />, danger: true },
+    { id: 'executors', label: 'Performa Teknisi', icon: <Users size={18} /> }
+  ];
+  
+  if (user?.role === 'SUPERADMIN') {
+      sidebarItems.push(
+        { id: 'approval', label: 'Manajemen User', icon: <UserCheck size={18} /> },
+        { id: 'risk-config', label: 'Aturan Risiko', icon: <Settings2 size={18} /> },
+        { id: 'audit', label: 'Log Sistem', icon: <Clock size={18} /> }
+      );
+  }
+  sidebarItems.push({ id: 'profile', label: 'Setup Profile', icon: <UserCheck size={18} /> });
+
+  const dynamicIslandItems = [
+    { id: 'dashboard', label: 'Ikhtisar', icon: ShieldCheck },
+    { id: 'projects', label: 'SPK', icon: Briefcase },
+    { id: 'reports', label: 'Laporan', icon: CheckCircle2 },
+    { id: 'inventory', label: 'Gudang', icon: Package }
+  ];
+
   return (
-    <div className="flex flex-col h-screen bg-[var(--bg-primary)]">
-      <Header currentUser={user!} onLogout={logout} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />
-      
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`absolute md:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-[var(--border-subtle)] flex flex-col transform transition-transform duration-200 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-          <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">
-            <h2 className="text-sm font-bold tracking-tight text-[var(--text-primary)] leading-tight mb-1">
-              Monitoring Presensi &amp;<br/>Audit Lapangan
-            </h2>
-            <p className="text-[10px] text-[var(--text-secondary)]">
-              {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-5">
+    <AppLayout
+        sidebarItems={sidebarItems}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as Tab)}
+        header={<Header currentUser={user!} onLogout={logout} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />}
+        dynamicIslandItems={dynamicIslandItems}
+        sidebarHeader={
             <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Dashboard Utama</div>
-              <div className="space-y-1">
-                <SidebarItem tab="dashboard" icon={<ShieldCheck size={16} />} label="Ikhtisar (Dashboard)" />
-                <SidebarItem tab="projects" icon={<Briefcase size={16} />} label="Penugasan (SPK)" />
-                <SidebarItem tab="tracking" icon={<MapPin size={16} />} label="Peta Pelacakan GPS" />
-              </div>
+                <h2 className="text-sm font-bold tracking-tight text-slate-800 leading-tight mb-1">
+                  Monitoring Presensi &amp;<br/>Audit Lapangan
+                </h2>
+                <p className="text-[10px] text-slate-500">
+                  {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
             </div>
-
-            <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Komersial & Gudang</div>
-              <div className="space-y-1">
-                <SidebarItem tab="quotation" icon={<FileText size={16} />} label="Penawaran Harga" />
-                <SidebarItem tab="inventory" icon={<Package size={16} />} label="Gudang & Stok" />
-                <SidebarItem tab="kontrol-rayap" icon={<AlertTriangle size={16} />} label="Garansi Rayap" />
-              </div>
-            </div>
-
-            <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Audit & Eksekusi</div>
-              <div className="space-y-1">
-                <SidebarItem tab="reports" icon={<CheckCircle2 size={16} />} label="Laporan Lapangan" count={reports.length} />
-                <SidebarItem tab="anomalies" icon={<ShieldAlert size={16} />} label="Anomali & Pelanggaran" danger count={kpi.flaggedJobs} />
-                <SidebarItem tab="executors" icon={<Users size={16} />} label="Performa Teknisi" />
-              </div>
-            </div>
-
-            {user?.role === 'SUPERADMIN' && (
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Sistem & Konfigurasi</div>
-                <div className="space-y-1">
-                  <SidebarItem tab="approval" icon={<UserCheck size={16} />} label="Manajemen User" count={adminUsers.length} />
-                  <SidebarItem tab="risk-config" icon={<Settings2 size={16} />} label="Aturan Risiko" />
-                  <SidebarItem tab="audit" icon={<Clock size={16} />} label="Log Sistem" />
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
-            <SidebarItem tab="profile" icon={<UserCheck size={16} />} label="Setup Profile" />
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors text-slate-600 hover:bg-rose-50 hover:text-rose-700"
-            >
-              <span className="flex-1 text-left">Keluar</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto flex flex-col w-full relative">
-        <div className="p-4 sm:p-6 space-y-5 max-w-6xl w-full mx-auto">
+        }
+    >
+      <div className="p-4 sm:p-6 space-y-5 max-w-6xl w-full mx-auto">
           {isLoading && <div className="py-16 text-center text-sm text-[var(--text-muted)]">Memuat dashboard...</div>}
 
           {loadError && !isLoading && (
@@ -1147,7 +1121,7 @@ export const AdminDashboard: React.FC = () => {
           </>
         )}
         </div>
-      </main>
+      
 
       {/* Detail Modal */}
       {selectedReportId && (
@@ -1483,8 +1457,7 @@ export const AdminDashboard: React.FC = () => {
       )}
       {viewingPhoto && <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />}
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 

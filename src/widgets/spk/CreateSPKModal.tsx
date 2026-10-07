@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { X, ClipboardList, Loader2, Search, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { db } from '@/shared/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
 import { createSPK } from '@/shared/api/spkService';
 import { formatRupiah, cn, formatDate as fmt } from '@/shared/lib/utils';
 import type { Quotation, AppUser } from '@/entities/types';
