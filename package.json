@@ -1,0 +1,44 @@
+{
+  "name": "fieldwork-fixed-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "server": "tsx backend-src/server.ts",
+    "test:geo": "tsx --test tests/haversine.test.ts",
+    "test:blackbox": "tsx --test tests/blackbox.test.ts",
+    "test": "npm run test:geo && npm run test:blackbox",
+    "test:e2e": "e2e run"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dexie": "^4.0.10",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "lucide-react": "^1.16.0",
+    "pg": "^8.13.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.1"
+  },
+  "devDependencies": {
+    "@e2e-dev/web": "^0.14.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "ai": "^7.0.0",
+    "e2e": "^0.19.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3",
+    "zod": "^4.1.8"
+  }
+}
