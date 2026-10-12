@@ -330,11 +330,11 @@ CREATE POLICY tenant_isolation_chemicals ON public.chemicals
     USING (company_id = public.current_user_company_id());
 
 -- ============================================================================
--- SEED DATA RIIL OPERASIONAL PT GUCI EMAS PRATAMA (ZERO DUMMY)
+-- SEED DATA RIIL OPERASIONAL PT GUCI EMAS PRATAMA (UUID RFC 4122 HEX VALID)
 -- ============================================================================
 INSERT INTO public.companies (id, code, name, address, phone, email)
 VALUES (
-    'c1111111-1111-4111-8111-111111111111',
+    '11111111-1111-4111-8111-111111111111',
     'GEP',
     'PT Guci Emas Pratama',
     'Jl. Ganda Sasmita No. 1, Serua, Kec. Ciputat, Kota Tangerang Selatan, Banten 15414',
@@ -346,32 +346,32 @@ VALUES (
 INSERT INTO public.users (id, company_id, email, full_name, role, phone)
 VALUES 
 (
-    'u0000000-0000-4000-8000-000000000000',
-    'c1111111-1111-4111-8111-111111111111',
+    '00000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'lieziragroup@gmail.com',
     'Superadmin Liezira',
     'SUPERADMIN',
     '081299998888'
 ),
 (
-    'u1111111-1111-4111-8111-111111111111',
-    'c1111111-1111-4111-8111-111111111111',
+    '00000000-0000-4000-8000-000000000002',
+    '11111111-1111-4111-8111-111111111111',
     'supervisor@guciemas.co.id',
     'Rafi Musyaffa Ahmad',
     'SUPERVISOR',
     '081289102938'
 ),
 (
-    'u2222222-2222-4222-8222-222222222222',
-    'c1111111-1111-4111-8111-111111111111',
+    '00000000-0000-4000-8000-000000000003',
+    '11111111-1111-4111-8111-111111111111',
     'agus.santoso@guciemas.co.id',
     'Agus Santoso',
     'TEKNISI_LAPANGAN',
     '081392819283'
 ),
 (
-    'u3333333-3333-4333-8333-333333333333',
-    'c1111111-1111-4111-8111-111111111111',
+    '00000000-0000-4000-8000-000000000004',
+    '11111111-1111-4111-8111-111111111111',
     'bambang.irawan@guciemas.co.id',
     'Bambang Irawan',
     'TEKNISI_LAPANGAN',
@@ -383,8 +383,8 @@ VALUES
 INSERT INTO public.projects (id, company_id, project_code, name, client_name, address, latitude, longitude, geofence_radius_meters)
 VALUES
 (
-    'p1111111-1111-4111-8111-111111111111',
-    'c1111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222221',
+    '11111111-1111-4111-8111-111111111111',
     'PRJ-GEP-HQ-01',
     'Kantor Pusat PT Guci Emas Pratama',
     'Internal PT Guci Emas Pratama',
@@ -394,8 +394,8 @@ VALUES
     100
 ),
 (
-    'p2222222-2222-4222-8222-222222222222',
-    'c1111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    '11111111-1111-4111-8111-111111111111',
     'PRJ-BXCHANGE-02',
     'Bintaro Jaya Xchange Mall',
     'PT Jaya Real Property, Tbk',
@@ -405,8 +405,8 @@ VALUES
     120
 ),
 (
-    'p3333333-3333-4333-8333-333333333333',
-    'c1111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222223',
+    '11111111-1111-4111-8111-111111111111',
     'PRJ-BSDGOP-03',
     'BSD Green Office Park 9',
     'Sinarmas Land BSD',
@@ -419,8 +419,8 @@ VALUES
 INSERT INTO public.chemicals (id, company_id, brand_name, active_ingredient, formulation, sni_standard, recommended_dose_ml_per_liter, target_pest, stock_qty)
 VALUES
 (
-    'ch111111-1111-4111-8111-111111111111',
-    'c1111111-1111-4111-8111-111111111111',
+    '33333333-3333-4333-8333-333333333331',
+    '11111111-1111-4111-8111-111111111111',
     'Premise 200 SL',
     'Imidakloprid 200 g/l',
     'Soluble Liquid (SL)',
@@ -430,8 +430,8 @@ VALUES
     45.0
 ),
 (
-    'ch222222-2222-4222-8222-222222222222',
-    'c1111111-1111-4111-8111-111111111111',
+    '33333333-3333-4333-8333-333333333332',
+    '11111111-1111-4111-8111-111111111111',
     'Termidor 25 EC',
     'Fipronil 25 g/l',
     'Emulsifiable Concentrate (EC)',
@@ -441,8 +441,8 @@ VALUES
     30.0
 ),
 (
-    'ch333333-3333-4333-8333-333333333333',
-    'c1111111-1111-4111-8111-111111111111',
+    '33333333-3333-4333-8333-333333333333',
+    '11111111-1111-4111-8111-111111111111',
     'Goliath Gel',
     'Fipronil 0.05%',
     'Ready-To-Use Gel Bait',

@@ -1,10 +1,11 @@
 /**
  * Master Data Riil Operasional PT Guci Emas Pratama
  * Disediakan langsung di client layer untuk isolasi frontend FSD mandiri
+ * Menggunakan format UUID heksadesimal RFC 4122 PostgreSQL yang valid (0-9, a-f)
  */
 
 export const REAL_COMPANY_DATA = {
-  id: 'c1111111-1111-4111-8111-111111111111',
+  id: '11111111-1111-4111-8111-111111111111',
   code: 'GEP',
   name: 'PT Guci Emas Pratama',
   address: 'Jl. Ganda Sasmita No. 1, Serua, Kec. Ciputat, Kota Tangerang Selatan, Banten 15414',
@@ -14,7 +15,7 @@ export const REAL_COMPANY_DATA = {
 
 export const REAL_USERS = [
   {
-    id: 'u0000000-0000-4000-8000-000000000000',
+    id: '00000000-0000-4000-8000-000000000001',
     company_id: REAL_COMPANY_DATA.id,
     email: 'lieziragroup@gmail.com',
     password_hash: '$2b$10$w0DqXl6R4zFak3HashLieziraSuperadminRafi0502',
@@ -23,7 +24,7 @@ export const REAL_USERS = [
     phone: '081299998888'
   },
   {
-    id: 'u1111111-1111-4111-8111-111111111111',
+    id: '00000000-0000-4000-8000-000000000002',
     company_id: REAL_COMPANY_DATA.id,
     email: 'supervisor@guciemas.co.id',
     password_hash: '$2b$10$e1Jz0uS1x/FakeHashGuciEmasSupervisor2026',
@@ -32,7 +33,7 @@ export const REAL_USERS = [
     phone: '081289102938'
   },
   {
-    id: 'u2222222-2222-4222-8222-222222222222',
+    id: '00000000-0000-4000-8000-000000000003',
     company_id: REAL_COMPANY_DATA.id,
     email: 'agus.santoso@guciemas.co.id',
     password_hash: '$2b$10$e1Jz0uS1x/FakeHashGuciEmasTeknisiAgus2026',
@@ -41,7 +42,7 @@ export const REAL_USERS = [
     phone: '081392819283'
   },
   {
-    id: 'u3333333-3333-4333-8333-333333333333',
+    id: '00000000-0000-4000-8000-000000000004',
     company_id: REAL_COMPANY_DATA.id,
     email: 'bambang.irawan@guciemas.co.id',
     password_hash: '$2b$10$e1Jz0uS1x/FakeHashGuciEmasTeknisiBambang2026',
@@ -53,7 +54,7 @@ export const REAL_USERS = [
 
 export const REAL_PROJECTS = [
   {
-    id: 'p1111111-1111-4111-8111-111111111111',
+    id: '22222222-2222-4222-8222-222222222221',
     company_id: REAL_COMPANY_DATA.id,
     project_code: 'PRJ-GEP-HQ-01',
     name: 'Kantor Pusat PT Guci Emas Pratama',
@@ -65,7 +66,7 @@ export const REAL_PROJECTS = [
     geofence_radius_meters: 100
   },
   {
-    id: 'p2222222-2222-4222-8222-222222222222',
+    id: '22222222-2222-4222-8222-222222222222',
     company_id: REAL_COMPANY_DATA.id,
     project_code: 'PRJ-BXCHANGE-02',
     name: 'Bintaro Jaya Xchange Mall',
@@ -77,7 +78,7 @@ export const REAL_PROJECTS = [
     geofence_radius_meters: 120
   },
   {
-    id: 'p3333333-3333-4333-8333-333333333333',
+    id: '22222222-2222-4222-8222-222222222223',
     company_id: REAL_COMPANY_DATA.id,
     project_code: 'PRJ-BSDGOP-03',
     name: 'BSD Green Office Park 9',
@@ -92,7 +93,7 @@ export const REAL_PROJECTS = [
 
 export const REAL_CHEMICALS_SNI = [
   {
-    id: 'ch111111-1111-4111-8111-111111111111',
+    id: '33333333-3333-4333-8333-333333333331',
     company_id: REAL_COMPANY_DATA.id,
     brand_name: 'Premise 200 SL',
     active_ingredient: 'Imidakloprid 200 g/l',
@@ -104,7 +105,7 @@ export const REAL_CHEMICALS_SNI = [
     stock_qty: 45.0
   },
   {
-    id: 'ch222222-2222-4222-8222-222222222222',
+    id: '33333333-3333-4333-8333-333333333332',
     company_id: REAL_COMPANY_DATA.id,
     brand_name: 'Termidor 25 EC',
     active_ingredient: 'Fipronil 25 g/l',
@@ -116,7 +117,7 @@ export const REAL_CHEMICALS_SNI = [
     stock_qty: 30.0
   },
   {
-    id: 'ch333333-3333-4333-8333-333333333333',
+    id: '33333333-3333-4333-8333-333333333333',
     company_id: REAL_COMPANY_DATA.id,
     brand_name: 'Goliath Gel',
     active_ingredient: 'Fipronil 0.05%',
@@ -131,7 +132,7 @@ export const REAL_CHEMICALS_SNI = [
 
 export const REAL_SPK = [
   {
-    id: 's1111111-1111-4111-8111-111111111111',
+    id: '44444444-4444-4444-8444-444444444441',
     spk_number: 'SPK-GEP-202610-001',
     project_id: REAL_PROJECTS[1].id,
     technician_id: REAL_USERS[2].id, // Agus Santoso
@@ -142,7 +143,7 @@ export const REAL_SPK = [
     scope_of_work: 'Injeksi perimeter pondasi basement dan chemical barrier sesuai SNI 2405'
   },
   {
-    id: 's2222222-2222-4222-8222-222222222222',
+    id: '44444444-4444-4444-8444-444444444442',
     spk_number: 'SPK-GEP-202610-002',
     project_id: REAL_PROJECTS[2].id,
     technician_id: REAL_USERS[3].id, // Bambang Irawan
