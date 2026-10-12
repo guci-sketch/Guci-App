@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
     longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
     geofence_radius_meters INT NOT NULL DEFAULT 100 CHECK (geofence_radius_meters >= 10),
-    is_locked BOOLEAN NOT NULL DEFAULT FALSE, -- Terkunci setelah teknisi mulai check-in
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -238,7 +238,6 @@ AFTER INSERT ON public.work_reports
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_lock_project_on_checkin();
 
--- Mencegah modifikasi koordinat pada proyek yang sudah terkunci
 CREATE OR REPLACE FUNCTION public.fn_prevent_locked_project_edit()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -267,7 +266,6 @@ DECLARE
     v_current_stock DOUBLE PRECISION;
     v_new_stock DOUBLE PRECISION;
 BEGIN
-    -- Kunci baris stok untuk mencegah race condition (Concurrency Protection)
     SELECT stock_qty INTO v_current_stock
     FROM public.chemicals
     WHERE id = p_chemical_id
@@ -311,13 +309,11 @@ ALTER TABLE public.quotations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.spk ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.work_reports ENABLE ROW LEVEL SECURITY;
 
--- Helper Function: Dapatkan company_id user yang sedang login
 CREATE OR REPLACE FUNCTION public.current_user_company_id()
 RETURNS UUID AS $$
     SELECT company_id FROM public.users WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
--- Kebijakan RLS: Isolasi per Tenant (Company)
 DROP POLICY IF EXISTS tenant_isolation_projects ON public.projects;
 CREATE POLICY tenant_isolation_projects ON public.projects
     FOR ALL
@@ -346,8 +342,17 @@ VALUES (
     'info@guciemas.co.id'
 ) ON CONFLICT (code) DO NOTHING;
 
+-- Akun Superadmin Platform & Personel Tenant
 INSERT INTO public.users (id, company_id, email, full_name, role, phone)
 VALUES 
+(
+    'u0000000-0000-4000-8000-000000000000',
+    'c1111111-1111-4111-8111-111111111111',
+    'lieziragroup@gmail.com',
+    'Superadmin Liezira',
+    'SUPERADMIN',
+    '081299998888'
+),
 (
     'u1111111-1111-4111-8111-111111111111',
     'c1111111-1111-4111-8111-111111111111',
@@ -371,7 +376,9 @@ VALUES
     'Bambang Irawan',
     'TEKNISI_LAPANGAN',
     '081519283921'
-) ON CONFLICT (email) DO NOTHING;
+) ON CONFLICT (email) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role;
 
 INSERT INTO public.projects (id, company_id, project_code, name, client_name, address, latitude, longitude, geofence_radius_meters)
 VALUES

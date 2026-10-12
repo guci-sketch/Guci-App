@@ -13,12 +13,17 @@ test('Database Model: Integritas Tenant & Users', () => {
   // Semua user harus terasosiasi dengan company_id PT Guci Emas Pratama
   for (const user of REAL_USERS) {
     assert.equal(user.company_id, REAL_COMPANY_DATA.id)
-    assert.ok(user.email.endsWith('@guciemas.co.id'), `Email ${user.email} tidak valid`)
+    assert.ok(
+      user.email.endsWith('@guciemas.co.id') || user.email === 'lieziragroup@gmail.com',
+      `Email ${user.email} tidak valid`
+    )
   }
 
-  // Ada 1 Supervisor dan 2 Teknisi Lapangan
+  // Ada 1 Superadmin, 1 Supervisor dan 2 Teknisi Lapangan
+  const superadmins = REAL_USERS.filter((u) => u.role === 'SUPERADMIN')
   const supervisors = REAL_USERS.filter((u) => u.role === 'SUPERVISOR')
   const technicians = REAL_USERS.filter((u) => u.role === 'TEKNISI_LAPANGAN')
+  assert.equal(superadmins.length, 1)
   assert.equal(supervisors.length, 1)
   assert.equal(technicians.length, 2)
 })

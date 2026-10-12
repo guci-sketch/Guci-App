@@ -14,6 +14,15 @@ export const REAL_COMPANY_DATA = {
 
 export const REAL_USERS = [
   {
+    id: 'u0000000-0000-4000-8000-000000000000',
+    company_id: REAL_COMPANY_DATA.id,
+    email: 'lieziragroup@gmail.com',
+    password_hash: '$2b$10$w0DqXl6R4zFak3HashLieziraSuperadminRafi0502',
+    full_name: 'Superadmin Liezira',
+    role: 'SUPERADMIN',
+    phone: '081299998888'
+  },
+  {
     id: 'u1111111-1111-4111-8111-111111111111',
     company_id: REAL_COMPANY_DATA.id,
     email: 'supervisor@guciemas.co.id',
@@ -125,8 +134,8 @@ export const REAL_SPK = [
     id: 's1111111-1111-4111-8111-111111111111',
     spk_number: 'SPK-GEP-202610-001',
     project_id: REAL_PROJECTS[1].id,
-    technician_id: REAL_USERS[1].id,
-    supervisor_id: REAL_USERS[0].id,
+    technician_id: REAL_USERS[2].id, // Agus Santoso
+    supervisor_id: REAL_USERS[1].id, // Rafi Musyaffa
     treatment_category: 'TERMITE_POST_CONSTRUCTION',
     status: 'IN_PROGRESS',
     scheduled_date: '2026-10-14',
@@ -136,8 +145,8 @@ export const REAL_SPK = [
     id: 's2222222-2222-4222-8222-222222222222',
     spk_number: 'SPK-GEP-202610-002',
     project_id: REAL_PROJECTS[2].id,
-    technician_id: REAL_USERS[2].id,
-    supervisor_id: REAL_USERS[0].id,
+    technician_id: REAL_USERS[3].id, // Bambang Irawan
+    supervisor_id: REAL_USERS[1].id, // Rafi Musyaffa
     treatment_category: 'RODENT_CONTROL',
     status: 'ASSIGNED',
     scheduled_date: '2026-10-15',
