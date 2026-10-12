@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card } from '@/shared/ui/Card'
 import { Badge } from '@/shared/ui/Badge'
-import { REAL_USERS } from '../../../backend-src/db/seed'
+import { REAL_USERS } from '@/shared/data/seedData'
 
 export const UserManagementPage: React.FC = () => {
   return (

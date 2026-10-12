@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card } from '@/shared/ui/Card'
 import { Badge } from '@/shared/ui/Badge'
-import { REAL_PROJECTS } from '../../../backend-src/db/seed'
+import { REAL_PROJECTS } from '@/shared/data/seedData'
 
 export const TrackingMapPage: React.FC = () => {
   return (

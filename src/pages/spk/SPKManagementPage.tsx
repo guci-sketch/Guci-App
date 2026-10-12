@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card } from '@/shared/ui/Card'
 import { Badge } from '@/shared/ui/Badge'
-import { REAL_SPK, REAL_PROJECTS, REAL_USERS } from '../../../backend-src/db/seed'
+import { REAL_SPK, REAL_PROJECTS, REAL_USERS } from '@/shared/data/seedData'
 
 export const SPKManagementPage: React.FC = () => {
   return (

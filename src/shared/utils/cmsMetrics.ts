@@ -1,4 +1,4 @@
-import { REAL_PROJECTS, REAL_CHEMICALS_SNI } from '../../../backend-src/db/seed.ts'
+import { REAL_PROJECTS, REAL_CHEMICALS_SNI } from '@/shared/data/seedData'
 
 export interface CMSMetrics {
   totalRevenueProjected: number

@@ -21,7 +21,7 @@ import { offlineQueue } from '@/shared/utils/offlineQueue'
 import { evaluateOperationalRisk, RiskAnomalyResult } from '@/shared/utils/riskEngine'
 import { calculatePostConstructionSNI } from '@/shared/utils/chemicalCalculator'
 import { UserRole } from '@/shared/utils/rbacEngine'
-import { REAL_PROJECTS } from '../backend-src/db/seed'
+import { REAL_PROJECTS } from '@/shared/data/seedData'
 
 export function App() {
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('SUPERVISOR')

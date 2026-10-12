@@ -2,7 +2,7 @@ import React from 'react'
 import { Card } from '@/shared/ui/Card'
 import { Badge } from '@/shared/ui/Badge'
 import { computeCMSMetrics } from '@/shared/utils/cmsMetrics'
-import { REAL_PROJECTS, REAL_USERS } from '../../backend-src/db/seed'
+import { REAL_PROJECTS, REAL_USERS } from '@/shared/data/seedData'
 
 export const ExecutiveDashboard: React.FC = () => {
   const metrics = computeCMSMetrics()

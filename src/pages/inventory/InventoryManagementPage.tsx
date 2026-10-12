@@ -3,7 +3,7 @@ import { Card } from '@/shared/ui/Card'
 import { Badge } from '@/shared/ui/Badge'
 import { Button } from '@/shared/ui/Button'
 import { Input } from '@/shared/ui/Input'
-import { REAL_CHEMICALS_SNI } from '../../../backend-src/db/seed'
+import { REAL_CHEMICALS_SNI } from '@/shared/data/seedData'
 import { calculatePostConstructionSNI, calculatePreConstructionSNI } from '@/shared/utils/chemicalCalculator'
 
 export const InventoryManagementPage: React.FC = () => {
