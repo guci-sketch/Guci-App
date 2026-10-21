@@ -1,0 +1,163 @@
+import { api } from './client';
+import { AuditLogEntry, ExecutorStats, KPIStats, Project, ReportFilters, RiskConfig, WorkReport, WorkReportListItem } from '@/entities/types';
+
+function filtersToQuery(f: Partial<ReportFilters>) {
+  return {
+    startDate: f.startDate,
+    endDate: f.endDate,
+    timeStart: f.timeStart,
+    timeEnd: f.timeEnd,
+    executorId: f.executorId,
+    projectId: f.projectId,
+    riskLevel: f.riskLevel,
+    status: f.status,
+    serviceType: f.serviceType,
+    search: f.search,
+  };
+}
+
+export async function fetchAdminReports(filters: Partial<ReportFilters>) {
+  const res = await api.get<{ reports: WorkReportListItem[]; count: number; totalCount: number; page: number; totalPages: number }>('/admin/reports', filtersToQuery(filters));
+  return res;
+}
+
+export async function fetchAdminReportDetail(id: string) {
+  const res = await api.get<{ workReport: WorkReport }>(`/admin/reports/${id}`);
+  return res.workReport;
+}
+
+export async function fetchAdminSummary() {
+  return api.get<KPIStats>('/admin/summary');
+}
+
+export async function fetchExecutors() {
+  const res = await api.get<{ executors: ExecutorStats[] }>('/admin/executors');
+  return res.executors;
+}
+
+export interface ProjectFilters {
+  search?: string;
+  serviceType?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function fetchAdminProjects(filters?: ProjectFilters) {
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.search) params.append('search', filters.search);
+    if (filters.serviceType && filters.serviceType !== 'ALL') params.append('serviceType', filters.serviceType);
+    if (filters.status && filters.status !== 'ALL') params.append('status', filters.status);
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
+  }
+  
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const res = await api.get<{ projects: Project[], totalCount: number, page: number, totalPages: number }>(`/admin/projects${qs}`);
+  return res;
+}
+
+export async function fetchAuditLogs() {
+  const res = await api.get<{ auditLogs: AuditLogEntry[] }>('/admin/audit-logs');
+  return res.auditLogs;
+}
+
+export async function fetchRiskConfig() {
+  const res = await api.get<{ riskConfig: RiskConfig }>('/admin/risk-config');
+  return res.riskConfig;
+}
+
+export async function updateRiskConfig(partial: Partial<RiskConfig>) {
+  const res = await api.put<{ riskConfig: RiskConfig }>('/admin/risk-config', partial);
+  return res.riskConfig;
+}
+
+export async function reviewReport(id: string, notes: string) {
+  const res = await api.post<{ workReport: WorkReport }>(`/work-reports/${id}/review`, { notes });
+  return res.workReport;
+}
+
+/** CSV export streams a file download — needs the real URL + token, not the JSON client. */
+export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
+  // `api.get` mengembalikan Blob untuk respons non-JSON dan sudah membawa Bearer token + X-Company-Id.
+  const blob = await api.get<Blob>('/admin/reports/export.csv', filtersToQuery(filters));
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fieldwork-reports-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  nip: string | null;
+  phone: string | null;
+  role: 'ADMIN' | 'MARKETING' | 'INVENTORY' | 'TEKNISI_LAPANGAN';
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function fetchUsers() {
+  const res = await api.get<{ users: AdminUser[] }>('/admin/users');
+  return res.users;
+}
+
+export interface NewUserInput {
+  email: string;
+  password: string;
+  name: string;
+  role: AdminUser['role'];
+  phone?: string;
+  nip?: string;
+}
+
+/** Membuat akun (login + profil) untuk perusahaan admin yang sedang login. Role & perusahaan ditegakkan server. */
+export async function createUser(input: NewUserInput) {
+  const res = await api.post<{ user: AdminUser }>('/admin/users', input);
+  return res.user;
+}
+
+export async function resetRiskConfig() {
+  const res = await api.delete<{ riskConfig: RiskConfig }>('/admin/risk-config');
+  return res.riskConfig;
+}
+
+export async function suspendUser(id: string) {
+  await api.post(`/admin/users/${id}/suspend`);
+}
+
+export async function activateUser(id: string) {
+  await api.post(`/admin/users/${id}/activate`);
+}
+
+export async function deleteUser(id: string) {
+  await api.delete(`/admin/users/${id}`);
+}
+
+export interface PhotoPurgePreview {
+  cutoffDate: string;
+  eligibleCount: number;
+  oldestPhotoDate: string | null;
+}
+
+export interface PhotoPurgeResult {
+  cutoffDate: string;
+  purgedCount: number;
+  failedCount: number;
+}
+
+/** How many photo files are older than the retention window — nothing is deleted by calling this. */
+export async function fetchPhotoPurgePreview(olderThanMonths = 2) {
+  return api.get<PhotoPurgePreview>('/admin/photos/purge-preview', { olderThanMonths: String(olderThanMonths) });
+}
+
+/** Deletes the underlying file for photos older than the window. Every other record (reports, risk events, treatment, audit log) is untouched. */
+export async function purgeOldPhotos(olderThanMonths = 2) {
+  return api.post<PhotoPurgeResult>('/admin/photos/purge', { olderThanMonths });
+}
