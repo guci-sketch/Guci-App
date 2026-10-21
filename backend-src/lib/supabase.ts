@@ -1,36 +1,37 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Supabase is used for two things in production: the Postgres database
- * (via DATABASE_URL, see db/pool.ts — plain `pg`, no Supabase client needed
- * for that) and Storage (evidence photos, via this client with the service
- * role key so the server can read/write a private bucket directly).
- *
- * Locally, if SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY aren't set, photo
- * storage falls back to local disk (see modules/photos/storage.ts) so
- * `npm run dev` works without a cloud account.
+ * Klien Supabase server-side (Storage & Admin API).
+ * Membaca `VITE_SUPABASE_URL` secara otomatis (dengan fallback `SUPABASE_URL` untuk kompatibilitas)
+ * sehingga URL proyek tidak perlu ditulis dua kali di file `.env`.
  */
+export function getSupabaseUrl(): string | undefined {
+  return process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+}
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export function getSupabaseServiceRoleKey(): string | undefined {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
 
-export const isSupabaseStorageConfigured = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+export const isSupabaseStorageConfigured = Boolean(getSupabaseUrl() && getSupabaseServiceRoleKey());
 
 let client: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
-  if (!isSupabaseStorageConfigured) {
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey();
+  if (!url || !key) {
     throw new Error(
-      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to use Supabase Storage. ' +
-        'Use the service role key (never the anon key) — this client runs server-side only.'
+      'VITE_SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY wajib diisi untuk menggunakan Supabase Storage / Admin API.'
     );
   }
   if (!client) {
-    client = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+    client = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
   return client;
 }
 
-export const EVIDENCE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'evidence-photos';
+/** Nama bucket standar untuk foto bukti lapangan (otomatis dibuat oleh skrip SQL database). */
+export const EVIDENCE_BUCKET = 'evidence-photos';

@@ -32,7 +32,7 @@ export const DEFAULT_RISK_CONFIG: RiskConfig = {
 };
 
 /** Zona waktu bisnis untuk membandingkan jam jadwal dengan jam check-in. Bisa diganti via env APP_TIMEZONE. */
-export const APP_TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Jakarta';
+export const APP_TIMEZONE = 'Asia/Jakarta';
 
 /** Jam dinding (hour/minute/menit-sejak-00:00) dari `date` pada zona waktu bisnis — bukan zona waktu server. */
 export function localClock(date: Date, timeZone: string = APP_TIMEZONE) {

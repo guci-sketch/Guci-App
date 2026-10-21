@@ -17,7 +17,7 @@ export const workReportRouter = Router();
 workReportRouter.use(requireAuth, withTenant);
 workReportRouter.param('id', uuidParam);
 
-const maxSizeMb = Number(process.env.MAX_PHOTO_SIZE_MB || 8);
+const maxSizeMb = 8;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: maxSizeMb * 1024 * 1024 },
@@ -47,7 +47,7 @@ const evidenceSchema = z.object({
 });
 
 /** Batas usia aksi offline yang masih diterima (jam). Lewat dari ini, waktu server yang dipakai. */
-const MAX_OFFLINE_AGE_MS = Number(process.env.OFFLINE_MAX_AGE_HOURS || 24) * 3600_000;
+const MAX_OFFLINE_AGE_MS = 24 * 3600_000;
 
 /**
  * Menentukan waktu resmi suatu aksi (check-in / foto / check-out).

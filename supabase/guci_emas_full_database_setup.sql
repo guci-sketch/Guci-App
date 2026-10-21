@@ -4,6 +4,7 @@
 -- Target Database : Supabase PostgreSQL / PostgreSQL >= 15
 -- Mencakup        : 00_baseline + 01_atomic_transactions + 02_fix_drift_and_rpc +
 --                   03_tenant_hardening + 04_rls_policies + 05_quotation_automation_drf_apr +
+--                   Auto-Provisioning Storage Bucket (`evidence-photos`) + Fungsi Retensi Otomatis +
 --                   Seed Identitas Resmi PT Guci Emas Pratama & Auto-Bootstrap User Pertama
 -- Sifat Skrip     : 100% Idempoten (Aman dijalankan langsung di Supabase SQL Editor)
 -- ====================================================================================================
@@ -985,13 +986,70 @@ CREATE POLICY invites_delete ON public.invites FOR DELETE TO authenticated
   USING (public.is_company_admin(company_id));
 
 -- ====================================================================================================
--- BAGIAN 10: SEED DATA AWAL RESMI PT GUCI EMAS PRATAMA & AUTO-BOOTSTRAP USER
+-- BAGIAN 10: PENYEDERHANAAN ENV DI DATABASE (STORAGE BUCKET, FUNGSI RETENSI, & SEED PT GUCI EMAS PRATAMA)
 -- ====================================================================================================
 
--- 10.1. Konfigurasi Risiko Default Global
+-- 10.1. Auto-Provisioning Supabase Storage Bucket (`evidence-photos`)
+-- Menggantikan kebutuhan variabel `SUPABASE_STORAGE_BUCKET` dan pembuatan bucket manual di dashboard Supabase.
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NOT NULL THEN
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES (
+      'evidence-photos',
+      'evidence-photos',
+      false,
+      8388608, -- 8 MB (menggantikan MAX_PHOTO_SIZE_MB di .env)
+      ARRAY['image/jpeg', 'image/png', 'image/webp']
+    )
+    ON CONFLICT (id) DO UPDATE
+      SET file_size_limit = EXCLUDED.file_size_limit,
+          allowed_mime_types = EXCLUDED.allowed_mime_types;
+  END IF;
+EXCEPTION WHEN insufficient_privilege OR undefined_column THEN
+  RAISE NOTICE 'Pembuatan otomatis storage.buckets dilewati (skema storage tidak tersedia di lingkungan ini).';
+END $$;
+
+-- 10.2. Fungsi Database Pembersihan Retensi Otomatis (`public.cleanup_old_telemetry`)
+-- Menggantikan variabel `LOCATION_RETENTION_DAYS`, `PHOTO_RETENTION_MONTHS`, dan `CRON_SECRET` di `.env`.
+-- Dapat dipanggil kapan saja lewat SQL (`SELECT public.cleanup_old_telemetry();`) atau pg_cron.
+CREATE OR REPLACE FUNCTION public.cleanup_old_telemetry(
+  p_location_days int DEFAULT 30,
+  p_photo_months int DEFAULT 2
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_deleted_locations int := 0;
+  v_marked_photos int := 0;
+BEGIN
+  WITH d AS (
+    DELETE FROM public.user_locations
+    WHERE tracked_at < now() - make_interval(days => p_location_days)
+    RETURNING 1
+  )
+  SELECT count(*)::int INTO v_deleted_locations FROM d;
+
+  WITH p AS (
+    UPDATE public.documentation_photos
+       SET purged_at = now()
+     WHERE purged_at IS NULL
+       AND captured_at < now() - make_interval(months => p_photo_months)
+    RETURNING 1
+  )
+  SELECT count(*)::int INTO v_marked_photos FROM p;
+
+  RETURN jsonb_build_object(
+    'locations_deleted', v_deleted_locations,
+    'photos_marked_purged', v_marked_photos,
+    'executed_at', now()
+  );
+END $$;
+
+REVOKE EXECUTE ON FUNCTION public.cleanup_old_telemetry(int, int) FROM public, anon, authenticated;
+
+-- 10.3. Konfigurasi Risiko Default Global
 INSERT INTO public.risk_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
--- 10.2. Buat Entitas Tenant Utama: PT Guci Emas Pratama
+-- 10.4. Buat Entitas Tenant Utama: PT Guci Emas Pratama
 INSERT INTO public.companies (id, company_name, company_slug, status, subscription_plan)
 VALUES (
   '00000000-0000-4000-a000-000000000001'::uuid,
@@ -1006,7 +1064,7 @@ ON CONFLICT (company_slug) DO UPDATE
       subscription_plan = 'PRO',
       updated_at = now();
 
--- 10.3. Pengaturan Kop Surat, Prefix Nomor (`GP`), & Identitas Resmi PT Guci Emas Pratama
+-- 10.5. Pengaturan Kop Surat, Prefix Nomor (`GP`), Identitas Resmi, & System Config PT Guci Emas Pratama
 INSERT INTO public.company_settings (company_id, settings, updated_at)
 SELECT
   c.id,
@@ -1023,6 +1081,14 @@ SELECT
     'kota', 'Tangerang Selatan',
     'ttdNama', 'H. Fakhrurrazi, S.E.',
     'ttdJabatan', 'Direktur Utama',
+    'systemConfig', jsonb_build_object(
+      'appTimezone', 'Asia/Jakarta',
+      'storageBucket', 'evidence-photos',
+      'maxPhotoSizeMb', 8,
+      'offlineMaxAgeHours', 24,
+      'photoRetentionMonths', 2,
+      'locationRetentionDays', 30
+    ),
     'template', jsonb_build_object(
       'primaryColor', '#1a5c38',
       'logoBase64', '',
@@ -1040,7 +1106,7 @@ FROM public.companies c
 WHERE c.company_slug = 'guci-emas-pratama'
 ON CONFLICT (company_id) DO NOTHING;
 
--- 10.4. Katalog Awal Gudang Chemical & Material PT Guci Emas Pratama (Idempoten)
+-- 10.6. Katalog Awal Gudang Chemical & Material PT Guci Emas Pratama (Idempoten)
 DO $$
 DECLARE
   v_co_id uuid;
@@ -1057,9 +1123,8 @@ BEGIN
   END IF;
 END $$;
 
--- 10.5. Fungsi Helper & Trigger Auto-Bootstrap Pengguna Supabase Auth -> `public.users`
--- Fungsi ini memudahkan pendaftaran atau pengubahan role akun yang dibuat di Supabase Authentication -> Users:
--- Contoh pemakaian manual:
+-- 10.7. Fungsi Helper & Trigger Auto-Bootstrap Pengguna Supabase Auth -> `public.users`
+-- Menggantikan variabel `SEED_SUPABASE_AUTH` dan `SEED_PASSWORD` di `.env`:
 --   SELECT public.register_guci_emas_user('admin@gucimaspratama.co.id', 'Admin Guci Emas', 'ADMIN', '08170795959');
 --   SELECT public.register_guci_emas_user('surveyor@gucimaspratama.co.id', 'Surveyor Marketing', 'MARKETING', '08170795959');
 CREATE OR REPLACE FUNCTION public.register_guci_emas_user(
@@ -1084,7 +1149,7 @@ BEGIN
   INSERT INTO public.users (id, company_id, name, email, nip, password_hash, role, phone, is_active)
   VALUES (
     coalesce(v_auth_id, gen_random_uuid()),
-    CASE WHEN p_role = 'SUPERADMIN' THEN v_co_id ELSE v_co_id END,
+    v_co_id,
     btrim(p_name),
     lower(btrim(p_email)),
     nullif(btrim(p_nip), ''),
@@ -1115,11 +1180,6 @@ END $$;
 
 REVOKE EXECUTE ON FUNCTION public.register_guci_emas_user(text, text, public.user_role, text, text) FROM public, anon, authenticated;
 
--- Trigger otomatis pada `auth.users`:
--- 1. Jika tabel `public.users` masih kosong (0 baris), akun PERTAMA yang dibuat di Supabase Dashboard -> Authentication
---    otomatis didaftarkan sebagai `ADMIN` PT Guci Emas Pratama sehingga langsung bisa login tanpa query tambahan.
--- 2. Jika email sudah didaftarkan terlebih dahulu via `register_guci_emas_user`, ID-nya otomatis disinkronkan dengan `auth.users.id`.
--- 3. Jika `raw_user_meta_data` berisi `{"role": "MARKETING" | "ADMIN" | "INVENTORY" | "TEKNISI_LAPANGAN"}`, otomatis dibuatkan profil `public.users`.
 CREATE OR REPLACE FUNCTION public.fn_sync_auth_user_to_public_users()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
@@ -1134,7 +1194,6 @@ BEGIN
     RETURN new;
   END IF;
 
-  -- Jika baris di public.users dengan email yang sama sudah ada, sinkronkan UUID-nya dengan auth.users.id
   IF EXISTS (SELECT 1 FROM public.users WHERE lower(email) = lower(new.email)) THEN
     UPDATE public.users
        SET id = new.id,

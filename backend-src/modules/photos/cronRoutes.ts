@@ -7,6 +7,10 @@ import { query } from '../../db/pool.js';
 
 export const cronRouter = Router();
 
+/** Konstanta bawaan retensi sistem (tanpa perlu konfigurasi di .env). */
+const DEFAULT_PHOTO_RETENTION_MONTHS = 2;
+const DEFAULT_LOCATION_RETENTION_DAYS = 30;
+
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a);
   const bb = Buffer.from(b);
@@ -14,25 +18,21 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Retensi foto terjadwal (lihat `crons` di vercel.json).
- * Cron TIDAK membawa JWT pengguna, jadi dijaga shared secret. Vercel Cron mengirim
- * `Authorization: Bearer $CRON_SECRET` otomatis bila env CRON_SECRET diset di proyek.
- *
- * PENTING: Vercel Cron memanggil endpoint dengan HTTP **GET**. Rute lama hanya menerima POST,
- * sehingga (selain `crons` memang tidak pernah ada di vercel.json) pemanggilan cron akan 404.
- * Rute ini menerima GET (Vercel) dan POST (pemicu manual).
+ * Endpoint pembersihan retensi foto & lokasi GPS.
+ * Menerima Bearer token dari `SUPABASE_SERVICE_ROLE_KEY` (atau `CRON_SECRET` bila diatur di CI/test)
+ * sehingga tidak membutuhkan variabel tambahan di `.env`.
  */
 const purgeHandler = asyncHandler(async (req: Request, res: Response) => {
-  const secret = process.env.CRON_SECRET;
+  const secret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!secret) {
-    throw new HttpError(500, 'CRON_SECRET belum dikonfigurasi di server.');
+    throw new HttpError(500, 'SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi di server.');
   }
   const provided = req.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
   if (!safeEqual(provided, secret)) {
     throw new HttpError(401, 'Unauthorized cron request.');
   }
 
-  const months = Number(process.env.PHOTO_RETENTION_MONTHS || 2);
+  const months = DEFAULT_PHOTO_RETENTION_MONTHS;
   const result = await purgeOldPhotos(months);
 
   await logSystemAction(
@@ -42,8 +42,7 @@ const purgeHandler = asyncHandler(async (req: Request, res: Response) => {
     `[cron] Menghapus file foto lebih lama dari ${months} bulan: ${result.purgedCount} berhasil, ${result.failedCount} gagal.`
   );
 
-  // Riwayat GPS bertambah tiap beberapa menit per teknisi → bersihkan agar tabel tidak membengkak.
-  const days = Number(process.env.LOCATION_RETENTION_DAYS || 30);
+  const days = DEFAULT_LOCATION_RETENTION_DAYS;
   const del = await query<{ n: string }>(
     `with d as (delete from user_locations where tracked_at < now() - make_interval(days => $1) returning 1) select count(*)::text as n from d`,
     [days]
