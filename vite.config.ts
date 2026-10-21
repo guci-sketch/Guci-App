@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'FIELDWORK',
-        short_name: 'FIELDWORK',
-        description: 'Dokumentasi, presensi, dan deteksi anomali pekerjaan lapangan.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        name: 'PT Guci Emas Pratama — CMS & Fieldwork',
+        short_name: 'Guci Emas',
+        description: 'Sistem Otomasi Penawaran (AR & PCO), SPK, dan Dokumentasi Lapangan PT Guci Emas Pratama.',
+        theme_color: '#1a5c38',
+        background_color: '#faf9f7',
         display: 'standalone',
         start_url: '/',
         icons: [
@@ -25,6 +25,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => !url.pathname.startsWith('/api'),
@@ -35,6 +36,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 2500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three')) return 'vendor-three';
+            if (id.includes('jspdf')) return 'vendor-pdf';
+            if (id.includes('xlsx')) return 'vendor-xlsx';
+            if (id.includes('recharts')) return 'vendor-charts';
+            if (id.includes('leaflet')) return 'vendor-maps';
+          }
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
