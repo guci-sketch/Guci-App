@@ -42,14 +42,14 @@ import { createUser, resetRiskConfig } from '@/shared/api/admin';
 import { TemplateSettingsPanel } from '@/widgets/admin/TemplateSettingsPanel';
 import { CompanyPicker } from '@/widgets/admin/CompanyPicker';
 import { useAuthStore } from '@/app/store/authStore';
-const InventoryPage = lazy(() => import('../../pages/inventory/InventoryPage').then(m => ({ default: m.InventoryPage })));
-const KontrolRayapPage = lazy(() => import('../../pages/customers/KontrolRayapPage').then(m => ({ default: m.KontrolRayapPage })));
-const QuotationPage = lazy(() => import('../../pages/quotation/QuotationPage').then(m => ({ default: m.QuotationPage })));
-const CustomersPage = lazy(() => import('../../pages/customers/CustomersPage').then(m => ({ default: m.CustomersPage })));
-const TrackingPage = lazy(() => import('../../pages/tracking/TrackingPage').then(m => ({ default: m.TrackingPage })));
-const CashflowPage = lazy(() => import('../../pages/cashflow/CashflowPage').then(m => ({ default: m.CashflowPage })));
-const PerformaPage = lazy(() => import('../../pages/performance/PerformaPage').then(m => ({ default: m.PerformaPage })));
-const SPKPage = lazy(() => import('../../pages/spk/SPKPage').then(m => ({ default: m.SPKPage })));
+import { InventoryPage } from '../../pages/inventory/InventoryPage';
+import { KontrolRayapPage } from '../../pages/customers/KontrolRayapPage';
+import { QuotationPage } from '../../pages/quotation/QuotationPage';
+import { CustomersPage } from '../../pages/customers/CustomersPage';
+import { TrackingPage } from '../../pages/tracking/TrackingPage';
+import { CashflowPage } from '../../pages/cashflow/CashflowPage';
+import { PerformaPage } from '../../pages/performance/PerformaPage';
+import { SPKPage } from '../../pages/spk/SPKPage';
 
 
 type Tab = 'dashboard' | 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile' | 'inventory' | 'quotation' | 'kontrol-rayap' | 'templates' | 'customers' | 'order-tracking' | 'cashflow' | 'performa' | 'spk-cms';
@@ -446,7 +446,11 @@ export const AdminDashboard: React.FC = () => {
             onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
             mobileMenuOpen={mobileMenuOpen}
             pageTitle={currentTabMeta?.label ?? 'PT Guci Emas Pratama'}
+            pageGroup={currentTabMeta?.group}
             onRefresh={handleHeaderRefresh}
+            modules={sidebarItems}
+            activeModuleId={activeTab}
+            onSelectModule={(id) => setActiveTab(id as Tab)}
           />
         }
         dynamicIslandItems={[]}
@@ -1185,63 +1189,14 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'quotation' && (
-                <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Automation Quotation Hub...</div>}>
-                  <QuotationPage />
-                </Suspense>
-            )}
-
-            {activeTab === 'customers' && (
-                <div className="clean-card p-4">
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Database Pelanggan...</div>}>
-                    <CustomersPage />
-                  </Suspense>
-                </div>
-            )}
-
-            {activeTab === 'spk-cms' && (
-                <div className="clean-card p-4">
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Manajemen SPK...</div>}>
-                    <SPKPage />
-                  </Suspense>
-                </div>
-            )}
-
-            {activeTab === 'order-tracking' && (
-                <div className="clean-card p-4">
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Termin & Tagihan Kontrak...</div>}>
-                    <TrackingPage />
-                  </Suspense>
-                </div>
-            )}
-
-            {activeTab === 'cashflow' && (
-                <div className="clean-card p-4">
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Arus Kas & Revenue...</div>}>
-                    <CashflowPage />
-                  </Suspense>
-                </div>
-            )}
-
-            {activeTab === 'performa' && (
-                <div className="clean-card p-4">
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Target & Performa Marketing...</div>}>
-                    <PerformaPage />
-                  </Suspense>
-                </div>
-            )}
-
-            {activeTab === 'inventory' && (
-                <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Daily Inventory &amp; Waste...</div>}>
-                  <InventoryPage />
-                </Suspense>
-            )}
-
-            {activeTab === 'kontrol-rayap' && (
-                <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Kontrol Garansi Rayap...</div>}>
-                  <KontrolRayapPage />
-                </Suspense>
-            )}
+            {activeTab === 'quotation' && <QuotationPage />}
+            {activeTab === 'customers' && <CustomersPage />}
+            {activeTab === 'spk-cms' && <SPKPage />}
+            {activeTab === 'order-tracking' && <TrackingPage />}
+            {activeTab === 'cashflow' && <CashflowPage />}
+            {activeTab === 'performa' && <PerformaPage />}
+            {activeTab === 'inventory' && <InventoryPage />}
+            {activeTab === 'kontrol-rayap' && <KontrolRayapPage />}
 
             {activeTab === 'templates' && isAdmin && (
               <TemplateSettingsPanel />

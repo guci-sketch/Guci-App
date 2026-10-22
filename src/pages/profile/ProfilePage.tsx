@@ -1,3 +1,4 @@
+import { supabase } from '@/shared/lib/supabase';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { doc, updateDoc } from '@/shared/lib/firebase';
@@ -54,7 +55,7 @@ export function ProfilePage() {
         setChangingPw(true);
         try {
             // Supabase password update
-            const { error } = await import('@/shared/lib/supabase').then(m => m.supabase.auth.updateUser({ password: newPassword }));
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
 
             setCurrentPassword("");
@@ -76,7 +77,7 @@ export function ProfilePage() {
     };
 
     const handleLogout = async () => {
-        await import('@/shared/lib/supabase').then(m => m.supabase.auth.signOut());
+        await supabase.auth.signOut();
         setUser(null);
         navigate("/login");
     };

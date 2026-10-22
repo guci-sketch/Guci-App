@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      selfDestroying: true,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
@@ -25,17 +26,15 @@ export default defineConfig({
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        globPatterns: [],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
   build: {
-    chunkSizeWarningLimit: 2500,
+    chunkSizeWarningLimit: 3500,
     rollupOptions: {
       output: {
         manualChunks(id) {

@@ -373,28 +373,44 @@ export function QuotationPage() {
                 }
             />
 
-            {/* KPI Cards bergaya Barventis */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="clean-card p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Total Dokumen</span>
-                    <div className="text-2xl font-bold font-mono text-[var(--text-primary)] mt-1 tabular-nums">{statsTotal}</div>
-                    <span className="text-[11px] text-[var(--text-secondary)]">AR & PCO tercatat</span>
-                </div>
-                <div className="clean-card p-4 border-amber-200 bg-amber-50/30">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">Fase Draft (GP-DRF)</span>
-                    <div className="text-2xl font-bold font-mono text-amber-800 mt-1 tabular-nums">{statsDraftPending}</div>
-                    <span className="text-[11px] text-amber-700">Menunggu verifikasi / nego</span>
-                </div>
-                <div className="clean-card p-4 border-emerald-200 bg-emerald-50/30">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Fase Approved (GP-APR)</span>
-                    <div className="text-2xl font-bold font-mono text-emerald-800 mt-1 tabular-nums">{statsApproved}</div>
-                    <span className="text-[11px] text-emerald-700">PDF resmi siap kirim</span>
-                </div>
-                <div className="clean-card p-4">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent)] block">Total Deal Kontrak</span>
-                    <div className="text-2xl font-bold font-mono text-[var(--accent)] mt-1 tabular-nums">{statsDeal}</div>
-                    <span className="text-[11px] text-[var(--text-secondary)]">Siap diterbitkan SPK</span>
-                </div>
+            {/* Interactive 4-Step Workflow & KPI Cards (Klik untuk Filter Langsung) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <button
+                    type="button"
+                    onClick={() => { setFilterStatus("all"); setPage(1); }}
+                    className={`clean-card p-3.5 text-left transition-all cursor-pointer ${filterStatus === "all" ? "ring-2 ring-[var(--accent)]" : "hover:border-slate-300"}`}
+                >
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Semua Penawaran</span>
+                    <div className="text-xl font-bold font-mono text-[var(--text-primary)] mt-0.5 tabular-nums">{statsTotal}</div>
+                    <span className="text-[10.5px] text-[var(--text-secondary)]">Klik tampilkan semua &rarr;</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => { setFilterStatus("pending"); setPage(1); }}
+                    className={`clean-card p-3.5 text-left border-amber-200 bg-amber-50/35 transition-all cursor-pointer ${filterStatus === "pending" ? "ring-2 ring-amber-600" : "hover:border-amber-300"}`}
+                >
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-amber-800 block">1. Tahap Draft (GP-DRF)</span>
+                    <div className="text-xl font-bold font-mono text-amber-800 mt-0.5 tabular-nums">{statsDraftPending}</div>
+                    <span className="text-[10.5px] text-amber-700">Klik untuk Nego / Approve &rarr;</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => { setFilterStatus("approved"); setPage(1); }}
+                    className={`clean-card p-3.5 text-left border-emerald-200 bg-emerald-50/35 transition-all cursor-pointer ${filterStatus === "approved" ? "ring-2 ring-emerald-600" : "hover:border-emerald-300"}`}
+                >
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-800 block">2. Approved (GP-APR)</span>
+                    <div className="text-xl font-bold font-mono text-emerald-800 mt-0.5 tabular-nums">{statsApproved}</div>
+                    <span className="text-[10.5px] text-emerald-700">Klik untuk PDF &amp; Kirim WA &rarr;</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSubTab("pipeline")}
+                    className="clean-card p-3.5 text-left hover:border-emerald-300 transition-all cursor-pointer"
+                >
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--accent)] block">3. Deal &amp; Pipeline SPK</span>
+                    <div className="text-xl font-bold font-mono text-[var(--accent)] mt-0.5 tabular-nums">{statsDeal}</div>
+                    <span className="text-[10.5px] text-[var(--text-secondary)]">Buka Pipeline Deal &rarr;</span>
+                </button>
             </div>
 
             {/* Filter & Search Bar */}
@@ -549,10 +565,10 @@ export function QuotationPage() {
                                                     <button
                                                         onClick={() => handleOpenOrRenderPdf(q, false)}
                                                         disabled={isActing}
-                                                        className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent)]"
-                                                        title="Lihat / Pratinjau PDF"
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent)] text-[11px] font-semibold cursor-pointer"
+                                                        title="Lihat / Pratinjau PDF Surat Penawaran"
                                                     >
-                                                        <Eye size={15} />
+                                                        <Eye size={13} /> PDF
                                                     </button>
 
                                                     {/* Adjust Garansi / Harga / Edit Draft */}

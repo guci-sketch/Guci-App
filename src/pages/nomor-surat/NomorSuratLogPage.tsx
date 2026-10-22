@@ -1,3 +1,4 @@
+import { getQuotationById } from "@/shared/api/quotationService";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -549,8 +550,7 @@ function DownloadPdfButton({ quoId, noSurat }: { quoId: string; noSurat: string 
     const handleClick = async () => {
         setLoading(true);
         try {
-            const { getQuotationById } = await import("@/shared/api/quotationService");
-            const quo = await getQuotationById(quoId);
+                        const quo = await getQuotationById(quoId);
             if (!quo?.pdfUrl) { alert("PDF tidak ditemukan."); return; }
             window.open(quo.pdfUrl, "_blank", "noopener,noreferrer");
         } catch {
