@@ -33,6 +33,8 @@ export function calculateDistanceMeters(
 /**
  * Checks if user location is within the defined project radius
  */
+export const isWithinRadius = isLocationWithinRadius;
+
 export function isLocationWithinRadius(
   userLocation: LatLng,
   projectLocation: LatLng,
