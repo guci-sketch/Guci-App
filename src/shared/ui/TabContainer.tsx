@@ -27,9 +27,9 @@ const BADGE_TONES: Record<NonNullable<CapsuleTabItem['badgeTone']>, string> = {
 };
 
 /**
- * Komponen TabContainer bergaya Barventis (sesuai screenshot referensi):
+ * Komponen TabContainer bergaya Barventis (Compact & Sleek Edition):
  * 1. Top Capsule Tab Bar: latar `#f5f3ef`, tab aktif putih bersih dengan teks & ikon hijau emerald.
- * 2. Dynamic Floating Bottom Pill: melayang di bawah tengah layar (`fixed bottom-5 left-1/2 -translate-x-1/2`),
+ * 2. Dynamic Floating Bottom Pill: melayang di bawah tengah layar (`fixed bottom-3.5 left-1/2 -translate-x-1/2`),
  *    tab aktif berupa kapsul hijau solid (`bg-[var(--accent)] text-white`) berisi ikon + label singkat,
  *    dan tab lainnya berupa tombol ikon bundar.
  */
@@ -57,7 +57,7 @@ export const TabContainer: React.FC<TabContainerProps> = ({
             <div
                 ref={containerRef}
                 role="tablist"
-                className={`inline-flex items-center gap-1 p-1.5 rounded-2xl bg-[#f5f3ef] border border-[#e8e5e0] max-w-full overflow-x-auto no-scrollbar ${className}`}
+                className={`inline-flex items-center gap-1 p-1 rounded-xl bg-[#f5f3ef] border border-[#e8e5e0] max-w-full overflow-x-auto no-scrollbar ${className}`}
             >
                 {tabs.map(tab => {
                     const isActive = tab.id === activeTab;
@@ -70,21 +70,21 @@ export const TabContainer: React.FC<TabContainerProps> = ({
                             role="tab"
                             aria-selected={isActive}
                             onClick={() => onChange(tab.id)}
-                            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all duration-150 cursor-pointer ${
                                 isActive
-                                    ? 'bg-white text-[var(--accent)] font-bold shadow-xs border border-[#e8e5e0]'
+                                    ? 'bg-white text-[var(--accent)] font-bold shadow-2xs border border-[#e8e5e0]'
                                     : 'text-[#5a554f] font-medium hover:text-[#2d2a26] hover:bg-white/60 border border-transparent'
                             }`}
                         >
                             {tab.icon && (
-                                <span className={isActive ? 'text-[var(--accent)]' : 'text-[#8a8580]'}>
+                                <span className={`shrink-0 ${isActive ? 'text-[var(--accent)]' : 'text-[#8a8580]'}`}>
                                     {tab.icon}
                                 </span>
                             )}
                             <span>{tab.label}</span>
                             {tab.badge !== undefined && tab.badge !== 0 && tab.badge !== '0' && (
                                 <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
+                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums leading-none ${
                                         isActive && tone === 'default'
                                             ? 'bg-[var(--accent-glow)] text-[var(--accent)]'
                                             : BADGE_TONES[tone]
@@ -100,14 +100,14 @@ export const TabContainer: React.FC<TabContainerProps> = ({
 
             {showFloatingBottom && tabs.length > 1 && (
                 <div
-                    className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[75] pointer-events-auto max-w-[94vw]"
+                    className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-[75] pointer-events-auto max-w-[94vw]"
                     role="navigation"
                     aria-label="Sub-Tab Cepat"
                 >
                     <motion.div
                         layout
                         transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                        className="bg-white/95 backdrop-blur-md border border-[#e8e5e0] shadow-[0_12px_32px_rgba(45,42,38,0.14)] rounded-full p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar"
+                        className="bg-white/95 backdrop-blur-md border border-[#e8e5e0] shadow-[0_8px_24px_rgba(45,42,38,0.12)] rounded-full p-1 flex items-center gap-0.5 overflow-x-auto no-scrollbar"
                     >
                         {tabs.map(tab => {
                             const isActive = tab.id === activeTab;
@@ -121,8 +121,8 @@ export const TabContainer: React.FC<TabContainerProps> = ({
                                     title={tab.label}
                                     className={`relative flex items-center justify-center rounded-full transition-colors cursor-pointer select-none shrink-0 ${
                                         isActive
-                                            ? 'bg-[var(--accent)] text-white px-4 py-2 gap-2 font-bold text-xs shadow-sm'
-                                            : 'w-9 h-9 text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[var(--accent)]'
+                                            ? 'bg-[var(--accent)] text-white px-3 py-1.5 gap-1.5 font-semibold text-[11px] shadow-2xs'
+                                            : 'w-8 h-8 text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[var(--accent)]'
                                     }`}
                                     style={{ touchAction: 'manipulation' }}
                                 >

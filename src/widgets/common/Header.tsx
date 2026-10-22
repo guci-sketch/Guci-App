@@ -76,41 +76,41 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="bg-white border-b border-[#e8e5e0] text-[#2d2a26] sticky top-0 z-40 px-3 sm:px-6 py-2.5 shadow-[0_1px_2px_rgba(45,42,38,0.04)]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          {/* Left: Square Rounded Hamburger Button + Dynamic Page Title (Persis Barventis UI) */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+      <header className="bg-white border-b border-[#e8e5e0] text-[#2d2a26] sticky top-0 z-40 px-3 sm:px-5 py-1.5 shadow-[0_1px_2px_rgba(45,42,38,0.03)]">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
+          {/* Left: Compact Hamburger Button + Dynamic Page Title */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             {!hideMobileMenu && (
               <button
                 type="button"
                 onClick={onMenuToggle}
                 aria-label="Buka Navigasi Sidebar"
-                className="w-10 h-10 rounded-xl border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center shadow-2xs transition-colors shrink-0 cursor-pointer"
+                className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center shadow-2xs transition-colors shrink-0 cursor-pointer"
               >
-                {mobileMenuOpen ? <X size={19} /> : <Menu size={19} />}
+                {mobileMenuOpen ? <X size={15} /> : <Menu size={15} />}
               </button>
             )}
 
             <div className="min-w-0">
-              <h1 className="font-extrabold text-base sm:text-lg md:text-xl tracking-tight text-[#2d2a26] truncate leading-tight">
+              <h1 className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-[#2d2a26] truncate leading-tight">
                 {pageTitle}
               </h1>
               {pageSubtitle && (
-                <p className="text-[11px] text-[#8a8580] truncate hidden sm:block">
+                <p className="text-[10px] text-[#8a8580] truncate hidden sm:block">
                   {pageSubtitle}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Right: Barventis Action Icons (Role Switcher + Green Guidebook + Refresh + Bell/Profile) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Right: Compact Barventis Action Icons (Role Switcher + Green Guidebook + Refresh + Bell/Profile) */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {pendingCount > 0 && (
               <button
                 type="button"
                 onClick={onSync}
                 disabled={isSyncing}
-                className="flex items-center gap-1 text-xs font-bold bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-2 rounded-xl hover:bg-amber-100 transition-colors"
+                className="flex items-center gap-1 text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1 rounded-lg hover:bg-amber-100 transition-colors"
                 title="Sinkronkan antrean data offline"
               >
                 {isSyncing ? 'Sync...' : `${pendingCount} Pending`}
@@ -118,14 +118,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Quick QA Role Switcher Pill */}
-            <div className="flex items-center gap-1 bg-emerald-50/80 border border-emerald-300 rounded-xl px-2 sm:px-2.5 h-10 text-xs">
-              <Repeat size={13} className="text-[var(--accent)] shrink-0" />
-              <span className="text-[10px] font-bold text-emerald-900 hidden lg:inline">QA Role:</span>
+            <div className="flex items-center gap-1 bg-emerald-50/80 border border-emerald-300 rounded-lg px-2 h-8 text-[11px]">
+              <Repeat size={12} className="text-[var(--accent)] shrink-0" />
+              <span className="text-[10px] font-bold text-emerald-900 hidden lg:inline">Role:</span>
               <select
                 value={currentUser.role}
                 disabled={switchingRole}
                 onChange={e => handleRoleSwitch(e.target.value as UserRole)}
-                className="bg-transparent font-extrabold text-[11px] text-[var(--accent)] focus:outline-none cursor-pointer pr-0.5 max-w-[92px] sm:max-w-[140px] truncate"
+                className="bg-transparent font-bold text-[11px] text-[var(--accent)] focus:outline-none cursor-pointer pr-0.5 max-w-[85px] sm:max-w-[130px] truncate"
                 title="Ganti Role instan untuk QA (1 Akun Semua Role)"
               >
                 {ROLE_OPTIONS.map(r => (
@@ -141,9 +141,9 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => setShowGuidebook(true)}
               title="Panduan QA & Alur Sistem PT Guci Emas Pratama"
-              className="w-10 h-10 rounded-xl border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
-              <BookOpen size={18} />
+              <BookOpen size={15} />
             </button>
 
             {/* Tombol Refresh Data (Kotak Putih ala Barventis) */}
@@ -151,9 +151,9 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={handleRefreshClick}
               title="Muat Ulang Data"
-              className="w-10 h-10 rounded-xl border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
-              <RefreshCw size={17} className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''} />
+              <RefreshCw size={14} className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''} />
             </button>
 
             {/* Tombol Notifikasi & Menu Profil (Lonceng dengan Titik Merah ala Barventis) */}
@@ -162,10 +162,10 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => setProfileMenuOpen(v => !v)}
                 title="Profil Akun & Pengaturan"
-                className="w-10 h-10 rounded-xl border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
+                className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
               >
-                <Bell size={18} />
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+                <Bell size={15} />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-500 ring-1 ring-white" />
               </button>
 
               {profileMenuOpen && (

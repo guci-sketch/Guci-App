@@ -462,7 +462,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
         }
     >
-      <div className="p-4 sm:p-6 space-y-5 max-w-6xl w-full mx-auto">
+      <div className="p-3 sm:p-4 space-y-3.5 max-w-7xl w-full mx-auto">
           {!hasInternalSubTabs && currentGroupTabs.length > 1 && (
             <TabContainer
               tabs={currentGroupTabs}

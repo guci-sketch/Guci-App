@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-primary: #1a5c38;
@@ -15,6 +15,22 @@
   --color-accent: #d97706;
   --color-surface-dim: #191c1e;
   --color-surface-text: #eff1f3;
+}
+
+/* Compact Enterprise UI Density:
+   Menurunkan root rem dari 16px ke 13px (mobile/tablet) dan 13.5px (desktop)
+   sehingga seluruh ukuran font, tombol, tabel, input, dan padding proporsional lebih ringkas & nyaman dilihat. */
+html {
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 13.5px;
+  }
 }
 
 :root {
@@ -55,18 +71,19 @@
   --border-light: #f5f3ef;
   --border-focus: rgba(26, 92, 56, 0.30);
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
   --shadow-sm: 0 1px 2px rgba(45, 42, 38, 0.04);
-  --shadow-md: 0 4px 12px rgba(45, 42, 38, 0.06);
-  --shadow-lg: 0 12px 32px rgba(45, 42, 38, 0.08);
+  --shadow-md: 0 3px 10px rgba(45, 42, 38, 0.05);
+  --shadow-lg: 0 8px 24px rgba(45, 42, 38, 0.07);
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  line-height: 1.45;
 }
 
 @layer utilities {
@@ -99,7 +116,7 @@
 
 /* Staggered Row Animation */
 .row-fade-in {
-  animation: rowFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+  animation: rowFadeIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 .row-fade-in:nth-child(1) { animation-delay: 0.02s; }
 .row-fade-in:nth-child(2) { animation-delay: 0.04s; }
@@ -115,7 +132,7 @@
 @keyframes rowFadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -125,12 +142,12 @@
 
 /* Page Content Animation */
 .page-fade-in {
-  animation: pageContentIn 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: pageContentIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @keyframes pageContentIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -140,7 +157,7 @@
 
 /* Modal Animation */
 .modal-overlay-in {
-  animation: modalOverlayIn 0.18s ease;
+  animation: modalOverlayIn 0.15s ease;
 }
 @keyframes modalOverlayIn {
   from { opacity: 0; }
@@ -148,10 +165,10 @@
 }
 
 .modal-card-in {
-  animation: modalCardIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalCardIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes modalCardIn {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
@@ -166,9 +183,9 @@
 
 /* Interactive hover lift */
 .hover-lift {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.18s ease;
 }
 .hover-lift:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }

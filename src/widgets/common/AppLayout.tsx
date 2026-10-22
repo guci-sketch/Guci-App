@@ -104,7 +104,6 @@ export function AppLayout({
         setSidebarOpen(false);
     };
 
-    // Kelompokkan item sidebar berdasarkan properti `group` agar mudah dipindai saat QA
     const groupedItems = React.useMemo(() => {
         const groups: { name: string; items: SidebarItem[] }[] = [];
         for (const item of sidebarItems) {
@@ -131,29 +130,29 @@ export function AppLayout({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:hidden"
+                            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
                             onClick={() => setSidebarOpen(false)}
                         />
                     )}
                 </AnimatePresence>
 
-                {/* Sidebar: Expandable Rail on Desktop (lg:) + Slide-Over Drawer on Mobile & Tablet */}
+                {/* Sidebar: Compact Expandable Rail on Desktop (lg:w-[58px] -> w-60) + Slide-Over Drawer on Mobile & Tablet */}
                 <aside
                     className={cn(
-                        'fixed inset-y-0 left-0 z-50 bg-white border-r border-[#e8e5e0] flex flex-col transition-all duration-300 ease-out shadow-2xl lg:shadow-none',
-                        'w-72 lg:w-[76px] lg:hover:w-72 group',
-                        isSidebarOpen ? 'translate-x-0 lg:w-72' : '-translate-x-full lg:translate-x-0'
+                        'fixed inset-y-0 left-0 z-50 bg-white border-r border-[#e8e5e0] flex flex-col transition-all duration-200 ease-out shadow-xl lg:shadow-none',
+                        'w-60 lg:w-[58px] lg:hover:w-60 group',
+                        isSidebarOpen ? 'translate-x-0 lg:w-60' : '-translate-x-full lg:translate-x-0'
                     )}
                 >
                     {/* Sidebar Header */}
-                    <div className="px-4 py-3.5 border-b border-[#e8e5e0] flex items-center justify-between min-h-[64px]">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-9 h-9 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-xs">
+                    <div className="px-3 py-2.5 border-b border-[#e8e5e0] flex items-center justify-between min-h-[48px]">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-bold text-[11px] shrink-0 shadow-2xs">
                                 GP
                             </div>
                             <div
                                 className={cn(
-                                    'transition-opacity duration-200 overflow-hidden',
+                                    'transition-opacity duration-150 overflow-hidden',
                                     isSidebarOpen ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
                                 )}
                             >
@@ -164,20 +163,20 @@ export function AppLayout({
                         <button
                             type="button"
                             onClick={() => setSidebarOpen(false)}
-                            className="lg:hidden w-8 h-8 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef]"
+                            className="lg:hidden w-7 h-7 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef]"
                             aria-label="Tutup Sidebar"
                         >
-                            <X size={16} />
+                            <X size={14} />
                         </button>
                     </div>
 
                     {/* Grouped Navigation List */}
-                    <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4 no-scrollbar">
+                    <div className="flex-1 overflow-y-auto px-2 py-2.5 space-y-3 no-scrollbar">
                         {groupedItems.map(group => (
-                            <div key={group.name} className="space-y-1">
+                            <div key={group.name} className="space-y-0.5">
                                 <div
                                     className={cn(
-                                        'px-2.5 text-[10px] font-extrabold uppercase tracking-wider text-[#8a8580] truncate transition-opacity duration-200',
+                                        'px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] truncate transition-opacity duration-150',
                                         isSidebarOpen
                                             ? 'opacity-100'
                                             : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
@@ -196,11 +195,11 @@ export function AppLayout({
                                             onClick={() => handleTabClick(item.id)}
                                             title={item.label}
                                             className={cn(
-                                                'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 relative group/btn cursor-pointer',
+                                                'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 relative group/btn cursor-pointer',
                                                 active
                                                     ? danger
-                                                        ? 'bg-rose-50 text-rose-700 font-bold'
-                                                        : 'bg-[var(--accent-glow)] text-[var(--accent)] font-bold'
+                                                        ? 'bg-rose-50 text-rose-700 font-semibold'
+                                                        : 'bg-[var(--accent-glow)] text-[var(--accent)] font-semibold'
                                                     : 'text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[#2d2a26]'
                                             )}
                                         >
@@ -208,15 +207,15 @@ export function AppLayout({
                                                 <motion.div
                                                     layoutId="sidebar-active-indicator"
                                                     className={cn(
-                                                        'absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full',
+                                                        'absolute left-0 top-1 bottom-1 w-0.5 rounded-r-full',
                                                         danger ? 'bg-rose-500' : 'bg-[var(--accent)]'
                                                     )}
                                                 />
                                             )}
-                                            <div className="flex items-center gap-3 min-w-0">
+                                            <div className="flex items-center gap-2.5 min-w-0">
                                                 <div
                                                     className={cn(
-                                                        'flex items-center justify-center min-w-[24px] shrink-0',
+                                                        'flex items-center justify-center min-w-[20px] shrink-0 [&_svg]:w-[15px] [&_svg]:h-[15px]',
                                                         active
                                                             ? danger
                                                                 ? 'text-rose-600'
@@ -228,7 +227,7 @@ export function AppLayout({
                                                 </div>
                                                 <span
                                                     className={cn(
-                                                        'whitespace-nowrap truncate transition-all duration-200',
+                                                        'whitespace-nowrap truncate transition-all duration-150',
                                                         isSidebarOpen
                                                             ? 'opacity-100 translate-x-0'
                                                             : 'opacity-100 lg:opacity-0 lg:-translate-x-2 lg:group-hover:opacity-100 lg:group-hover:translate-x-0'
@@ -241,7 +240,7 @@ export function AppLayout({
                                             {item.badge !== undefined && item.badge !== 0 && item.badge !== '0' && (
                                                 <span
                                                     className={cn(
-                                                        'px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-opacity duration-200',
+                                                        'px-1.5 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 leading-none transition-opacity duration-150',
                                                         active
                                                             ? danger
                                                                 ? 'bg-rose-200 text-rose-800'
@@ -261,11 +260,11 @@ export function AppLayout({
                     </div>
                 </aside>
 
-                {/* Main Content Area (Leaves bottom padding pb-24 for Dynamic Floating Bottom Pill) */}
+                {/* Main Content Area */}
                 <main
                     className={cn(
-                        'flex-1 overflow-y-auto relative bg-[var(--bg-primary)] page-fade-in w-full pb-24 transition-all duration-300',
-                        isSidebarOpen ? 'lg:ml-72' : 'lg:ml-[76px]'
+                        'flex-1 overflow-y-auto relative bg-[var(--bg-primary)] page-fade-in w-full pb-20 transition-all duration-200',
+                        isSidebarOpen ? 'lg:ml-60' : 'lg:ml-[58px]'
                     )}
                 >
                     {children}
