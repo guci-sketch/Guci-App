@@ -1,10 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+/**
+ * Menormalisasi URL Supabase: jika pengguna tidak sengaja memasukkan URL endpoint REST
+ * (misal: `https://xyz.supabase.co/rest/v1`), otomatis dipangkas menjadi origin dasar
+ * (`https://xyz.supabase.co`) agar `/auth/v1/token` tidak menghasilkan 404.
+ */
+function normalizeSupabaseUrl(raw: string | undefined): string | undefined {
+    if (!raw) return undefined;
+    return raw
+        .trim()
+        .replace(/\/+(rest|auth|storage|functions)\/v1(\/.*)?$/i, '')
+        .replace(/\/+$/, '');
+}
 
-// Sebelumnya: fallback ke 'https://xxx.supabase.co' / 'eyJ...' bila env kosong, sehingga build produksi yang
-// lupa env berjalan "normal" tetapi semua request gagal dengan error jaringan yang membingungkan.
+const supabaseUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
+const supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+
 if (!supabaseUrl || !supabaseKey) {
     const msg =
         'VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diatur. Salin .env.example menjadi .env lalu isi nilainya ' +
@@ -17,8 +28,7 @@ export const supabase = createClient(supabaseUrl || 'http://localhost:54321', su
 
 /**
  * Klien terisolasi TANPA persistensi sesi. Dipakai untuk membuat akun pengguna lain (signUp) tanpa
- * menimpa sesi admin yang sedang login — `supabase.auth.signUp` pada klien utama akan otomatis
- * berpindah sesi ke akun baru.
+ * menimpa sesi admin yang sedang login.
  */
 export function createIsolatedSupabaseClient() {
     return createClient(supabaseUrl || 'http://localhost:54321', supabaseKey || 'missing-anon-key', {

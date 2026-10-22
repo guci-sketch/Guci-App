@@ -5,7 +5,7 @@
 -- Mencakup        : 00_baseline + 01_atomic_transactions + 02_fix_drift_and_rpc +
 --                   03_tenant_hardening + 04_rls_policies + 05_quotation_automation_drf_apr +
 --                   Auto-Provisioning Storage Bucket (`evidence-photos`) + Fungsi Retensi Otomatis +
---                   Seed Identitas Resmi PT Guci Emas Pratama & Auto-Bootstrap User Pertama
+--                   Seed Identitas Resmi PT Guci Emas Pratama + 5 AKUN DEMO SIAP LOGIN + DATA DEMO LENGKAP
 -- Sifat Skrip     : 100% Idempoten (Aman dijalankan langsung di Supabase SQL Editor)
 -- ====================================================================================================
 
@@ -501,7 +501,6 @@ CREATE TRIGGER trg_treatment_record_touch
 -- ====================================================================================================
 -- BAGIAN 6: VIEW DAFTAR PENAWARAN RINGAN (`quotations_light`)
 -- ====================================================================================================
--- Menghindari pengunduhan kolom base64 besar (pdfBase64, signedPdfBase64, surveyPhotos) saat memuat tabel daftar PH.
 CREATE OR REPLACE VIEW public.quotations_light WITH (security_invoker = true) AS
   SELECT
     id,
@@ -685,8 +684,6 @@ BEGIN
 END $$;
 
 -- 8.5. RPC Penomoran Surat Atomik 2 Tahap (`GP-DRF` -> `GP-APR`) & Kategori (`AR` vs `PCO`)
---   * Tahap Draft (Surveyor/Marketing): GP-DRF/AR/PH/YYYY/MM/NNNN atau GP-DRF/PCO/PH/YYYY/MM/NNNN
---   * Tahap Approved (Admin):           GP-APR/AR/PH/YYYY/MM/NNNN atau GP-APR/PCO/PH/YYYY/MM/NNNN
 DROP FUNCTION IF EXISTS public.generate_nomor_surat(text, text, text, text, text, boolean, text);
 DROP FUNCTION IF EXISTS public.generate_nomor_surat(text, text, text, text, text, boolean, text, text);
 
@@ -985,12 +982,151 @@ CREATE POLICY invites_update ON public.invites FOR UPDATE TO authenticated
 CREATE POLICY invites_delete ON public.invites FOR DELETE TO authenticated
   USING (public.is_company_admin(company_id));
 
+-- 9.9. RLS Policies untuk Modul Fieldwork & Admin (projects, work_reports, treatment_records, documentation_photos, risk_events, risk_config, audit_logs, user_locations)
+-- Mendukung akses langsung via Supabase PostgREST (@supabase/supabase-js) tanpa bergantung pada koneksi TCP backend.
+CREATE POLICY projects_select ON public.projects FOR SELECT TO authenticated
+  USING (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY projects_insert ON public.projects FOR INSERT TO authenticated
+  WITH CHECK (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY projects_update ON public.projects FOR UPDATE TO authenticated
+  USING (company_id = public.current_company_id() OR public.is_superadmin())
+  WITH CHECK (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY projects_delete ON public.projects FOR DELETE TO authenticated
+  USING (public.is_company_admin(company_id));
+
+CREATE POLICY work_reports_select ON public.work_reports FOR SELECT TO authenticated
+  USING (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY work_reports_insert ON public.work_reports FOR INSERT TO authenticated
+  WITH CHECK (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY work_reports_update ON public.work_reports FOR UPDATE TO authenticated
+  USING (company_id = public.current_company_id() OR public.is_superadmin())
+  WITH CHECK (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY work_reports_delete ON public.work_reports FOR DELETE TO authenticated
+  USING (public.is_company_admin(company_id));
+
+CREATE POLICY treatment_records_all ON public.treatment_records FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = treatment_records.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = treatment_records.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ));
+
+CREATE POLICY documentation_photos_all ON public.documentation_photos FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = documentation_photos.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = documentation_photos.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ));
+
+CREATE POLICY risk_events_all ON public.risk_events FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = risk_events.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.work_reports wr
+    WHERE wr.id = risk_events.work_report_id
+      AND (wr.company_id = public.current_company_id() OR public.is_superadmin())
+  ));
+
+CREATE POLICY risk_config_select ON public.risk_config FOR SELECT TO authenticated
+  USING (true);
+CREATE POLICY risk_config_write ON public.risk_config FOR ALL TO authenticated
+  USING (public.current_app_role() IN ('ADMIN', 'SUPERADMIN'))
+  WITH CHECK (public.current_app_role() IN ('ADMIN', 'SUPERADMIN'));
+
+CREATE POLICY audit_logs_select ON public.audit_logs FOR SELECT TO authenticated
+  USING (company_id = public.current_company_id() OR public.is_superadmin());
+CREATE POLICY audit_logs_insert ON public.audit_logs FOR INSERT TO authenticated
+  WITH CHECK (company_id = public.current_company_id() OR public.is_superadmin());
+
+CREATE POLICY user_locations_select ON public.user_locations FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = user_locations.user_id
+      AND (u.company_id = public.current_company_id() OR public.is_superadmin())
+  ));
+CREATE POLICY user_locations_insert ON public.user_locations FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid() OR public.current_app_role() IN ('ADMIN', 'SUPERADMIN'));
+
+-- 9.10. RPC Manajemen Pengguna via Admin (Mendukung Buat, Aktif/Suspend, & Hapus User Langsung dari Frontend)
+CREATE OR REPLACE FUNCTION public.admin_upsert_company_user(
+  p_email text,
+  p_password text,
+  p_name text,
+  p_role text,
+  p_phone text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, auth, pg_temp AS $$
+DECLARE
+  v_co_id uuid := public.current_company_id();
+  v_uid uuid := gen_random_uuid();
+  v_role public.user_role;
+BEGIN
+  IF NOT public.is_company_admin(v_co_id) THEN
+    RAISE EXCEPTION 'Hanya Admin yang dapat membuat akun pengguna' USING ERRCODE = '42501';
+  END IF;
+  v_role := upper(btrim(p_role))::public.user_role;
+  PERFORM public.upsert_demo_account_guci_emas(v_uid, p_email, p_password, p_name, v_role, p_phone, NULL);
+  RETURN (
+    SELECT jsonb_build_object(
+      'id', u.id, 'name', u.name, 'email', u.email,
+      'role', u.role, 'phone', u.phone, 'is_active', u.is_active, 'created_at', u.created_at
+    )
+    FROM public.users u WHERE lower(u.email) = lower(btrim(p_email)) LIMIT 1
+  );
+END $$;
+
+CREATE OR REPLACE FUNCTION public.admin_set_user_active(p_user_id uuid, p_active boolean)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_co_id uuid;
+BEGIN
+  SELECT company_id INTO v_co_id FROM public.users WHERE id = p_user_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
+  IF NOT public.is_company_admin(v_co_id) THEN
+    RAISE EXCEPTION 'Tidak berwenang mengubah status user' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.users SET is_active = p_active, updated_at = now() WHERE id = p_user_id;
+  RETURN jsonb_build_object('id', p_user_id, 'is_active', p_active);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_company_user(p_user_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_co_id uuid;
+BEGIN
+  SELECT company_id INTO v_co_id FROM public.users WHERE id = p_user_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
+  IF NOT public.is_company_admin(v_co_id) THEN
+    RAISE EXCEPTION 'Tidak berwenang menghapus user' USING ERRCODE = '42501';
+  END IF;
+  DELETE FROM public.users WHERE id = p_user_id;
+  RETURN jsonb_build_object('deleted', true, 'id', p_user_id);
+END $$;
+
+REVOKE EXECUTE ON FUNCTION public.admin_upsert_company_user(text, text, text, text, text) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_set_user_active(uuid, boolean) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION public.admin_delete_company_user(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_company_user(text, text, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_set_user_active(uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_company_user(uuid) TO authenticated;
+
 -- ====================================================================================================
 -- BAGIAN 10: PENYEDERHANAAN ENV DI DATABASE (STORAGE BUCKET, FUNGSI RETENSI, & SEED PT GUCI EMAS PRATAMA)
 -- ====================================================================================================
 
 -- 10.1. Auto-Provisioning Supabase Storage Bucket (`evidence-photos`)
--- Menggantikan kebutuhan variabel `SUPABASE_STORAGE_BUCKET` dan pembuatan bucket manual di dashboard Supabase.
 DO $$
 BEGIN
   IF to_regclass('storage.buckets') IS NOT NULL THEN
@@ -999,7 +1135,7 @@ BEGIN
       'evidence-photos',
       'evidence-photos',
       false,
-      8388608, -- 8 MB (menggantikan MAX_PHOTO_SIZE_MB di .env)
+      8388608,
       ARRAY['image/jpeg', 'image/png', 'image/webp']
     )
     ON CONFLICT (id) DO UPDATE
@@ -1007,12 +1143,10 @@ BEGIN
           allowed_mime_types = EXCLUDED.allowed_mime_types;
   END IF;
 EXCEPTION WHEN insufficient_privilege OR undefined_column THEN
-  RAISE NOTICE 'Pembuatan otomatis storage.buckets dilewati (skema storage tidak tersedia di lingkungan ini).';
+  RAISE NOTICE 'Pembuatan otomatis storage.buckets dilewati.';
 END $$;
 
 -- 10.2. Fungsi Database Pembersihan Retensi Otomatis (`public.cleanup_old_telemetry`)
--- Menggantikan variabel `LOCATION_RETENTION_DAYS`, `PHOTO_RETENTION_MONTHS`, dan `CRON_SECRET` di `.env`.
--- Dapat dipanggil kapan saja lewat SQL (`SELECT public.cleanup_old_telemetry();`) atau pg_cron.
 CREATE OR REPLACE FUNCTION public.cleanup_old_telemetry(
   p_location_days int DEFAULT 30,
   p_photo_months int DEFAULT 2
@@ -1124,9 +1258,6 @@ BEGIN
 END $$;
 
 -- 10.7. Fungsi Helper & Trigger Auto-Bootstrap Pengguna Supabase Auth -> `public.users`
--- Menggantikan variabel `SEED_SUPABASE_AUTH` dan `SEED_PASSWORD` di `.env`:
---   SELECT public.register_guci_emas_user('admin@gucimaspratama.co.id', 'Admin Guci Emas', 'ADMIN', '08170795959');
---   SELECT public.register_guci_emas_user('surveyor@gucimaspratama.co.id', 'Surveyor Marketing', 'MARKETING', '08170795959');
 CREATE OR REPLACE FUNCTION public.register_guci_emas_user(
   p_email text,
   p_name text,
@@ -1242,6 +1373,559 @@ BEGIN
   END IF;
 EXCEPTION WHEN insufficient_privilege THEN
   RAISE NOTICE 'Trigger pada auth.users dilewati (gunakan SELECT public.register_guci_emas_user(...) untuk mendaftarkan user).';
+END $$;
+
+-- ====================================================================================================
+-- BAGIAN 11: SEED 5 AKUN DEMO SIAP LOGIN (`auth.users` + `auth.identities` + `public.users`)
+--            DAN DATA DEMO OPERASIONAL PT GUCI EMAS PRATAMA (QUOTATION `GP-DRF`/`GP-APR`, SPK, PROYEK)
+-- ====================================================================================================
+-- Semua akun demo di bawah ini otomatis dibuat di Supabase Auth (`auth.users` & `auth.identities`)
+-- sekaligus di `public.users` dengan password seragam:
+--
+--   Password Semua Akun Demo : GuciEmas123!
+--
+--   1. ADMIN (Approve GP-APR & Negosiasi) : admin@gucimaspratama.co.id
+--   2. SURVEYOR / MARKETING (Input GP-DRF): surveyor@gucimaspratama.co.id
+--   3. TEKNISI LAPANGAN (SPK & Check-In)  : teknisi@gucimaspratama.co.id
+--   4. ADMIN GUDANG (Inventaris Chemical) : gudang@gucimaspratama.co.id
+--   5. SUPERADMIN (Multi-Tenant Control)  : superadmin@gucimaspratama.co.id
+-- ====================================================================================================
+
+CREATE OR REPLACE FUNCTION public.upsert_demo_account_guci_emas(
+  p_uid uuid,
+  p_email text,
+  p_password text,
+  p_name text,
+  p_role public.user_role,
+  p_phone text,
+  p_nip text DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, auth, pg_temp AS $$
+DECLARE
+  v_co_id uuid;
+  v_actual_uid uuid := p_uid;
+  v_has_full_auth boolean;
+  v_has_provider_id boolean;
+BEGIN
+  SELECT id INTO v_co_id FROM public.companies WHERE company_slug = 'guci-emas-pratama' LIMIT 1;
+  IF v_co_id IS NULL THEN
+    RAISE EXCEPTION 'Perusahaan PT Guci Emas Pratama belum ada';
+  END IF;
+
+  -- Cek apakah email sudah ada di auth.users
+  SELECT id INTO v_actual_uid FROM auth.users WHERE lower(email) = lower(btrim(p_email)) LIMIT 1;
+  v_actual_uid := coalesce(v_actual_uid, p_uid);
+
+  -- Deteksi apakah ini tabel `auth.users` penuh milik Supabase Cloud (memiliki kolom encrypted_password)
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'auth' AND table_name = 'users' AND column_name = 'encrypted_password'
+  ) INTO v_has_full_auth;
+
+  IF v_has_full_auth THEN
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_actual_uid) THEN
+      INSERT INTO auth.users (
+        instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+        confirmation_token, email_change, email_change_token_new, recovery_token
+      ) VALUES (
+        '00000000-0000-0000-0000-000000000000'::uuid,
+        v_actual_uid,
+        'authenticated',
+        'authenticated',
+        lower(btrim(p_email)),
+        crypt(p_password, gen_salt('bf')),
+        now(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        jsonb_build_object(
+          'sub', v_actual_uid::text,
+          'email', lower(btrim(p_email)),
+          'name', p_name,
+          'role', p_role::text,
+          'phone', p_phone,
+          'email_verified', true,
+          'phone_verified', false
+        ),
+        now(),
+        now(),
+        '', '', '', ''
+      );
+    ELSE
+      UPDATE auth.users
+         SET encrypted_password     = crypt(p_password, gen_salt('bf')),
+             email_confirmed_at     = coalesce(email_confirmed_at, now()),
+             raw_app_meta_data      = '{"provider":"email","providers":["email"]}'::jsonb,
+             raw_user_meta_data     = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+               'sub', v_actual_uid::text,
+               'email', lower(btrim(p_email)),
+               'name', p_name,
+               'role', p_role::text,
+               'email_verified', true
+             ),
+             confirmation_token     = coalesce(confirmation_token, ''),
+             email_change           = coalesce(email_change, ''),
+             email_change_token_new = coalesce(email_change_token_new, ''),
+             recovery_token         = coalesce(recovery_token, ''),
+             updated_at             = now()
+       WHERE id = v_actual_uid;
+    END IF;
+
+    -- Pastikan kolom string GoTrue lainnya tidak NULL jika ada di versi Supabase tersebut
+    BEGIN
+      EXECUTE 'UPDATE auth.users SET email_change_token_current = coalesce(email_change_token_current, ''''), phone_change = coalesce(phone_change, ''''), phone_change_token = coalesce(phone_change_token, ''''), reauthentication_token = coalesce(reauthentication_token, '''') WHERE id = $1'
+      USING v_actual_uid;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    END;
+
+    -- Isi auth.identities apabila tabelnya tersedia di Supabase
+    IF to_regclass('auth.identities') IS NOT NULL THEN
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'auth' AND table_name = 'identities' AND column_name = 'provider_id'
+      ) INTO v_has_provider_id;
+
+      IF NOT EXISTS (SELECT 1 FROM auth.identities WHERE user_id = v_actual_uid AND provider = 'email') THEN
+        IF v_has_provider_id THEN
+          INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+          VALUES (
+            gen_random_uuid(),
+            v_actual_uid,
+            v_actual_uid::text,
+            jsonb_build_object('sub', v_actual_uid::text, 'email', lower(btrim(p_email)), 'email_verified', true, 'phone_verified', false),
+            'email',
+            now(), now(), now()
+          );
+        ELSE
+          INSERT INTO auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+          VALUES (
+            v_actual_uid::text,
+            v_actual_uid,
+            jsonb_build_object('sub', v_actual_uid::text, 'email', lower(btrim(p_email)), 'email_verified', true, 'phone_verified', false),
+            'email',
+            now(), now(), now()
+          );
+        END IF;
+      END IF;
+    END IF;
+  ELSE
+    -- Lingkungan Postgres lokal / stub auth.users
+    INSERT INTO auth.users (id, email, raw_user_meta_data)
+    VALUES (
+      v_actual_uid,
+      lower(btrim(p_email)),
+      jsonb_build_object('name', p_name, 'role', p_role::text)
+    )
+    ON CONFLICT (id) DO UPDATE
+      SET email = EXCLUDED.email,
+          raw_user_meta_data = EXCLUDED.raw_user_meta_data;
+  END IF;
+
+  -- Upsert ke public.users
+  INSERT INTO public.users (id, company_id, name, email, nip, password_hash, role, phone, is_active)
+  VALUES (
+    v_actual_uid,
+    v_co_id,
+    p_name,
+    lower(btrim(p_email)),
+    p_nip,
+    'managed-by-supabase-auth',
+    p_role,
+    p_phone,
+    true
+  )
+  ON CONFLICT (email) DO UPDATE
+    SET id         = v_actual_uid,
+        company_id = v_co_id,
+        name       = EXCLUDED.name,
+        nip        = EXCLUDED.nip,
+        role       = EXCLUDED.role,
+        phone      = EXCLUDED.phone,
+        is_active  = true,
+        updated_at = now();
+END $$;
+
+REVOKE EXECUTE ON FUNCTION public.upsert_demo_account_guci_emas(uuid, text, text, text, public.user_role, text, text) FROM public, anon, authenticated;
+
+-- RPC Ganti Role Instan (Memungkinkan 1 akun seperti lieziragroup@gmail.com mencoba SEMUA role:
+-- ADMIN, MARKETING / Surveyor, TEKNISI_LAPANGAN, INVENTORY / Gudang, maupun SUPERADMIN)
+CREATE OR REPLACE FUNCTION public.switch_my_role(p_new_role text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_role public.user_role;
+  v_co_id uuid;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Belum login' USING ERRCODE = '28000';
+  END IF;
+  BEGIN
+    v_role := upper(btrim(p_new_role))::public.user_role;
+  EXCEPTION WHEN invalid_text_representation THEN
+    RAISE EXCEPTION 'Role tidak valid: %', p_new_role;
+  END;
+
+  UPDATE public.users
+     SET role = v_role,
+         updated_at = now()
+   WHERE id = v_uid
+  RETURNING company_id INTO v_co_id;
+
+  -- Jika beralih ke TEKNISI_LAPANGAN, tautkan tugas demo ke akun ini agar halaman Teknisi langsung menampilkan daftar proyek & SPK
+  IF v_role = 'TEKNISI_LAPANGAN' AND v_co_id IS NOT NULL THEN
+    UPDATE public.work_reports
+       SET executor_id = v_uid
+     WHERE company_id = v_co_id
+       AND id IN ('00000000-0000-4000-e000-000000000001'::uuid, '00000000-0000-4000-e000-000000000002'::uuid);
+
+    UPDATE public.spk
+       SET technician_id = v_uid,
+           payload = payload || jsonb_build_object('technicianId', v_uid::text)
+     WHERE company_id = v_co_id
+       AND id = '00000000-0000-4000-f000-000000000001'::uuid;
+  END IF;
+
+  RETURN jsonb_build_object('uid', v_uid, 'role', v_role);
+END $$;
+
+REVOKE EXECUTE ON FUNCTION public.switch_my_role(text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.switch_my_role(text) TO authenticated;
+
+-- 11.0. AKUN UTAMA ALL-ROLE (1 Akun Bisa Semua Role): lieziragroup@gmail.com (Password: Rafi0502!)
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000000'::uuid,
+  'lieziragroup@gmail.com',
+  'Rafi0502!',
+  'Rafi — Master All-Role (Guci Emas)',
+  'ADMIN',
+  '0817 0795 959',
+  'GEP-ALL-000'
+);
+
+-- 11.1. Eksekusi Pembuatan 5 Akun Demo PT Guci Emas Pratama (Password: GuciEmas123!)
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000001'::uuid,
+  'admin@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'H. Fakhrurrazi, S.E. (Admin)',
+  'ADMIN',
+  '0817 0795 959',
+  'GEP-ADM-001'
+);
+
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000002'::uuid,
+  'surveyor@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'Rizky Pratama (Surveyor / Marketing)',
+  'MARKETING',
+  '0812 8899 7766',
+  'GEP-SRV-002'
+);
+
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000003'::uuid,
+  'teknisi@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'Budi Santoso (Teknisi Lapangan)',
+  'TEKNISI_LAPANGAN',
+  '0813 2000 3014',
+  'GEP-TEK-003'
+);
+
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000004'::uuid,
+  'gudang@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'Hendra Wijaya (Admin Gudang)',
+  'INVENTORY',
+  '0815 4000 5042',
+  'GEP-INV-004'
+);
+
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000005'::uuid,
+  'superadmin@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'Super Admin Guci Emas',
+  'SUPERADMIN',
+  '0817 0795 959',
+  'GEP-SUP-000'
+);
+
+-- 11.2. Seed Data Demo Quotation (`GP-DRF` & `GP-APR`), Proyek, SPK, & Laporan Kerja Lapangan
+DO $$
+DECLARE
+  v_co_id uuid := '00000000-0000-4000-a000-000000000001'::uuid;
+  v_admin_id uuid;
+  v_surveyor_id uuid;
+  v_teknisi_id uuid;
+  v_q1_id uuid := '00000000-0000-4000-c000-000000000001'::uuid;
+  v_q2_id uuid := '00000000-0000-4000-c000-000000000002'::uuid;
+  v_q3_id uuid := '00000000-0000-4000-c000-000000000003'::uuid;
+  v_proj1_id uuid := '00000000-0000-4000-d000-000000000001'::uuid;
+  v_proj2_id uuid := '00000000-0000-4000-d000-000000000002'::uuid;
+  v_wr1_id uuid := '00000000-0000-4000-e000-000000000001'::uuid;
+  v_wr2_id uuid := '00000000-0000-4000-e000-000000000002'::uuid;
+  v_spk1_id uuid := '00000000-0000-4000-f000-000000000001'::uuid;
+BEGIN
+  SELECT id INTO v_admin_id FROM public.users WHERE email = 'admin@gucimaspratama.co.id' LIMIT 1;
+  SELECT id INTO v_surveyor_id FROM public.users WHERE email = 'surveyor@gucimaspratama.co.id' LIMIT 1;
+  SELECT id INTO v_teknisi_id FROM public.users WHERE email = 'teknisi@gucimaspratama.co.id' LIMIT 1;
+
+  -- (A) DEMO QUOTATION 1: Draft Anti Rayap Pasca-Konstruksi / Retreatment (Siap Dicoba Negosiasi Garansi & Approve!)
+  --     Mengikuti contoh nyata PDF 0022 (Bank Victoria Cabang Fatmawati) dengan rumus volume & upah peralatan
+  INSERT INTO public.quotations (id, company_id, marketing_uid, status, created_at, payload)
+  VALUES (
+    v_q1_id,
+    v_co_id,
+    v_surveyor_id,
+    'pending',
+    now() - interval '2 hours',
+    jsonb_build_object(
+      'id', v_q1_id::text,
+      'noSurat', 'GP-DRF/AR/PH/2026/10/0001',
+      'draftNoSurat', 'GP-DRF/AR/PH/2026/10/0001',
+      'stage', 'DRF',
+      'kategoriProyek', 'Korporat',
+      'kategori', 'AR',
+      'tipeKontrak', 'PH',
+      'jenisLayanan', 'anti_rayap_injeksi',
+      'pdfVariant', 'ar_pasca_standar_4p',
+      'kondisiBangunan', 'pasca_konstruksi',
+      'perihal', 'Penawaran Harga Anti Rayap (Retreatment)',
+      'kepadaNama', 'PT Bank Victoria International Tbk',
+      'kepadaAlamatLines', jsonb_build_array('Gedung Graha BIP Lt. 10', 'Jl. Jend. Gatot Subroto Kav. 23, Jakarta Selatan'),
+      'kepadaUp', 'Bpk. Hendra Kusuma (Building Management)',
+      'kepadaWa', '08119988776',
+      'objekPekerjaan', 'bangunan gedung kantor Bank Victoria Cabang Fatmawati',
+      'lokasiPekerjaan', 'Jl. RS. Fatmawati Raya No. 39, Cilandak, Jakarta Selatan',
+      'tanggal', to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'surveyor', 'Rizky Pratama (Surveyor / Marketing)',
+      'tanggalSurvey', to_char(current_date - 1, 'YYYY-MM-DD'),
+      'hasilSurvey', 'Ditemukan jalur kembara rayap tanah (Coptotermes curvignathus) pada area kusen arsip lantai 1 dan partisi ruang operasional.',
+      'items', jsonb_build_array(
+        jsonb_build_object('presetCode', 'ar_pondasi_1_sisi', 'desc', 'Pondasi 1 sisi', 'volumeFormula', '37+37+5,5+9+6+5', 'qty', 99.5, 'unit', 'm¹', 'harga', 19000),
+        jsonb_build_object('presetCode', 'ar_pondasi_2_sisi', 'desc', 'Pondasi 2 sisi', 'volumeFormula', '9+12+7,5+6', 'qty', 34.5, 'unit', 'm¹', 'harga', 38000),
+        jsonb_build_object('presetCode', 'ar_plafon', 'desc', 'Plafon Lt 1 s.d. 4', 'volumeFormula', '37 x 9 x 4', 'qty', 1332, 'unit', 'm²', 'harga', 9100),
+        jsonb_build_object('presetCode', 'ar_partisi', 'desc', 'Partisi', 'volumeFormula', '(37+37+9+9+12+10) x 5,5', 'qty', 627, 'unit', 'm²', 'harga', 13000)
+      ),
+      'biayaTambahan', '[]'::jsonb,
+      'upahPeralatanPct', 25,
+      'diskonUpahPct', 15,
+      'upahPeralatanRp', 5868550,
+      'diskonUpahRp', 3521130,
+      'diskonPct', 0,
+      'ppn', false,
+      'garansiTahun', 3,
+      'garansiNilai', 3,
+      'garansiUnit', 'tahun',
+      'tampilkanPengontrolan', true,
+      'estimasiHari', 5,
+      'subtotal', 23474200,
+      'diskonRp', 0,
+      'ppnRp', 0,
+      'total', 25821620,
+      'marketingUid', v_surveyor_id::text,
+      'marketingNama', 'Rizky Pratama (Surveyor / Marketing)',
+      'marketingWa', '0812 8899 7766',
+      'status', 'pending',
+      'companyId', v_co_id::text,
+      'notesMarketing', 'Customer sedang negosiasi minta opsi harga garansi 2 tahun atau 1 tahun. Mohon Admin review di panel Adjust.'
+    )
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  -- (B) DEMO QUOTATION 2: Draft Anti Rayap Pra-Konstruksi + Pemipaan (Mengikuti PDF 0005 - PT Oreka Solusi Kreatif)
+  INSERT INTO public.quotations (id, company_id, marketing_uid, status, created_at, payload)
+  VALUES (
+    v_q2_id,
+    v_co_id,
+    v_surveyor_id,
+    'pending',
+    now() - interval '1 day',
+    jsonb_build_object(
+      'id', v_q2_id::text,
+      'noSurat', 'GP-DRF/AR/PH/2026/10/0002',
+      'draftNoSurat', 'GP-DRF/AR/PH/2026/10/0002',
+      'stage', 'DRF',
+      'kategoriProyek', 'Komersial',
+      'kategori', 'AR',
+      'tipeKontrak', 'PH',
+      'jenisLayanan', 'anti_rayap_pipanisasi',
+      'pdfVariant', 'ar_pra_profile_8p',
+      'kondisiBangunan', 'pra_konstruksi',
+      'perihal', 'Penawaran Harga Anti Rayap (Pra Konstruksi & Sistem Pemipaan)',
+      'kepadaNama', 'PT Oreka Solusi Kreatif',
+      'kepadaAlamatLines', jsonb_build_array('Jl. RC. Veteran Raya No. 9, RT.001/RW.003', 'Bintaro, Kec. Pesanggrahan, Jakarta Selatan'),
+      'kepadaUp', 'Ibu Clarissa (Project Manager)',
+      'kepadaWa', '081234567890',
+      'objekPekerjaan', 'bangunan rumah tinggal pra konstruksi',
+      'lokasiPekerjaan', 'Jl. RC. Veteran Raya No. 9, Bintaro, Jakarta Selatan',
+      'tanggal', to_char(now() - interval '1 day', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'surveyor', 'Rizky Pratama (Surveyor / Marketing)',
+      'tanggalSurvey', to_char(current_date - 2, 'YYYY-MM-DD'),
+      'hasilSurvey', 'Kondisi tapak bangunan siap pasang jalur pipa PVC AW Ø 1/2 inch sebelum pengecoran lantai kerja.',
+      'items', jsonb_build_array(
+        jsonb_build_object('presetCode', 'ar_luas_permukaan_soil', 'desc', 'Luas Permukaan', 'volumeFormula', '20 x 11', 'qty', 220, 'unit', 'm²', 'harga', 30000),
+        jsonb_build_object('presetCode', 'ar_pemipaan_instalasi', 'desc', 'Pemipaan', 'volumeFormula', '155 + 77,5', 'qty', 232.5, 'unit', 'm¹', 'harga', 35000)
+      ),
+      'biayaTambahan', '[]'::jsonb,
+      'upahPeralatanPct', 0,
+      'diskonUpahPct', 0,
+      'diskonPct', 5,
+      'ppn', false,
+      'garansiTahun', 5,
+      'garansiNilai', 5,
+      'garansiUnit', 'tahun',
+      'tampilkanPengontrolan', true,
+      'estimasiHari', 4,
+      'subtotal', 14737500,
+      'diskonRp', 736875,
+      'ppnRp', 0,
+      'total', 14000625,
+      'marketingUid', v_surveyor_id::text,
+      'marketingNama', 'Rizky Pratama (Surveyor / Marketing)',
+      'marketingWa', '0812 8899 7766',
+      'status', 'pending',
+      'companyId', v_co_id::text,
+      'notesMarketing', 'Paket Pra-Konstruksi Garansi 5 Tahun + Instalasi Pipa.'
+    )
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  -- (C) DEMO QUOTATION 3: Penawaran Pest Control Approved (`GP-APR/PCO/PH/2026/10/0001` dari `GP-DRF/PCO/PH/2026/10/0001`)
+  --     Mengikuti contoh nyata PDF 0003 (PLN UP3 Bulungan) dengan PPN DPP 11/12
+  INSERT INTO public.quotations (id, company_id, marketing_uid, status, created_at, payload)
+  VALUES (
+    v_q3_id,
+    v_co_id,
+    v_surveyor_id,
+    'approved',
+    now() - interval '3 days',
+    jsonb_build_object(
+      'id', v_q3_id::text,
+      'noSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'draftNoSurat', 'GP-DRF/PCO/PH/2026/10/0001',
+      'approvedNoSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'stage', 'APR',
+      'kategoriProyek', 'Instansi',
+      'kategori', 'PCO',
+      'tipeKontrak', 'K',
+      'jenisLayanan', 'pest_umum',
+      'pdfVariant', 'pco_korporat_boq_3p',
+      'kondisiBangunan', 'pasca_konstruksi',
+      'perihal', 'Penawaran Pest Control & Rodent Control',
+      'kepadaNama', 'PT PLN (Persero) UP3 Bulungan',
+      'kepadaAlamatLines', jsonb_build_array('Jl. Sisingamangaraja No. 1, Kebayoran Baru', 'Jakarta Selatan'),
+      'kepadaUp', 'Bagian K3L & Umum',
+      'kepadaWa', '081122334455',
+      'objekPekerjaan', 'Gedung Kantor PT PLN (Persero) UP3 Bulungan',
+      'lokasiPekerjaan', 'Jl. Sisingamangaraja No. 1, Kebayoran Baru, Jakarta Selatan',
+      'tanggal', to_char(now() - interval '3 days', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'surveyor', 'Rizky Pratama (Surveyor / Marketing)',
+      'tanggalSurvey', to_char(current_date - 4, 'YYYY-MM-DD'),
+      'hasilSurvey', 'Pengendalian terpadu nyamuk, kecoa, semut, dan tikus pada area kantor pelayanan, ruang server, dan gudang arsip.',
+      'items', jsonb_build_array(
+        jsonb_build_object('presetCode', 'pco_pest_control_kali', 'desc', 'Pest Control', 'volumeFormula', '3', 'qty', 3, 'unit', 'Kali', 'harga', 4900000),
+        jsonb_build_object('presetCode', 'pco_rodent_lot_8x', 'desc', 'Rodent Control (8x kunjungan)', 'volumeFormula', '1', 'qty', 1, 'unit', 'Lot', 'harga', 4500000)
+      ),
+      'biayaTambahan', '[]'::jsonb,
+      'diskonPct', 0,
+      'ppn', true,
+      'ppnDppFaktor', 0.9166666667,
+      'garansiTahun', 0,
+      'garansiNilai', 6,
+      'garansiUnit', 'bulan',
+      'estimasiHari', 30,
+      'subtotal', 19200000,
+      'diskonRp', 0,
+      'ppnRp', 2112000,
+      'total', 21312000,
+      'marketingUid', v_surveyor_id::text,
+      'marketingNama', 'Rizky Pratama (Surveyor / Marketing)',
+      'marketingWa', '0812 8899 7766',
+      'status', 'approved',
+      'approvedBy', 'H. Fakhrurrazi, S.E. (Admin)',
+      'approvedAt', to_char(now() - interval '2 days', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'companyId', v_co_id::text
+    )
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  -- (D) Log Register Nomor Surat (`GP-DRF` & `GP-APR`)
+  INSERT INTO public.nomor_surat_logs ("noSurat", stage, "draftNoSurat", kategori, tipe, "tipeLabel", kepada, "byUid", "byName", dibuat, status, "quoId", "companyId", "isManual", "keteranganManual")
+  VALUES
+    ('GP-DRF/AR/PH/2026/10/0001',  'DRF', NULL,                        'AR',  'PH', 'Penawaran Harga', 'PT Bank Victoria International Tbk', v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '2 hours', 'pending',  v_q1_id, v_co_id, false, ''),
+    ('GP-DRF/AR/PH/2026/10/0002',  'DRF', NULL,                        'AR',  'PH', 'Penawaran Harga', 'PT Oreka Solusi Kreatif',              v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '1 day',   'pending',  v_q2_id, v_co_id, false, ''),
+    ('GP-DRF/PCO/PH/2026/10/0001', 'DRF', NULL,                        'PCO', 'K',  'Kontrak',         'PT PLN (Persero) UP3 Bulungan',        v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '3 days',  'approved', v_q3_id, v_co_id, false, ''),
+    ('GP-APR/PCO/PH/2026/10/0001', 'APR', 'GP-DRF/PCO/PH/2026/10/0001','PCO', 'K',  'Kontrak',         'PT PLN (Persero) UP3 Bulungan',        v_admin_id,    'H. Fakhrurrazi, S.E. (Admin)',         now() - interval '2 days',  'approved', v_q3_id, v_co_id, false, 'Approved dari GP-DRF/PCO/PH/2026/10/0001')
+  ON CONFLICT ("companyId", "noSurat") DO NOTHING;
+
+  -- (E) Seed Proyek Lapangan, Work Reports, & SPK untuk Teknisi Lapangan
+  INSERT INTO public.projects (
+    id, company_id, project_name, client_name, address, latitude, longitude, radius,
+    work_date, work_type, service_type, focus_target, building_area_sqm, contract_type,
+    warranty_months, next_service_date, scheduled_start_time, created_by
+  ) VALUES
+    (
+      v_proj1_id, v_co_id,
+      'Bank Victoria Cabang Fatmawati — Anti Rayap',
+      'PT Bank Victoria International Tbk',
+      'Jl. RS. Fatmawati Raya No. 39, Cilandak, Jakarta Selatan',
+      -6.283812, 106.796641, 100,
+      current_date,
+      'Injeksi Pondasi & Penyemprotan Plafon/Partisi Anti Rayap',
+      'TERMITE_CONTROL',
+      'Rayap Tanah (Coptotermes curvignathus)',
+      1332, 'ONE_TIME', 36, current_date + interval '6 months', '08:30', v_admin_id
+    ),
+    (
+      v_proj2_id, v_co_id,
+      'PT PLN (Persero) UP3 Bulungan — Pest & Rodent Control',
+      'PT PLN (Persero) UP3 Bulungan',
+      'Jl. Sisingamangaraja No. 1, Kebayoran Baru, Jakarta Selatan',
+      -6.241520, 106.797890, 120,
+      current_date,
+      'Fogging Outdoor, Spraying B&G, ULV Indoor & Umpan Tikus',
+      'GENERAL_PEST_CONTROL',
+      'Nyamuk, Kecoa, Semut, Lalat & Rodentia (Tikus)',
+      1800, 'RECURRING', 6, current_date + interval '1 month', '09:00', v_admin_id
+    )
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.work_reports (id, company_id, project_id, executor_id, status, customer_name, customer_phone, notes)
+  VALUES
+    (v_wr1_id, v_co_id, v_proj1_id, v_teknisi_id, 'READY', 'Bpk. Hendra Kusuma', '08119988776', 'Siap eksekusi pengeboran & injeksi termitisida Cypergard 100 EC.'),
+    (v_wr2_id, v_co_id, v_proj2_id, v_teknisi_id, 'READY', 'Bagian K3L PLN Bulungan', '081122334455', 'Kunjungan perdana kontrak Pest & Rodent Control.')
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.spk (id, company_id, technician_id, status, schedule_date, payload)
+  VALUES (
+    v_spk1_id,
+    v_co_id,
+    v_teknisi_id,
+    'assigned',
+    now(),
+    jsonb_build_object(
+      'id', v_spk1_id::text,
+      'quotationId', v_q3_id::text,
+      'quotationNoSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'customerId', 'cust-pln-bulungan',
+      'customerName', 'PT PLN (Persero) UP3 Bulungan',
+      'technicianId', v_teknisi_id::text,
+      'technicianName', 'Budi Santoso (Teknisi Lapangan)',
+      'scheduleDate', to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'status', 'assigned',
+      'serviceType', 'GENERAL_PEST_CONTROL',
+      'perihal', 'Pelaksanaan Pest Control & Rodent Control Kunjungan #1',
+      'lokasi', 'Jl. Sisingamangaraja No. 1, Kebayoran Baru, Jakarta Selatan',
+      'notes', 'Bawa Thermal Fogging, B&G Sprayer, ULV Cold Fogger, Cypergard 100 EC, Demand CS, dan Klerat.',
+      'alatPekerjaan', jsonb_build_array('Thermal Fogging', 'B&G Sprayer', 'ULV Cold Fogger', 'Bait Station Tikus'),
+      'companyId', v_co_id::text,
+      'createdBy', v_admin_id::text,
+      'createdByName', 'H. Fakhrurrazi, S.E. (Admin)'
+    )
+  )
+  ON CONFLICT (id) DO NOTHING;
 END $$;
 
 COMMIT;

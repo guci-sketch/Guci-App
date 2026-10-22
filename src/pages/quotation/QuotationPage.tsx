@@ -261,10 +261,10 @@ export function QuotationPage() {
     const statsDeal = quotations.filter(q => q.status === "deal").length;
 
     const hubTabs = [
-        { id: "list",      label: "Daftar & Verifikasi Quotation", icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
-        ...(canCreate ? [{ id: "new", label: "+ Input Survey / Buat Draft (GP-DRF)", icon: <Plus size={15} /> }] : []),
-        { id: "pipeline",  label: "Pipeline Status PH & Deal",    icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
-        { id: "nomor-log", label: "Register Nomor (DRF & APR)",   icon: <Hash size={15} /> },
+        { id: "list",      label: "Daftar & Verifikasi Quotation", shortLabel: "Semua", icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
+        ...(canCreate ? [{ id: "new", label: "+ Input Survey / Buat Draft (GP-DRF)", shortLabel: "Input Survey", icon: <Plus size={15} /> }] : []),
+        { id: "pipeline",  label: "Pipeline Status PH & Deal", shortLabel: "Pipeline", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
+        { id: "nomor-log", label: "Register Nomor (DRF & APR)", shortLabel: "Register", icon: <Hash size={15} /> },
     ];
 
     if (subTab === "new") {
@@ -346,6 +346,8 @@ export function QuotationPage() {
                 />
             )}
 
+            <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
+
             <PageHeader
                 title="Automation Quotation Hub — PT Guci Emas Pratama"
                 subtitle="Alur Terpadu: Input Hasil Survey & Volume (GP-DRF) → Negosiasi Garansi & Harga via Admin → Approval Resmi (GP-APR)"
@@ -370,8 +372,6 @@ export function QuotationPage() {
                     </>
                 }
             />
-
-            <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
 
             {/* KPI Cards bergaya Barventis */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

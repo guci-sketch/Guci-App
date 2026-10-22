@@ -16,6 +16,7 @@ import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { getServiceTypeMeta } from '@/shared/utils/serviceMeta';
 import { formatDistance, calculateDistanceMeters } from '@/shared/utils/geo';
 import { Header } from '../common/Header';
+import { TabContainer } from '@/shared/ui/TabContainer';
 import {
   Plus, Camera, CheckCircle2, Clock, MapPin, Briefcase, History, User as UserIcon,
   Home, Check, Lock, Eye, LogOut, ChevronRight, Building, WifiOff, RefreshCw, AlertCircle, ImagePlus, ShieldCheck, X,
@@ -323,13 +324,38 @@ export const ExecutorHome: React.FC = () => {
   };
 
 
+  const executorTabs = [
+    { id: 'home', label: 'Tugas Hari Ini', shortLabel: 'Tugas', icon: <Home size={15} />, badge: (ongoingJob ? 1 : 0) + (readyJob ? 1 : 0) },
+    { id: 'jobs', label: 'Daftar Proyek', shortLabel: 'Proyek', icon: <Briefcase size={15} />, badge: projects.length },
+    { id: 'history', label: 'Riwayat Selesai', shortLabel: 'Riwayat', icon: <History size={15} />, badge: completedJobs.length },
+    { id: 'profile', label: 'Profil Teknisi', shortLabel: 'Profil', icon: <UserIcon size={15} /> },
+  ];
+  const activeExecTabMeta = executorTabs.find(t => t.id === activeTab) ?? executorTabs[0];
+
   return (
     <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <Header currentUser={user} onLogout={logout} pendingCount={pendingCount} onSync={attemptSync} isSyncing={isSyncing} hideMobileMenu={true} />
+      <Header
+        currentUser={user}
+        onLogout={logout}
+        pendingCount={pendingCount}
+        onSync={attemptSync}
+        isSyncing={isSyncing}
+        hideMobileMenu={true}
+        pageTitle={`Fieldwork Teknisi — ${activeExecTabMeta.label}`}
+        onRefresh={loadData}
+      />
       
       <div className="flex flex-1 overflow-hidden relative">
         
-        <main className="flex-1 overflow-y-auto flex flex-col w-full relative pb-20">
+        <main className="flex-1 overflow-y-auto flex flex-col w-full relative pb-28">
+          <div className="max-w-xl w-full mx-auto px-4 pt-4">
+            <TabContainer
+              tabs={executorTabs}
+              activeTab={activeTab}
+              onChange={(id) => setActiveTab(id as any)}
+              showFloatingBottom={true}
+            />
+          </div>
       {successFeedback && (
         <div className="m-4 p-4 bg-emerald-50 border-2 border-emerald-500 rounded-2xl shadow-sm text-emerald-900 flex items-start justify-between">
           <div className="flex items-start gap-3">
@@ -705,46 +731,26 @@ export const ExecutorHome: React.FC = () => {
 
       </main>
         
-        {/* Bottom Navigation for Mobile App UI/UX */}
-        <nav className="absolute bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-40 h-[65px] flex items-center justify-between px-4 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
-          <div className="flex-1 flex justify-around">
-            <NavItem tab="home" label="Beranda" icon={Home} />
-            <NavItem tab="jobs" label="Proyek" icon={Briefcase} />
-          </div>
-          
-          <div className="relative -top-5 flex flex-col items-center px-2">
+        {/* Floating Quick Check-In / Check-Out Action Button above Dynamic Bottom Pill */}
+        {(ongoingJob || readyJob) && (
+          <div className="fixed bottom-20 right-4 z-40">
             {ongoingJob ? (
               <button
                 onClick={() => setTreatmentFormReport(ongoingJob)}
-                className="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 border-4 border-white active:scale-95 transition-transform"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-lg border-2 border-white active:scale-95 transition-transform"
               >
-                <LogOut size={24} />
+                <LogOut size={16} /> Check-Out Tugas
               </button>
             ) : readyJob ? (
               <button
                 onClick={() => setActiveCameraAction({ type: 'CHECK_IN', report: readyJob })}
-                className="w-14 h-14 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 border-4 border-white active:scale-95 transition-transform"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold shadow-lg border-2 border-white active:scale-95 transition-transform"
               >
-                <Camera size={24} />
+                <Camera size={16} /> Check-In GPS
               </button>
-            ) : (
-              <button
-                onClick={() => setActiveTab('jobs')}
-                className="w-14 h-14 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-lg shadow-slate-800/30 border-4 border-white active:scale-95 transition-transform"
-              >
-                <Plus size={24} />
-              </button>
-            )}
-            <span className="text-[10px] font-bold text-slate-700 mt-1 whitespace-nowrap">
-              {ongoingJob ? 'Check Out' : 'Check In'}
-            </span>
+            ) : null}
           </div>
-
-          <div className="flex-1 flex justify-around">
-            <NavItem tab="history" label="Riwayat" icon={History} />
-            <NavItem tab="profile" label="Profil" icon={UserIcon} />
-          </div>
-        </nav>
+        )}
 
       {activeCameraAction && (
         <CameraCaptureModal

@@ -82,13 +82,14 @@ import { Header } from '../common/Header';
 
 const MotionDiv = motion.div as any;
 import { AppLayout } from '../common/AppLayout';
+import { TabContainer } from '@/shared/ui/TabContainer';
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
   const isSuper = user?.role === 'SUPERADMIN';
   const activeCompanyId = useAuthStore(st => st.activeCompanyId);
   // Tab awal per role: MARKETING → penawaran, INVENTORY → gudang (menu 'dashboard' memakai API admin).
-  const [activeTab, setActiveTab] = useState<Tab>(user?.role === 'MARKETING' ? 'quotation' : user?.role === 'INVENTORY' ? 'inventory' : 'dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>(user?.role === 'INVENTORY' ? 'inventory' : 'quotation');
   const [inviteRole, setInviteRole] = useState<AdminUser['role']>('TEKNISI_LAPANGAN');
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'TEKNISI_LAPANGAN' as AdminUser['role'], phone: '' });
   const [creatingUser, setCreatingUser] = useState(false);
@@ -376,64 +377,100 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
-  // Menu disaring per role. Menu yang memakai API admin lapangan (dashboard, SPK, laporan, ...) hanya untuk ADMIN/SUPERADMIN.
-  const ALL_ITEMS: { id: Tab; label: string; icon: React.ReactNode; danger?: boolean; roles: string[] }[] = [
-    { id: 'quotation', label: 'Automation Quotation Hub', icon: <FileText size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'customers', label: 'Database Pelanggan (CRM)', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'kontrol-rayap', label: 'Garansi & Kontrol Rayap', icon: <AlertTriangle size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'spk-cms', label: 'Manajemen SPK (Dari Deal)', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'order-tracking', label: 'Termin & Tagihan Kontrak', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'cashflow', label: 'Arus Kas & Revenue', icon: <SlidersHorizontal size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'performa', label: 'Target & Performa Mkt', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'dashboard', label: 'Ikhtisar Fieldwork', icon: <ShieldCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'projects', label: 'Proyek & Geofence', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'tracking', label: 'Peta Pelacakan GPS', icon: <MapPin size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'reports', label: 'Laporan Lapangan', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'anomalies', label: 'Anomali & Pelanggaran', icon: <ShieldAlert size={18} />, danger: true, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'executors', label: 'Performa Teknisi', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'inventory', label: 'Gudang & Stok Obat', icon: <Package size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'INVENTORY'] },
-    { id: 'templates', label: 'Template & Pengaturan', icon: <Palette size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'approval', label: 'Manajemen User', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'risk-config', label: 'Aturan Risiko', icon: <Settings2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'audit', label: 'Log Sistem', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'profile', label: 'Setup Profile', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING', 'INVENTORY'] },
+  // Menu dikelompokkan ke 4 Kategori QA yang terstruktur agar mudah dinavigasi di Desktop, Tablet, & Mobile
+  const ALL_ITEMS: { id: Tab; label: string; shortLabel: string; group: string; icon: React.ReactNode; danger?: boolean; badge?: number; roles: string[] }[] = [
+    // GRUP 1: PENAWARAN & CRM (UTAMA)
+    { id: 'quotation', label: 'Automation Quotation Hub', shortLabel: 'Quotation', group: '1. PENAWARAN & CRM', icon: <FileText size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'customers', label: 'Database Pelanggan (CRM)', shortLabel: 'Pelanggan', group: '1. PENAWARAN & CRM', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'kontrol-rayap', label: 'Garansi & Kontrol Rayap', shortLabel: 'Garansi', group: '1. PENAWARAN & CRM', icon: <AlertTriangle size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'spk-cms', label: 'Manajemen SPK (Dari Deal)', shortLabel: 'SPK Deal', group: '1. PENAWARAN & CRM', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+
+    // GRUP 2: OPERASIONAL LAPANGAN (FIELDWORK)
+    { id: 'dashboard', label: 'Ikhtisar Fieldwork', shortLabel: 'Ikhtisar', group: '2. OPERASIONAL LAPANGAN', icon: <ShieldCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'projects', label: 'Proyek & Geofence', shortLabel: 'Proyek', group: '2. OPERASIONAL LAPANGAN', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'reports', label: 'Laporan Lapangan', shortLabel: 'Laporan', group: '2. OPERASIONAL LAPANGAN', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'anomalies', label: 'Anomali & Pelanggaran', shortLabel: 'Anomali', group: '2. OPERASIONAL LAPANGAN', icon: <ShieldAlert size={18} />, danger: true, badge: kpi.flaggedJobs > 0 ? kpi.flaggedJobs : undefined, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'executors', label: 'Performa Teknisi', shortLabel: 'Teknisi', group: '2. OPERASIONAL LAPANGAN', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'tracking', label: 'Peta Pelacakan GPS', shortLabel: 'GPS Live', group: '2. OPERASIONAL LAPANGAN', icon: <MapPin size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+
+    // GRUP 3: GUDANG & FINANSIAL
+    { id: 'inventory', label: 'Daily Inventory & Waste', shortLabel: 'Gudang', group: '3. GUDANG & FINANSIAL', icon: <Package size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'INVENTORY'] },
+    { id: 'order-tracking', label: 'Termin & Tagihan Kontrak', shortLabel: 'Tagihan', group: '3. GUDANG & FINANSIAL', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'cashflow', label: 'Arus Kas & Revenue', shortLabel: 'Cashflow', group: '3. GUDANG & FINANSIAL', icon: <SlidersHorizontal size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'performa', label: 'Target & Performa Mkt', shortLabel: 'Performa', group: '3. GUDANG & FINANSIAL', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+
+    // GRUP 4: PENGATURAN & SISTEM
+    { id: 'templates', label: 'Template & Kop Surat', shortLabel: 'Template', group: '4. PENGATURAN & SISTEM', icon: <Palette size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'approval', label: 'Manajemen User & Role', shortLabel: 'Users', group: '4. PENGATURAN & SISTEM', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'risk-config', label: 'Aturan Skor Risiko', shortLabel: 'Risiko', group: '4. PENGATURAN & SISTEM', icon: <Settings2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'audit', label: 'Log Audit Sistem', shortLabel: 'Audit', group: '4. PENGATURAN & SISTEM', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'profile', label: 'Profil & Keamanan', shortLabel: 'Profil', group: '4. PENGATURAN & SISTEM', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING', 'INVENTORY'] },
   ];
   const sidebarItems = ALL_ITEMS.filter(i => user && i.roles.includes(user.role));
+  const currentTabMeta = sidebarItems.find(i => i.id === activeTab) ?? sidebarItems[0];
 
-  const dynamicIslandItems = (
-    isAdmin ? [
-      { id: 'dashboard', label: 'Ikhtisar', icon: ShieldCheck },
-      { id: 'projects', label: 'SPK', icon: Briefcase },
-      { id: 'reports', label: 'Laporan', icon: CheckCircle2 },
-      { id: 'inventory', label: 'Gudang', icon: Package },
-    ] : user?.role === 'MARKETING' ? [
-      { id: 'quotation', label: 'Penawaran', icon: FileText },
-      { id: 'kontrol-rayap', label: 'Garansi', icon: AlertTriangle },
-    ] : [
-      { id: 'inventory', label: 'Gudang', icon: Package },
-    ]
-  );
+  // Tab di dalam grup yang sama untuk ditampilkan sebagai Top Capsule Sub-Tab & Floating Bottom Pill ala Barventis
+  // Catatan: halaman `quotation` dan `inventory` sudah memiliki internal sub-tab & floating bottom sendiri.
+  const hasInternalSubTabs = activeTab === 'quotation' || activeTab === 'inventory';
+  const currentGroupTabs = useMemo(() => {
+    if (!currentTabMeta) return [];
+    return sidebarItems
+      .filter(i => i.group === currentTabMeta.group)
+      .map(i => ({
+        id: i.id,
+        label: i.label,
+        shortLabel: i.shortLabel,
+        icon: i.icon,
+        badge: i.badge,
+        badgeTone: i.danger ? ('danger' as const) : ('default' as const),
+      }));
+  }, [sidebarItems, currentTabMeta]);
+
+  const handleHeaderRefresh = useCallback(() => {
+    if (activeTab === 'projects') { void loadProjects(); return; }
+    if (activeTab === 'reports' || activeTab === 'anomalies' || activeTab === 'dashboard') { void loadReports(); return; }
+    window.location.reload();
+  }, [activeTab, loadProjects, loadReports]);
 
   return (
     <AppLayout
         sidebarItems={sidebarItems}
         activeTab={activeTab}
         onTabChange={(id) => setActiveTab(id as Tab)}
-        header={<Header currentUser={user!} onLogout={logout} onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} mobileMenuOpen={mobileMenuOpen} />}
-        dynamicIslandItems={dynamicIslandItems}
+        isSidebarOpen={mobileMenuOpen}
+        onSidebarOpenChange={setMobileMenuOpen}
+        header={
+          <Header
+            currentUser={user!}
+            onLogout={logout}
+            onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            mobileMenuOpen={mobileMenuOpen}
+            pageTitle={currentTabMeta?.label ?? 'PT Guci Emas Pratama'}
+            onRefresh={handleHeaderRefresh}
+          />
+        }
+        dynamicIslandItems={[]}
         sidebarHeader={
             <div>
-                <h2 className="text-sm font-bold tracking-tight text-slate-800 leading-tight mb-1">
-                  Monitoring Presensi &amp;<br/>Audit Lapangan
+                <h2 className="text-xs font-extrabold tracking-tight text-slate-800 leading-tight mb-0.5 uppercase">
+                  Navigasi Modul &amp; QA
                 </h2>
-                <p className="text-[10px] text-slate-500">
-                  {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                <p className="text-[11px] text-slate-500">
+                  {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
                 </p>
                 {isSuper && <CompanyPicker />}
             </div>
         }
     >
       <div className="p-4 sm:p-6 space-y-5 max-w-6xl w-full mx-auto">
+          {!hasInternalSubTabs && currentGroupTabs.length > 1 && (
+            <TabContainer
+              tabs={currentGroupTabs}
+              activeTab={activeTab}
+              onChange={(id) => setActiveTab(id as Tab)}
+              showFloatingBottom={true}
+            />
+          )}
           {isSuper && !activeCompanyId && (
             <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
               Pilih perusahaan yang akan dikelola pada menu di sidebar untuk mulai melihat data dan mengatur template.
@@ -1195,10 +1232,9 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             {activeTab === 'inventory' && (
-                <div className="clean-card p-4">
-                  <h3 className="font-bold text-lg mb-4">Modul Inventori & Gudang</h3>
-                  <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat InventoryPage...</div>}><InventoryPage /></Suspense>
-                </div>
+                <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--text-muted)] animate-pulse">Memuat Daily Inventory &amp; Waste...</div>}>
+                  <InventoryPage />
+                </Suspense>
             )}
 
             {activeTab === 'kontrol-rayap' && (

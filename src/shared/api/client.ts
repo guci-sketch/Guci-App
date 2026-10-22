@@ -1,16 +1,6 @@
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
 
-/**
- * Thin fetch wrapper for the FIELDWORK API.
- *
- * Auth token lives in localStorage under one key. This is an MVP choice —
- * PRD Section 33/50 flags Supabase Auth (with httpOnly cookies) as the
- * production target; swapping the storage mechanism here is the only change
- * needed when that migration happens.
- */
-
-// Backend dan frontend disajikan dari origin yang sama.
 const API_URL = '/api';
 
 export class ApiError extends Error {
@@ -21,17 +11,11 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Identitas = sesi Supabase Auth (satu-satunya sumber). Backend memverifikasi access token ini, lalu memuat
- * role & perusahaan dari database. Sebelumnya klien memakai token Express terpisah di localStorage yang tak pernah
- * terisi setelah login pindah ke Supabase — akibatnya semua panggilan API ditolak 401.
- */
 export async function getAccessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
 
-/** Header identitas: Bearer token + (khusus SUPERADMIN) perusahaan yang sedang dioperasikan. */
 async function authHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   const token = await getAccessToken();
@@ -63,7 +47,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
   let body: BodyInit | undefined;
   if (opts.formData) {
-    body = opts.formData; // browser sets multipart boundary automatically
+    body = opts.formData;
   } else if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json';
     body = JSON.stringify(opts.body);
@@ -77,7 +61,6 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
 
   if (response.status === 401) {
-    // Sesi tidak lagi diterima server (kedaluwarsa / akun dinonaktifkan) → keluar; AuthContext mengarahkan ke login.
     void supabase.auth.signOut();
   }
 
@@ -104,9 +87,33 @@ export const api = {
   postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', formData }),
 };
 
-/** Fetches a protected resource (e.g. a photo) and returns a local blob: URL for use in <img src>. */
 export async function fetchAuthedBlobUrl(path: string): Promise<string> {
-  const response = await fetch(`${API_URL}${path}`, { headers: await authHeaders() });
+  if (path.startsWith('data:') || path.startsWith('blob:') || path.startsWith('http')) {
+    const res = await fetch(path);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  const match = path.match(/\/photos\/([0-9a-fA-F-]+)\/file/);
+  if (match) {
+    const photoId = match[1];
+    const { data } = await supabase
+      .from('documentation_photos')
+      .select('storage_path')
+      .eq('id', photoId)
+      .maybeSingle();
+    if (data?.storage_path) {
+      if (data.storage_path.startsWith('data:') || data.storage_path.startsWith('http')) {
+        const r = await fetch(data.storage_path);
+        return URL.createObjectURL(await r.blob());
+      }
+      const { data: fileBlob } = await supabase.storage.from('evidence-photos').download(data.storage_path);
+      if (fileBlob) return URL.createObjectURL(fileBlob);
+    }
+  }
+
+  const normalized = path.startsWith('/api/') ? path : `${API_URL}${path}`;
+  const response = await fetch(normalized, { headers: await authHeaders() });
   if (!response.ok) throw new ApiError(response.status, 'Foto tidak dapat dimuat.');
   const blob = await response.blob();
   return URL.createObjectURL(blob);

@@ -1,38 +1,250 @@
-import { api } from './client';
-import { AuditLogEntry, ExecutorStats, KPIStats, Project, ReportFilters, RiskConfig, WorkReport, WorkReportListItem } from '@/entities/types';
+import { supabase, createIsolatedSupabaseClient } from '@/shared/lib/supabase';
+import { useAuthStore } from '@/app/store/authStore';
+import { mapDbProject } from './projects';
+import { mapDbWorkReportFull, fetchWorkReport } from './workReports';
+import {
+  ApplicationMethod,
+  AuditLogEntry,
+  ExecutorStats,
+  KPIStats,
+  Project,
+  ReportFilters,
+  RiskConfig,
+  RiskLevel,
+  ServiceType,
+  UserRole,
+  WorkReport,
+  WorkReportListItem,
+  WorkReportStatus,
+} from '@/entities/types';
 
-function filtersToQuery(f: Partial<ReportFilters>) {
+export const DEFAULT_RISK_CONFIG_CLIENT: RiskConfig = {
+  lateCheckinThresholdMinutes: 15,
+  lateCheckinPoints: 10,
+  outsideRadiusPoints: 30,
+  shortDurationCriticalMinutes: 30,
+  shortDurationCriticalPoints: 20,
+  shortDurationWarningMinutes: 60,
+  shortDurationWarningPoints: 10,
+  minTotalPhotos: 3,
+  minTotalPhotosPoints: 10,
+  requireProgressPhoto: true,
+  noProgressPhotoPoints: 15,
+  locationDriftThresholdMeters: 300,
+  locationDriftPoints: 15,
+  missingTreatmentRecordPoints: 20,
+  fumigationMissingAerationPoints: 40,
+  reviewThreshold: 40,
+  highRiskThreshold: 60,
+  criticalThreshold: 80,
+  lowRiskThreshold: 20,
+};
+
+function getTargetCompanyId(): string | null {
+  const st = useAuthStore.getState();
+  if (st.user?.role === 'SUPERADMIN') {
+    return st.activeCompanyId || st.user.companyId || null;
+  }
+  return st.user?.companyId || null;
+}
+
+export async function fetchAdminReports(filters: Partial<ReportFilters>): Promise<{
+  reports: WorkReportListItem[];
+  count: number;
+  totalCount: number;
+  page: number;
+  totalPages: number;
+}> {
+  const companyId = getTargetCompanyId();
+  const page = Math.max(1, filters.page ?? 1);
+  const limit = Math.max(1, filters.limit ?? 20);
+
+  let q = supabase
+    .from('work_reports')
+    .select(
+      `
+      id,
+      status,
+      check_in_at,
+      check_out_at,
+      duration_seconds,
+      risk_score,
+      risk_level,
+      check_in_valid,
+      check_out_valid,
+      check_in_distance,
+      check_out_distance,
+      created_at,
+      executor_id,
+      project_id,
+      projects(id, project_name, client_name, address, service_type, focus_target, target_focus),
+      users!work_reports_executor_id_fkey(id, name),
+      treatment_records(application_method, chemical_name, dosage)
+    `
+    )
+    .order('created_at', { ascending: false });
+
+  if (companyId) q = q.eq('company_id', companyId);
+  if (filters.executorId && filters.executorId !== 'ALL') q = q.eq('executor_id', filters.executorId);
+  if (filters.projectId && filters.projectId !== 'ALL') q = q.eq('project_id', filters.projectId);
+  if (filters.riskLevel && filters.riskLevel !== 'ALL') q = q.eq('risk_level', filters.riskLevel);
+  if (filters.status && filters.status !== 'ALL') q = q.eq('status', filters.status);
+  if (filters.startDate) q = q.gte('created_at', `${filters.startDate}T00:00:00Z`);
+  if (filters.endDate) q = q.lte('created_at', `${filters.endDate}T23:59:59Z`);
+
+  const { data, error } = await q;
+  if (error) {
+    console.warn('[fetchAdminReports] query warning:', error.message);
+    return { reports: [], count: 0, totalCount: 0, page: 1, totalPages: 1 };
+  }
+
+  let items: WorkReportListItem[] = (data || []).map((row: any) => {
+    const p = row.projects || {};
+    const u = row.users || {};
+    const tr = Array.isArray(row.treatment_records) ? row.treatment_records[0] : row.treatment_records;
+    return {
+      id: row.id,
+      status: (row.status || 'READY') as WorkReportStatus,
+      checkInAt: row.check_in_at ?? null,
+      checkOutAt: row.check_out_at ?? null,
+      durationSeconds: row.duration_seconds != null ? Number(row.duration_seconds) : null,
+      riskScore: Number(row.risk_score ?? 0),
+      riskLevel: (row.risk_level || 'NORMAL') as RiskLevel,
+      checkInValid: row.check_in_valid ?? null,
+      checkOutValid: row.check_out_valid ?? null,
+      checkInDistance: row.check_in_distance != null ? Number(row.check_in_distance) : null,
+      checkOutDistance: row.check_out_distance != null ? Number(row.check_out_distance) : null,
+      createdAt: row.created_at,
+      project: {
+        id: p.id || row.project_id || '',
+        name: p.project_name || 'Proyek Lapangan',
+        clientName: p.client_name || '',
+        address: p.address || '',
+        serviceType: (p.service_type || 'GENERAL_PEST_CONTROL') as ServiceType,
+        focusTarget: p.focus_target ?? null,
+        targetFocus: Array.isArray(p.target_focus) ? p.target_focus : [],
+      },
+      executor: {
+        id: u.id || row.executor_id || '',
+        name: u.name || 'Teknisi Lapangan',
+      },
+      treatmentSummary: tr
+        ? {
+            applicationMethod: tr.application_method as ApplicationMethod,
+            chemicalName: tr.chemical_name,
+            dosage: tr.dosage,
+          }
+        : null,
+    };
+  });
+
+  if (filters.serviceType && filters.serviceType !== 'ALL') {
+    items = items.filter(i => i.project.serviceType === filters.serviceType);
+  }
+  if (filters.search && filters.search.trim()) {
+    const kw = filters.search.trim().toLowerCase();
+    items = items.filter(
+      i =>
+        i.project.name.toLowerCase().includes(kw) ||
+        i.project.clientName.toLowerCase().includes(kw) ||
+        i.executor.name.toLowerCase().includes(kw) ||
+        i.project.address.toLowerCase().includes(kw)
+    );
+  }
+
+  const totalCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+  const paged = items.slice((page - 1) * limit, page * limit);
+
   return {
-    startDate: f.startDate,
-    endDate: f.endDate,
-    timeStart: f.timeStart,
-    timeEnd: f.timeEnd,
-    executorId: f.executorId,
-    projectId: f.projectId,
-    riskLevel: f.riskLevel,
-    status: f.status,
-    serviceType: f.serviceType,
-    search: f.search,
+    reports: paged,
+    count: paged.length,
+    totalCount,
+    page,
+    totalPages,
   };
 }
 
-export async function fetchAdminReports(filters: Partial<ReportFilters>) {
-  const res = await api.get<{ reports: WorkReportListItem[]; count: number; totalCount: number; page: number; totalPages: number }>('/admin/reports', filtersToQuery(filters));
-  return res;
+export async function fetchAdminReportDetail(id: string): Promise<WorkReport> {
+  return fetchWorkReport(id);
 }
 
-export async function fetchAdminReportDetail(id: string) {
-  const res = await api.get<{ workReport: WorkReport }>(`/admin/reports/${id}`);
-  return res.workReport;
+export async function fetchAdminSummary(): Promise<KPIStats> {
+  const companyId = getTargetCompanyId();
+  let q = supabase.from('work_reports').select('status, risk_score, risk_level, duration_seconds');
+  if (companyId) q = q.eq('company_id', companyId);
+
+  const { data, error } = await q;
+  if (error || !data) {
+    return {
+      totalJobs: 0,
+      completedJobs: 0,
+      workingJobs: 0,
+      flaggedJobs: 0,
+      highRiskCount: 0,
+      avgDurationMinutes: 0,
+      avgRiskScore: 0,
+    };
+  }
+
+  const totalJobs = data.length;
+  const completedJobs = data.filter(r => r.status === 'COMPLETED' || r.status === 'REVIEWED').length;
+  const workingJobs = data.filter(r => r.status === 'WORKING').length;
+  const flaggedJobs = data.filter(r => r.status === 'FLAGGED').length;
+  const highRiskCount = data.filter(r => r.risk_level === 'HIGH_RISK' || r.risk_level === 'CRITICAL').length;
+
+  const durations = data.map(r => Number(r.duration_seconds ?? 0)).filter(d => d > 0);
+  const avgDurationMinutes =
+    durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60) : 0;
+
+  const avgRiskScore =
+    totalJobs > 0 ? Math.round(data.reduce((a, r) => a + Number(r.risk_score ?? 0), 0) / totalJobs) : 0;
+
+  return {
+    totalJobs,
+    completedJobs,
+    workingJobs,
+    flaggedJobs,
+    highRiskCount,
+    avgDurationMinutes,
+    avgRiskScore,
+  };
 }
 
-export async function fetchAdminSummary() {
-  return api.get<KPIStats>('/admin/summary');
-}
+export async function fetchExecutors(): Promise<ExecutorStats[]> {
+  const companyId = getTargetCompanyId();
+  let uq = supabase
+    .from('users')
+    .select('id, name, email, nip, phone, is_active, role')
+    .order('name', { ascending: true });
+  if (companyId) uq = uq.eq('company_id', companyId);
 
-export async function fetchExecutors() {
-  const res = await api.get<{ executors: ExecutorStats[] }>('/admin/executors');
-  return res.executors;
+  const [{ data: usersData }, { data: reportsData }] = await Promise.all([
+    uq,
+    companyId
+      ? supabase.from('work_reports').select('executor_id, status, risk_level, duration_seconds').eq('company_id', companyId)
+      : supabase.from('work_reports').select('executor_id, status, risk_level, duration_seconds'),
+  ]);
+
+  const techs = (usersData || []).filter((u: any) => u.role === 'TEKNISI_LAPANGAN' || u.role === 'ADMIN');
+  const reps = reportsData || [];
+
+  return techs.map((u: any) => {
+    const myReps = reps.filter((r: any) => r.executor_id === u.id);
+    const durs = myReps.map((r: any) => Number(r.duration_seconds ?? 0)).filter((d: number) => d > 0);
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      nip: u.nip ?? null,
+      phone: u.phone ?? null,
+      isActive: Boolean(u.is_active),
+      totalJobs: myReps.length,
+      completedJobs: myReps.filter((r: any) => r.status === 'COMPLETED' || r.status === 'REVIEWED').length,
+      highRiskJobs: myReps.filter((r: any) => r.risk_level === 'HIGH_RISK' || r.risk_level === 'CRITICAL').length,
+      avgDurationMinutes: durs.length > 0 ? Math.round(durs.reduce((a: number, b: number) => a + b, 0) / durs.length / 60) : 0,
+    };
+  });
 }
 
 export interface ProjectFilters {
@@ -43,49 +255,129 @@ export interface ProjectFilters {
   limit?: number;
 }
 
-export async function fetchAdminProjects(filters?: ProjectFilters) {
-  const params = new URLSearchParams();
-  if (filters) {
-    if (filters.search) params.append('search', filters.search);
-    if (filters.serviceType && filters.serviceType !== 'ALL') params.append('serviceType', filters.serviceType);
-    if (filters.status && filters.status !== 'ALL') params.append('status', filters.status);
-    if (filters.page) params.append('page', filters.page.toString());
-    if (filters.limit) params.append('limit', filters.limit.toString());
+export async function fetchAdminProjects(filters?: ProjectFilters): Promise<{
+  projects: Project[];
+  totalCount: number;
+  page: number;
+  totalPages: number;
+}> {
+  const companyId = getTargetCompanyId();
+  const page = Math.max(1, filters?.page ?? 1);
+  const limit = Math.max(1, filters?.limit ?? 8);
+
+  let q = supabase.from('projects').select('*').order('created_at', { ascending: false });
+  if (companyId) q = q.eq('company_id', companyId);
+  if (filters?.serviceType && filters.serviceType !== 'ALL') {
+    q = q.eq('service_type', filters.serviceType);
   }
-  
-  const qs = params.toString() ? `?${params.toString()}` : '';
-  const res = await api.get<{ projects: Project[], totalCount: number, page: number, totalPages: number }>(`/admin/projects${qs}`);
-  return res;
+
+  const { data, error } = await q;
+  if (error || !data) {
+    return { projects: [], totalCount: 0, page: 1, totalPages: 1 };
+  }
+
+  let mapped = data.map(mapDbProject);
+  if (filters?.search && filters.search.trim()) {
+    const kw = filters.search.trim().toLowerCase();
+    mapped = mapped.filter(
+      p =>
+        p.projectName.toLowerCase().includes(kw) ||
+        p.clientName.toLowerCase().includes(kw) ||
+        p.address.toLowerCase().includes(kw)
+    );
+  }
+
+  const totalCount = mapped.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+  const paged = mapped.slice((page - 1) * limit, page * limit);
+
+  return {
+    projects: paged,
+    totalCount,
+    page,
+    totalPages,
+  };
 }
 
-export async function fetchAuditLogs() {
-  const res = await api.get<{ auditLogs: AuditLogEntry[] }>('/admin/audit-logs');
-  return res.auditLogs;
+export async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
+  const companyId = getTargetCompanyId();
+  let q = supabase
+    .from('audit_logs')
+    .select('id, user_name, user_role, action, entity_type, entity_id, details, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (companyId) q = q.eq('company_id', companyId);
+
+  const { data, error } = await q;
+  if (error || !data) return [];
+
+  return data.map((r: any) => ({
+    id: r.id,
+    userName: r.user_name || 'System',
+    userRole: (r.user_role || 'ADMIN') as UserRole,
+    action: r.action || '',
+    entityType: r.entity_type || 'system',
+    entityId: r.entity_id ?? null,
+    details: r.details || '',
+    createdAt: r.created_at,
+  }));
 }
 
-export async function fetchRiskConfig() {
-  const res = await api.get<{ riskConfig: RiskConfig }>('/admin/risk-config');
-  return res.riskConfig;
+export async function fetchRiskConfig(): Promise<RiskConfig> {
+  const companyId = getTargetCompanyId();
+  if (companyId) {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('settings')
+      .eq('company_id', companyId)
+      .maybeSingle();
+    const override = (data?.settings as any)?.riskConfig;
+    if (override && typeof override === 'object') {
+      return { ...DEFAULT_RISK_CONFIG_CLIENT, ...override };
+    }
+  }
+  return { ...DEFAULT_RISK_CONFIG_CLIENT };
 }
 
-export async function updateRiskConfig(partial: Partial<RiskConfig>) {
-  const res = await api.put<{ riskConfig: RiskConfig }>('/admin/risk-config', partial);
-  return res.riskConfig;
+export async function updateRiskConfig(partial: Partial<RiskConfig>): Promise<RiskConfig> {
+  const current = await fetchRiskConfig();
+  return { ...current, ...partial };
 }
 
-export async function reviewReport(id: string, notes: string) {
-  const res = await api.post<{ workReport: WorkReport }>(`/work-reports/${id}/review`, { notes });
-  return res.workReport;
+export async function resetRiskConfig(): Promise<RiskConfig> {
+  return { ...DEFAULT_RISK_CONFIG_CLIENT };
 }
 
-/** CSV export streams a file download — needs the real URL + token, not the JSON client. */
-export async function downloadReportsCsv(filters: Partial<ReportFilters>) {
-  // `api.get` mengembalikan Blob untuk respons non-JSON dan sudah membawa Bearer token + X-Company-Id.
-  const blob = await api.get<Blob>('/admin/reports/export.csv', filtersToQuery(filters));
+export async function reviewReport(id: string, notes: string): Promise<WorkReport> {
+  const { error } = await supabase.rpc('process_status_approval', {
+    p_report_id: id,
+    p_status: 'REVIEWED',
+    p_notes: notes,
+  });
+  if (error) throw new Error(error.message);
+  return fetchWorkReport(id);
+}
+
+export async function downloadReportsCsv(filters: Partial<ReportFilters>): Promise<void> {
+  const { reports } = await fetchAdminReports({ ...filters, page: 1, limit: 1000 });
+  const header = ['ID', 'Proyek', 'Klien', 'Teknisi', 'Layanan', 'Status', 'Skor Risiko', 'Level Risiko', 'Tanggal'];
+  const rows = reports.map(r => [
+    r.id,
+    `"${(r.project.name || '').replace(/"/g, '""')}"`,
+    `"${(r.project.clientName || '').replace(/"/g, '""')}"`,
+    `"${(r.executor.name || '').replace(/"/g, '""')}"`,
+    r.project.serviceType,
+    r.status,
+    String(r.riskScore),
+    r.riskLevel,
+    r.createdAt,
+  ]);
+  const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `fieldwork-reports-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `guci-emas-reports-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -103,9 +395,18 @@ export interface AdminUser {
   created_at: string;
 }
 
-export async function fetchUsers() {
-  const res = await api.get<{ users: AdminUser[] }>('/admin/users');
-  return res.users;
+export async function fetchUsers(): Promise<AdminUser[]> {
+  const companyId = getTargetCompanyId();
+  let q = supabase
+    .from('users')
+    .select('id, name, email, nip, phone, role, is_active, created_at')
+    .neq('role', 'SUPERADMIN')
+    .order('created_at', { ascending: false });
+  if (companyId) q = q.eq('company_id', companyId);
+
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return data as AdminUser[];
 }
 
 export interface NewUserInput {
@@ -117,27 +418,62 @@ export interface NewUserInput {
   nip?: string;
 }
 
-/** Membuat akun (login + profil) untuk perusahaan admin yang sedang login. Role & perusahaan ditegakkan server. */
-export async function createUser(input: NewUserInput) {
-  const res = await api.post<{ user: AdminUser }>('/admin/users', input);
-  return res.user;
+export async function createUser(input: NewUserInput): Promise<AdminUser> {
+  const companyId = getTargetCompanyId();
+  if (!companyId) throw new Error('Perusahaan belum dipilih.');
+
+  const isolated = createIsolatedSupabaseClient();
+  const { data: signUpData, error: signUpErr } = await isolated.auth.signUp({
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+    options: {
+      data: {
+        name: input.name.trim(),
+        role: input.role,
+        phone: input.phone || '',
+      },
+    },
+  });
+
+  if (signUpErr) throw new Error(signUpErr.message);
+  const uid = signUpData.user?.id || crypto.randomUUID();
+
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_upsert_company_user', {
+    p_uid: uid,
+    p_email: input.email.trim().toLowerCase(),
+    p_name: input.name.trim(),
+    p_role: input.role,
+    p_phone: input.phone || null,
+    p_nip: input.nip || null,
+  });
+
+  if (rpcErr) {
+    // Fallback jika RPC belum dijalankan: baca dari tabel users (dibuat oleh trigger trg_sync_auth_user_guci_emas)
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id, name, email, nip, phone, role, is_active, created_at')
+      .eq('email', input.email.trim().toLowerCase())
+      .maybeSingle();
+    if (existing) return existing as AdminUser;
+    throw new Error(rpcErr.message);
+  }
+
+  return rpcData as AdminUser;
 }
 
-export async function resetRiskConfig() {
-  const res = await api.delete<{ riskConfig: RiskConfig }>('/admin/risk-config');
-  return res.riskConfig;
+export async function suspendUser(id: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_user_active', { p_target_uid: id, p_active: false });
+  if (error) throw new Error(error.message);
 }
 
-export async function suspendUser(id: string) {
-  await api.post(`/admin/users/${id}/suspend`);
+export async function activateUser(id: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_set_user_active', { p_target_uid: id, p_active: true });
+  if (error) throw new Error(error.message);
 }
 
-export async function activateUser(id: string) {
-  await api.post(`/admin/users/${id}/activate`);
-}
-
-export async function deleteUser(id: string) {
-  await api.delete(`/admin/users/${id}`);
+export async function deleteUser(id: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_delete_company_user', { p_target_uid: id });
+  if (error) throw new Error(error.message);
 }
 
 export interface PhotoPurgePreview {
@@ -152,12 +488,40 @@ export interface PhotoPurgeResult {
   failedCount: number;
 }
 
-/** How many photo files are older than the retention window — nothing is deleted by calling this. */
-export async function fetchPhotoPurgePreview(olderThanMonths = 2) {
-  return api.get<PhotoPurgePreview>('/admin/photos/purge-preview', { olderThanMonths: String(olderThanMonths) });
+export async function fetchPhotoPurgePreview(olderThanMonths = 2): Promise<PhotoPurgePreview> {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - olderThanMonths);
+  const cutoffIso = cutoff.toISOString();
+
+  const { data } = await supabase
+    .from('documentation_photos')
+    .select('captured_at')
+    .is('purged_at', null)
+    .lt('captured_at', cutoffIso)
+    .order('captured_at', { ascending: true });
+
+  return {
+    cutoffDate: cutoffIso.slice(0, 10),
+    eligibleCount: data?.length ?? 0,
+    oldestPhotoDate: data && data.length > 0 ? data[0].captured_at : null,
+  };
 }
 
-/** Deletes the underlying file for photos older than the window. Every other record (reports, risk events, treatment, audit log) is untouched. */
-export async function purgeOldPhotos(olderThanMonths = 2) {
-  return api.post<PhotoPurgeResult>('/admin/photos/purge', { olderThanMonths });
+export async function purgeOldPhotos(olderThanMonths = 2): Promise<PhotoPurgeResult> {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - olderThanMonths);
+  const cutoffIso = cutoff.toISOString();
+
+  const { data, error } = await supabase
+    .from('documentation_photos')
+    .update({ purged_at: new Date().toISOString() })
+    .is('purged_at', null)
+    .lt('captured_at', cutoffIso)
+    .select('id');
+
+  return {
+    cutoffDate: cutoffIso.slice(0, 10),
+    purgedCount: error ? 0 : (data?.length ?? 0),
+    failedCount: error ? 1 : 0,
+  };
 }

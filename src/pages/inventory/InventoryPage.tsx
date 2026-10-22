@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Package, FileText, Search, Plus, Download, UploadCloud, ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle } from "lucide-react";
+import { Package, FileText, Search, Plus, Download, UploadCloud, ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle, ClipboardList, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuthStore } from '@/app/store/authStore';
 import {
     getInventoryItems, getInventoryLogs, processInventoryRPC, createInventoryItem,
 } from '@/shared/api/inventoryService';
 import type { InventoryItem, InventoryLog } from '@/shared/api/inventoryService';
+import { TabContainer } from '@/shared/ui/TabContainer';
 
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
@@ -13,6 +14,7 @@ const fmt = (n: number) => n.toLocaleString("id-ID", { maximumFractionDigits: 3 
 const monthStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 type Mutation = { item: InventoryItem; type: "IN" | "OUT" } | null;
+type InvTab = "stok" | "rekap" | "log" | "alert";
 
 export function InventoryPage() {
     const user = useAuthStore(s => s.user);
@@ -20,8 +22,9 @@ export function InventoryPage() {
     const companyId = user?.role === "SUPERADMIN" ? activeCompanyId : user?.companyId ?? null;
     const canWrite = user?.role === "ADMIN" || user?.role === "INVENTORY" || user?.role === "SUPERADMIN";
 
-    const [tab, setTab] = useState<"stok" | "log" | "rekap">("stok");
+    const [tab, setTab] = useState<InvTab>("stok");
     const [searchQ, setSearchQ] = useState("");
+    const [kategoriFilter, setKategoriFilter] = useState("ALL");
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [logs, setLogs] = useState<InventoryLog[]>([]);
     const [recapLogs, setRecapLogs] = useState<InventoryLog[]>([]);
@@ -50,7 +53,6 @@ export function InventoryPage() {
     }, [companyId]);
     useEffect(() => { void reload(); }, [reload]);
 
-    // Rekap bulanan: ambil log bulan terpilih (tanggal WIB dari kolom `tanggal`).
     useEffect(() => {
         if (tab !== "rekap" || !companyId) return;
         const [y, m] = month.split("-").map(Number);
@@ -140,68 +142,194 @@ export function InventoryPage() {
         return <div className="p-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl m-4">Pilih perusahaan pada menu di sidebar untuk melihat gudang.</div>;
     }
 
-    const filtered = items.filter(s => s.nama.toLowerCase().includes(searchQ.toLowerCase()));
-    const tabBtn = (id: typeof tab, label: string, icon?: React.ReactNode) => (
-        <button onClick={() => setTab(id)} className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${tab === id ? "bg-slate-100 text-slate-800" : "text-slate-500 hover:text-slate-700"}`}>
-            {icon}{label}
-        </button>
-    );
+    const categories = useMemo(() => {
+        const set = new Set<string>();
+        items.forEach(i => { if (i.kategori) set.add(i.kategori); });
+        return Array.from(set);
+    }, [items]);
+
+    const lowStockItems = useMemo(() => items.filter(s => s.stok <= s.minAlert), [items]);
+
+    const filtered = useMemo(() => {
+        let base = tab === "alert" ? lowStockItems : items;
+        if (kategoriFilter !== "ALL") base = base.filter(s => s.kategori === kategoriFilter);
+        if (searchQ.trim()) base = base.filter(s => s.nama.toLowerCase().includes(searchQ.toLowerCase()));
+        return base;
+    }, [items, lowStockItems, tab, kategoriFilter, searchQ]);
+
+    const invTabs = [
+        { id: "stok",  label: "Semua Bahan",       shortLabel: "Semua",      icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "rekap", label: "Rekap Pemakaian",   shortLabel: "Rekap",      icon: <FileText size={15} /> },
+        { id: "log",   label: "Catatan Mutasi",    shortLabel: "Mutasi",     icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "alert", label: "Pantau Stok Minim", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+    ];
 
     return (
-        <div className="p-4 md:p-6 max-w-screen-xl mx-auto space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-4">
+            {/* Barventis Top Capsule Sub-Tab Bar + Synchronized Bottom Floating Pill */}
+            <TabContainer
+                tabs={invTabs}
+                activeTab={tab}
+                onChange={(id) => setTab(id as InvTab)}
+                showFloatingBottom={true}
+            />
+
+            {/* Barventis Section Header & Action Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Package size={20} className="text-blue-600" /> Inventori & Gudang</h1>
-                    <p className="text-sm text-slate-500 mt-0.5">Kelola stok chemical, alat, dan pantau log pemakaian.</p>
+                    <h2 className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] tracking-tight">
+                        Daily Inventory &amp; Stok Obat Chemical
+                    </h2>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                        Kelola stok termitisida, insektisida PCO, peralatan lapangan, dan pantau mutasi keluar/masuk.
+                    </p>
                 </div>
-                {tab === "stok" && canWrite && (
-                    <div className="flex items-center gap-2">
-                        <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"><Download size={13} /> Template</button>
-                        <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-                            {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import
-                            <input type="file" accept=".xlsx,.xls" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
-                        </label>
-                        <button onClick={() => setShowNew(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors shadow-sm"><Plus size={13} /> Item Baru</button>
+                {canWrite && (
+                    <div className="flex flex-wrap items-center gap-2 bg-[#f5f3ef] border border-[#e8e5e0] rounded-2xl p-1.5">
+                        <button
+                            onClick={() => setTab("rekap")}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white rounded-xl transition-colors"
+                        >
+                            <FileText size={14} /> Rekap Bulanan
+                        </button>
+                        <button
+                            onClick={() => setShowNew(true)}
+                            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] transition-colors shadow-xs"
+                        >
+                            <Plus size={14} /> Form Input Obat / Material
+                        </button>
                     </div>
                 )}
             </div>
 
-            {error && <div className="p-3 rounded-lg text-sm border border-red-200 bg-red-50 text-red-700">{error}</div>}
-
-            <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit">
-                {tabBtn("stok", "Stok Barang", <Package size={14} className="inline mr-1.5 -mt-0.5" />)}
-                {tabBtn("log", "Log Pemakaian", <FileText size={14} className="inline mr-1.5 -mt-0.5" />)}
-                {tabBtn("rekap", "Rekap Bulanan")}
-            </div>
+            {error && <div className="p-3 rounded-xl text-sm border border-red-200 bg-red-50 text-red-700">{error}</div>}
 
             {loading && <div className="py-10 text-center text-sm text-slate-400"><Loader2 className="inline animate-spin mr-2" size={14} />Memuat data gudang...</div>}
 
-            {!loading && tab === "stok" && (
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="p-3 border-b border-slate-200 relative">
-                        <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Cari nama barang..." className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200" />
+            {!loading && (tab === "stok" || tab === "alert") && (
+                <div className="bg-white border border-[#e8e5e0] rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs">
+                    {/* Barventis Filter & Action Row */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-700">Tanggal:</span>
+                                <span className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
+                                    {new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-700">Kategori:</span>
+                                <select
+                                    value={kategoriFilter}
+                                    onChange={e => setKategoriFilter(e.target.value)}
+                                    className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700"
+                                >
+                                    <option value="ALL">Semua Lokasi / Kategori</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {canWrite && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                                    <Download size={13} /> Export Template
+                                </button>
+                                <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
+                                    {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import Excel
+                                    <input type="file" accept=".xlsx,.xls" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
+                                </label>
+                            </div>
+                        )}
                     </div>
+
+                    {/* Search Bar Box */}
+                    <div className="bg-[#faf9f7] border border-[#e8e5e0] rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="relative flex-1">
+                            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                value={searchQ}
+                                onChange={e => setSearchQ(e.target.value)}
+                                placeholder="Cari nama chemical, kode barang, atau material..."
+                                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[var(--accent)]"
+                            />
+                        </div>
+                        <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                            Menampilkan <b>{filtered.length}</b> dari <b>{items.length}</b> material
+                        </span>
+                    </div>
+
+                    {/* Barventis Pill Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase">
-                                <th className="p-3">Nama</th><th className="p-3">Kategori</th><th className="p-3 text-right">Stok</th><th className="p-3">Satuan</th><th className="p-3 text-right">Min Alert</th>{canWrite && <th className="p-3 text-right">Mutasi</th>}
-                            </tr></thead>
+                            <thead>
+                                <tr className="bg-[#f5f3ef] text-slate-600 text-[11px] font-bold uppercase tracking-wider">
+                                    <th className="p-3 rounded-l-xl">Barang / Material</th>
+                                    <th className="p-3 text-center">Stok Saat Ini (Full)</th>
+                                    <th className="p-3 text-center">Batas Minimum</th>
+                                    <th className="p-3 text-center">Status Stok</th>
+                                    {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-50/60">Mutasi (IN / OUT)</th>}
+                                </tr>
+                            </thead>
                             <tbody>
-                                {filtered.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-400">{items.length === 0 ? "Belum ada item. Tambahkan lewat \"Item Baru\" atau Import." : "Tidak ada hasil."}</td></tr>}
+                                {filtered.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat \"Form Input Obat / Material\" atau Import." : "Tidak ada hasil yang cocok."}
+                                        </td>
+                                    </tr>
+                                )}
                                 {filtered.map(s => {
                                     const low = s.stok <= s.minAlert;
                                     return (
-                                        <tr key={s.id} className="border-t border-slate-100">
-                                            <td className="p-3 font-semibold text-slate-800">{s.nama}</td>
-                                            <td className="p-3 text-slate-500">{s.kategori}</td>
-                                            <td className={`p-3 text-right font-bold ${low ? "text-red-600" : "text-slate-800"}`}>{low && <AlertTriangle size={12} className="inline mr-1 -mt-0.5" />}{fmt(s.stok)}</td>
-                                            <td className="p-3 text-slate-500">{s.satuan}</td>
-                                            <td className="p-3 text-right text-slate-500">{fmt(s.minAlert)}</td>
-                                            {canWrite && <td className="p-3 text-right whitespace-nowrap">
-                                                <button onClick={() => setMutation({ item: s, type: "IN" })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg" title="Barang masuk"><ArrowDownCircle size={16} /></button>
-                                                <button onClick={() => setMutation({ item: s, type: "OUT" })} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg" title="Barang keluar"><ArrowUpCircle size={16} /></button>
-                                            </td>}
+                                        <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors">
+                                            <td className="p-3">
+                                                <div className="font-bold text-slate-900">{s.nama}</div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{s.kategori} • Satuan: {s.satuan}</div>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className={`inline-flex items-center justify-center min-w-[88px] px-3 py-1.5 rounded-full border text-xs font-bold ${
+                                                    low ? "border-rose-300 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-800"
+                                                }`}>
+                                                    {fmt(s.stok)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className="inline-flex items-center justify-center min-w-[76px] px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                                                    {fmt(s.minAlert)}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {low ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+                                                        <AlertTriangle size={12} /> Perlu Restock
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                        Aman
+                                                    </span>
+                                                )}
+                                            </td>
+                                            {canWrite && (
+                                                <td className="p-3 text-center whitespace-nowrap bg-emerald-50/20">
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        <button
+                                                            onClick={() => setMutation({ item: s, type: "IN" })}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full transition-colors"
+                                                            title="Catat Barang Masuk (IN)"
+                                                        >
+                                                            <ArrowDownCircle size={13} /> + IN
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setMutation({ item: s, type: "OUT" })}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full transition-colors"
+                                                            title="Catat Pemakaian Keluar (OUT)"
+                                                        >
+                                                            <ArrowUpCircle size={13} /> - OUT
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
@@ -212,10 +340,10 @@ export function InventoryPage() {
             )}
 
             {!loading && tab === "log" && (
-                <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+                <div className="bg-white border border-[#e8e5e0] rounded-2xl overflow-x-auto p-4 shadow-xs">
                     <table className="w-full text-left border-collapse text-sm">
-                        <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase">
-                            <th className="p-3">Tanggal</th><th className="p-3">Item</th><th className="p-3 text-right">Masuk</th><th className="p-3 text-right">Keluar</th><th className="p-3 text-right">Sisa</th><th className="p-3">Proyek</th><th className="p-3">Keterangan</th>
+                        <thead><tr className="bg-[#f5f3ef] text-slate-600 text-xs uppercase font-bold">
+                            <th className="p-3 rounded-l-xl">Tanggal</th><th className="p-3">Item</th><th className="p-3 text-right">Masuk (IN)</th><th className="p-3 text-right">Keluar (OUT)</th><th className="p-3 text-right">Sisa Stok</th><th className="p-3">Proyek</th><th className="p-3 rounded-r-xl">Keterangan</th>
                         </tr></thead>
                         <tbody>
                             {logs.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-400">Belum ada mutasi stok.</td></tr>}
@@ -223,11 +351,11 @@ export function InventoryPage() {
                                 <tr key={l.id} className="border-t border-slate-100">
                                     <td className="p-3 text-slate-500 whitespace-nowrap">{l.tanggal}</td>
                                     <td className="p-3 font-semibold text-slate-800">{itemName.get(l.itemId)?.nama ?? "—"}</td>
-                                    <td className="p-3 text-right text-emerald-600">{l.qtyMasuk ? `+${fmt(l.qtyMasuk)}` : ""}</td>
-                                    <td className="p-3 text-right text-orange-600">{l.qtyKeluar ? `-${fmt(l.qtyKeluar)}` : ""}</td>
+                                    <td className="p-3 text-right text-emerald-600 font-bold">{l.qtyMasuk ? `+${fmt(l.qtyMasuk)}` : "—"}</td>
+                                    <td className="p-3 text-right text-orange-600 font-bold">{l.qtyKeluar ? `-${fmt(l.qtyKeluar)}` : "—"}</td>
                                     <td className="p-3 text-right font-semibold">{fmt(l.sisaStok)}</td>
-                                    <td className="p-3 text-slate-500">{l.proyek ?? ""}</td>
-                                    <td className="p-3 text-slate-500">{l.keterangan ?? ""}</td>
+                                    <td className="p-3 text-slate-500">{l.proyek ?? "—"}</td>
+                                    <td className="p-3 text-slate-500">{l.keterangan ?? "—"}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -236,21 +364,21 @@ export function InventoryPage() {
             )}
 
             {!loading && tab === "rekap" && (
-                <div className="bg-white border border-slate-200 rounded-xl">
-                    <div className="p-3 border-b border-slate-200 flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-700">Bulan</span>
-                        <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="px-2 py-1.5 text-sm rounded-lg border border-slate-200" />
+                <div className="bg-white border border-[#e8e5e0] rounded-2xl p-4 space-y-3 shadow-xs">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700">Periode Bulan:</span>
+                        <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200" />
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead><tr className="bg-slate-50 text-slate-500 text-xs uppercase"><th className="p-3">Item</th><th className="p-3 text-right">Total Masuk</th><th className="p-3 text-right">Total Keluar</th><th className="p-3 text-right">Stok Akhir Bulan</th><th className="p-3">Satuan</th></tr></thead>
+                            <thead><tr className="bg-[#f5f3ef] text-slate-600 text-xs uppercase font-bold"><th className="p-3 rounded-l-xl">Item</th><th className="p-3 text-right">Total Masuk</th><th className="p-3 text-right">Total Keluar</th><th className="p-3 text-right">Stok Akhir Bulan</th><th className="p-3 rounded-r-xl">Satuan</th></tr></thead>
                             <tbody>
                                 {recap.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-400">Tidak ada mutasi pada bulan ini.</td></tr>}
                                 {recap.map(r => (
                                     <tr key={r.item.id} className="border-t border-slate-100">
                                         <td className="p-3 font-semibold text-slate-800">{r.item.nama}</td>
-                                        <td className="p-3 text-right text-emerald-600">{fmt(r.masuk)}</td>
-                                        <td className="p-3 text-right text-orange-600">{fmt(r.keluar)}</td>
+                                        <td className="p-3 text-right text-emerald-600 font-bold">{fmt(r.masuk)}</td>
+                                        <td className="p-3 text-right text-orange-600 font-bold">{fmt(r.keluar)}</td>
                                         <td className="p-3 text-right font-semibold">{r.akhir == null ? "—" : fmt(r.akhir)}</td>
                                         <td className="p-3 text-slate-500">{r.item.satuan}</td>
                                     </tr>
@@ -272,7 +400,7 @@ export function InventoryPage() {
                         <input autoFocus inputMode="decimal" placeholder={`Jumlah (${mutation.item.satuan})`} value={mQty} onChange={e => setMQty(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
                         {mutation.type === "OUT" && <input placeholder="Proyek / pelanggan (opsional)" value={mProyek} onChange={e => setMProyek(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />}
                         <input placeholder="Keterangan (opsional)" value={mNote} onChange={e => setMNote(e.target.value)} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
-                        <button onClick={submitMutation} disabled={busy} className="w-full py-2 text-sm font-bold rounded-lg bg-slate-800 text-white disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan"}</button>
+                        <button onClick={submitMutation} disabled={busy} className="w-full py-2 text-sm font-bold rounded-lg bg-[var(--accent)] text-white disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan Mutasi"}</button>
                     </div>
                 </div>
             )}
@@ -288,7 +416,7 @@ export function InventoryPage() {
                             <input inputMode="decimal" placeholder="Stok awal" value={newItem.stokAwal} onChange={e => setNewItem({ ...newItem, stokAwal: e.target.value })} className="px-3 py-2 text-sm rounded-lg border border-slate-300" />
                             <input inputMode="decimal" placeholder="Min alert" value={newItem.minAlert} onChange={e => setNewItem({ ...newItem, minAlert: e.target.value })} className="px-3 py-2 text-sm rounded-lg border border-slate-300" />
                         </div>
-                        <button onClick={submitNewItem} disabled={busy} className="w-full py-2 text-sm font-bold rounded-lg bg-slate-800 text-white disabled:opacity-50">{busy ? "Menyimpan..." : "Tambah Item"}</button>
+                        <button onClick={submitNewItem} disabled={busy} className="w-full py-2 text-sm font-bold rounded-lg bg-[var(--accent)] text-white disabled:opacity-50">{busy ? "Menyimpan..." : "Tambah Item"}</button>
                     </div>
                 </div>
             )}

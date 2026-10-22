@@ -1,16 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-/**
- * Klien Supabase server-side (Storage & Admin API).
- * Membaca `VITE_SUPABASE_URL` secara otomatis (dengan fallback `SUPABASE_URL` untuk kompatibilitas)
- * sehingga URL proyek tidak perlu ditulis dua kali di file `.env`.
- */
+function normalizeSupabaseUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  return raw
+    .trim()
+    .replace(/\/+(rest|auth|storage|functions)\/v1(\/.*)?$/i, '')
+    .replace(/\/+$/, '');
+}
+
 export function getSupabaseUrl(): string | undefined {
-  return process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  return normalizeSupabaseUrl(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
 }
 
 export function getSupabaseServiceRoleKey(): string | undefined {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 }
 
 export const isSupabaseStorageConfigured = Boolean(getSupabaseUrl() && getSupabaseServiceRoleKey());
@@ -33,5 +36,4 @@ export function getSupabaseClient(): SupabaseClient {
   return client;
 }
 
-/** Nama bucket standar untuk foto bukti lapangan (otomatis dibuat oleh skrip SQL database). */
 export const EVIDENCE_BUCKET = 'evidence-photos';

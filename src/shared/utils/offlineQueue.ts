@@ -6,6 +6,7 @@
  */
 import { checkIn, addProgressPhoto, checkOut, submitTreatment, EvidencePayload, TreatmentInput } from '@/shared/api/workReports';
 import { ApiError } from '@/shared/api/client';
+import { postLocation } from '@/shared/api/location';
 
 export type QueuedAction = 'CHECK_IN' | 'PROGRESS' | 'CHECK_OUT' | 'TREATMENT' | 'GPS';
 
@@ -152,7 +153,6 @@ async function runOne(item: QueuedItem): Promise<void> {
     return;
   }
   if (item.action === 'GPS') {
-    const { postLocation } = await import('../api/location');
     await postLocation({ latitude: item.latitude!, longitude: item.longitude!, accuracy: item.accuracy });
     return;
   }
