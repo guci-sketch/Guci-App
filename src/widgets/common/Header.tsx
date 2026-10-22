@@ -34,11 +34,11 @@ interface HeaderProps {
 }
 
 const ROLE_OPTIONS: { value: UserRole; label: string; short: string }[] = [
-  { value: 'ADMIN',            label: 'ADMIN — Full CMS, Negosiasi & Approve GP-APR', short: 'ADMIN' },
-  { value: 'MARKETING',        label: 'MARKETING / SURVEYOR — Buat Draft GP-DRF',      short: 'SURVEYOR' },
-  { value: 'TEKNISI_LAPANGAN', label: 'TEKNISI LAPANGAN — Eksekusi SPK & Check-In',    short: 'TEKNISI' },
-  { value: 'INVENTORY',        label: 'INVENTORY — Gudang Chemical & Pipa',            short: 'GUDANG' },
-  { value: 'SUPERADMIN',       label: 'SUPERADMIN — Multi-Cabang / Tenant',            short: 'SUPERADMIN' },
+  { value: 'ADMIN',            label: 'Admin Utama (Semua Menu)',    short: 'ADMIN' },
+  { value: 'MARKETING',        label: 'Surveyor / Marketing',        short: 'SURVEYOR' },
+  { value: 'TEKNISI_LAPANGAN', label: 'Teknisi Lapangan',            short: 'TEKNISI' },
+  { value: 'INVENTORY',        label: 'Bagian Gudang Obat',          short: 'GUDANG' },
+  { value: 'SUPERADMIN',       label: 'Super Admin (Pusat)',         short: 'SUPERADMIN' },
 ];
 
 export const Header: React.FC<HeaderProps> = ({

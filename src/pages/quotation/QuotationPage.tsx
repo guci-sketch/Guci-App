@@ -261,10 +261,10 @@ export function QuotationPage() {
     const statsDeal = quotations.filter(q => q.status === "deal").length;
 
     const hubTabs = [
-        { id: "list",      label: "Daftar & Verifikasi Quotation", shortLabel: "Semua", icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
-        ...(canCreate ? [{ id: "new", label: "+ Input Survey / Buat Draft (GP-DRF)", shortLabel: "Input Survey", icon: <Plus size={15} /> }] : []),
-        { id: "pipeline",  label: "Pipeline Status PH & Deal", shortLabel: "Pipeline", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
-        { id: "nomor-log", label: "Register Nomor (DRF & APR)", shortLabel: "Register", icon: <Hash size={15} /> },
+        { id: "list",      label: "Daftar Penawaran", shortLabel: "Semua", icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
+        ...(canCreate ? [{ id: "new", label: "+ Buat Penawaran Baru", shortLabel: "Buat Baru", icon: <Plus size={15} /> }] : []),
+        { id: "pipeline",  label: "Status Deal & Kontrak", shortLabel: "Status Deal", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
+        { id: "nomor-log", label: "Buku Nomor Surat", shortLabel: "Nomor Surat", icon: <Hash size={15} /> },
     ];
 
     if (subTab === "new") {
@@ -349,8 +349,8 @@ export function QuotationPage() {
             <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
 
             <PageHeader
-                title="Automation Quotation Hub — PT Guci Emas Pratama"
-                subtitle="Alur Terpadu: Input Hasil Survey & Volume (GP-DRF) → Negosiasi Garansi & Harga via Admin → Approval Resmi (GP-APR)"
+                title="Surat Penawaran Harga — PT Guci Emas Pratama"
+                subtitle="Buat draf penawaran dari hasil survei lapangan, sesuaikan harga atau garansi saat negosiasi, lalu setujui untuk cetak PDF resmi."
                 icon={<FileText size={20} />}
                 actions={
                     <>
@@ -366,7 +366,7 @@ export function QuotationPage() {
                                 onClick={() => setSubTab("new")}
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold shadow-xs btn-tactile"
                             >
-                                <Plus size={16} /> Input Survey / Buat Draft (GP-DRF)
+                                <Plus size={15} /> Buat Penawaran Baru
                             </button>
                         )}
                     </>
@@ -568,7 +568,7 @@ export function QuotationPage() {
                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent)] text-[11px] font-semibold cursor-pointer"
                                                         title="Lihat / Pratinjau PDF Surat Penawaran"
                                                     >
-                                                        <Eye size={13} /> PDF
+                                                        <Eye size={13} /> Lihat PDF
                                                     </button>
 
                                                     {/* Adjust Garansi / Harga / Edit Draft */}
@@ -577,7 +577,7 @@ export function QuotationPage() {
                                                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11px] font-bold"
                                                         title="Adjust Garansi (Bulan/Tahun), Volume, atau Harga"
                                                     >
-                                                        <SlidersHorizontal size={12} /> Adjust
+                                                        <SlidersHorizontal size={12} /> Ubah Harga / Garansi
                                                     </button>
 
                                                     {/* Tombol Approve Admin (Konversi GP-DRF -> GP-APR) */}
@@ -589,7 +589,7 @@ export function QuotationPage() {
                                                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold"
                                                                 title="Approve & Terbitkan Nomor GP-APR"
                                                             >
-                                                                <CheckCircle2 size={12} /> Approve
+                                                                <CheckCircle2 size={12} /> Setujui
                                                             </button>
                                                             <button
                                                                 onClick={() => setRejectTarget(q)}

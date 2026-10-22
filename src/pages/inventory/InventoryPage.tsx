@@ -158,10 +158,10 @@ export function InventoryPage() {
     }, [items, lowStockItems, tab, kategoriFilter, searchQ]);
 
     const invTabs = [
-        { id: "stok",  label: "Semua Bahan",       shortLabel: "Semua",      icon: <ClipboardList size={15} />, badge: items.length },
-        { id: "rekap", label: "Rekap Pemakaian",   shortLabel: "Rekap",      icon: <FileText size={15} /> },
-        { id: "log",   label: "Catatan Mutasi",    shortLabel: "Mutasi",     icon: <Trash2 size={15} />, badge: logs.length },
-        { id: "alert", label: "Pantau Stok Minim", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+        { id: "stok",  label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "rekap", label: "Rekap Bulanan",           shortLabel: "Rekap",      icon: <FileText size={15} /> },
+        { id: "log",   label: "Riwayat Masuk / Keluar",  shortLabel: "Riwayat",    icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "alert", label: "Stok Hampir Habis",       shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ];
 
     return (
@@ -178,10 +178,10 @@ export function InventoryPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                 <div>
                     <h2 className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] tracking-tight">
-                        Daily Inventory &amp; Stok Obat Chemical
+                        Stok Obat &amp; Alat Gudang
                     </h2>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                        Kelola stok termitisida, insektisida PCO, peralatan lapangan, dan pantau mutasi keluar/masuk.
+                        Catat obat masuk, pemakaian teknisi di lapangan, dan pantau barang yang hampir habis.
                     </p>
                 </div>
                 {canWrite && (
@@ -196,7 +196,7 @@ export function InventoryPage() {
                             onClick={() => setShowNew(true)}
                             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] transition-colors shadow-xs"
                         >
-                            <Plus size={14} /> Form Input Obat / Material
+                            <Plus size={14} /> Tambah Barang Baru
                         </button>
                     </div>
                 )}
@@ -268,14 +268,14 @@ export function InventoryPage() {
                                     <th className="p-3 text-center">Stok Saat Ini (Full)</th>
                                     <th className="p-3 text-center">Batas Minimum</th>
                                     <th className="p-3 text-center">Status Stok</th>
-                                    {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-50/60">Mutasi (IN / OUT)</th>}
+                                    {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-50/60">Catat Masuk / Pakai</th>}
                                 </tr>
                             </thead>
                             <tbody>
                                 {filtered.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="p-8 text-center text-slate-400">
-                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat \"Form Input Obat / Material\" atau Import." : "Tidak ada hasil yang cocok."}
+                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat \"Tambah Barang Baru\" atau Import." : "Tidak ada hasil yang cocok."}
                                         </td>
                                     </tr>
                                 )}
@@ -318,14 +318,14 @@ export function InventoryPage() {
                                                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full transition-colors"
                                                             title="Catat Barang Masuk (IN)"
                                                         >
-                                                            <ArrowDownCircle size={13} /> + IN
+                                                            <ArrowDownCircle size={13} /> + Masuk
                                                         </button>
                                                         <button
                                                             onClick={() => setMutation({ item: s, type: "OUT" })}
                                                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full transition-colors"
                                                             title="Catat Pemakaian Keluar (OUT)"
                                                         >
-                                                            <ArrowUpCircle size={13} /> - OUT
+                                                            <ArrowUpCircle size={13} /> - Pakai
                                                         </button>
                                                     </div>
                                                 </td>

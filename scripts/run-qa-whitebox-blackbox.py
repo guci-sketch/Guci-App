@@ -227,7 +227,7 @@ with open(os.path.join(root, "src/pages/inventory/InventoryPage.tsx"), "r", enco
 record(
     "BB-03", "Blackbox",
     "Modul Daily Inventory & Gudang Chemical (4 Sub-Tab Barventis & Mutasi IN/OUT)",
-    all(lbl in inv_src for lbl in ["Semua Bahan", "Rekap Pemakaian", "Catatan Mutasi", "Pantau Stok Minim"])
+    all(lbl in inv_src for lbl in ["Daftar Stok Obat & Alat", "Rekap Bulanan", "Riwayat Masuk / Keluar", "Stok Hampir Habis"])
     and "processInventoryRPC" in inv_src,
     "4 sub-tab Barventis, tabel kapsul stok, filter kategori, import/export Excel, dan RPC mutasi stok atomik tervalidasi."
 )
@@ -250,7 +250,7 @@ with open(os.path.join(root, "src/app/index.css"), "r", encoding="utf-8") as f:
 with open(os.path.join(root, "src/widgets/admin/AdminDashboard.tsx"), "r", encoding="utf-8") as f:
     ad_src = f.read()
 
-groups = ["1. PENAWARAN & CRM", "2. OPERASIONAL LAPANGAN", "3. GUDANG & FINANSIAL", "4. PENGATURAN & SISTEM"]
+groups = ["1. PENAWARAN & PELANGGAN", "2. PEKERJAAN LAPANGAN", "3. STOK OBAT & KEUANGAN", "4. PENGATURAN"]
 record(
     "BB-05", "Blackbox",
     "UI/UX Barventis (4 Grup Sidebar QA, Hamburger, Top Capsule, Floating Bottom Pill, Compact Font)",

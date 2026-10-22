@@ -377,34 +377,34 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
-  // Menu dikelompokkan ke 4 Kategori QA yang terstruktur agar mudah dinavigasi di Desktop, Tablet, & Mobile
+  // Menu menggunakan Bahasa Indonesia sehari-hari yang mudah dipahami oleh Admin, Surveyor, Teknisi, maupun Gudang
   const ALL_ITEMS: { id: Tab; label: string; shortLabel: string; group: string; icon: React.ReactNode; danger?: boolean; badge?: number; roles: string[] }[] = [
-    // GRUP 1: PENAWARAN & CRM (UTAMA)
-    { id: 'quotation', label: 'Automation Quotation Hub', shortLabel: 'Quotation', group: '1. PENAWARAN & CRM', icon: <FileText size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'customers', label: 'Database Pelanggan (CRM)', shortLabel: 'Pelanggan', group: '1. PENAWARAN & CRM', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'kontrol-rayap', label: 'Garansi & Kontrol Rayap', shortLabel: 'Garansi', group: '1. PENAWARAN & CRM', icon: <AlertTriangle size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'spk-cms', label: 'Manajemen SPK (Dari Deal)', shortLabel: 'SPK Deal', group: '1. PENAWARAN & CRM', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    // GRUP 1: PENAWARAN & PELANGGAN
+    { id: 'quotation', label: 'Buat & Cek Penawaran', shortLabel: 'Penawaran', group: '1. PENAWARAN & PELANGGAN', icon: <FileText size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'customers', label: 'Data Pelanggan', shortLabel: 'Pelanggan', group: '1. PENAWARAN & PELANGGAN', icon: <Users size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'kontrol-rayap', label: 'Jadwal Garansi Rayap', shortLabel: 'Garansi', group: '1. PENAWARAN & PELANGGAN', icon: <AlertTriangle size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'spk-cms', label: 'Perintah Kerja (SPK)', shortLabel: 'SPK', group: '1. PENAWARAN & PELANGGAN', icon: <Briefcase size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
 
-    // GRUP 2: OPERASIONAL LAPANGAN (FIELDWORK)
-    { id: 'dashboard', label: 'Ikhtisar Fieldwork', shortLabel: 'Ikhtisar', group: '2. OPERASIONAL LAPANGAN', icon: <ShieldCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'projects', label: 'Proyek & Geofence', shortLabel: 'Proyek', group: '2. OPERASIONAL LAPANGAN', icon: <Briefcase size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'reports', label: 'Laporan Lapangan', shortLabel: 'Laporan', group: '2. OPERASIONAL LAPANGAN', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'anomalies', label: 'Anomali & Pelanggaran', shortLabel: 'Anomali', group: '2. OPERASIONAL LAPANGAN', icon: <ShieldAlert size={18} />, danger: true, badge: kpi.flaggedJobs > 0 ? kpi.flaggedJobs : undefined, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'executors', label: 'Performa Teknisi', shortLabel: 'Teknisi', group: '2. OPERASIONAL LAPANGAN', icon: <Users size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'tracking', label: 'Peta Pelacakan GPS', shortLabel: 'GPS Live', group: '2. OPERASIONAL LAPANGAN', icon: <MapPin size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    // GRUP 2: PEKERJAAN LAPANGAN
+    { id: 'dashboard', label: 'Ringkasan Hari Ini', shortLabel: 'Ringkasan', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'projects', label: 'Lokasi & Jadwal Proyek', shortLabel: 'Proyek', group: '2. PEKERJAAN LAPANGAN', icon: <Briefcase size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'reports', label: 'Hasil Kerja Teknisi', shortLabel: 'Hasil Kerja', group: '2. PEKERJAAN LAPANGAN', icon: <CheckCircle2 size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'anomalies', label: 'Laporan Perlu Dicek', shortLabel: 'Perlu Cek', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldAlert size={16} />, danger: true, badge: kpi.flaggedJobs > 0 ? kpi.flaggedJobs : undefined, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'executors', label: 'Kinerja Teknisi', shortLabel: 'Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <Users size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'tracking', label: 'Lacak Posisi Teknisi', shortLabel: 'Peta Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <MapPin size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
 
-    // GRUP 3: GUDANG & FINANSIAL
-    { id: 'inventory', label: 'Daily Inventory & Waste', shortLabel: 'Gudang', group: '3. GUDANG & FINANSIAL', icon: <Package size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'INVENTORY'] },
-    { id: 'order-tracking', label: 'Termin & Tagihan Kontrak', shortLabel: 'Tagihan', group: '3. GUDANG & FINANSIAL', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'cashflow', label: 'Arus Kas & Revenue', shortLabel: 'Cashflow', group: '3. GUDANG & FINANSIAL', icon: <SlidersHorizontal size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'performa', label: 'Target & Performa Mkt', shortLabel: 'Performa', group: '3. GUDANG & FINANSIAL', icon: <CheckCircle2 size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    // GRUP 3: STOK OBAT & KEUANGAN
+    { id: 'inventory', label: 'Stok Obat & Alat', shortLabel: 'Stok Obat', group: '3. STOK OBAT & KEUANGAN', icon: <Package size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'INVENTORY'] },
+    { id: 'order-tracking', label: 'Tagihan & Cicilan Klien', shortLabel: 'Tagihan', group: '3. STOK OBAT & KEUANGAN', icon: <Clock size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'cashflow', label: 'Pemasukan & Kas', shortLabel: 'Pemasukan', group: '3. STOK OBAT & KEUANGAN', icon: <SlidersHorizontal size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'performa', label: 'Target & Capaian Sales', shortLabel: 'Target Sales', group: '3. STOK OBAT & KEUANGAN', icon: <CheckCircle2 size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
 
-    // GRUP 4: PENGATURAN & SISTEM
-    { id: 'templates', label: 'Template & Kop Surat', shortLabel: 'Template', group: '4. PENGATURAN & SISTEM', icon: <Palette size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'approval', label: 'Manajemen User & Role', shortLabel: 'Users', group: '4. PENGATURAN & SISTEM', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'risk-config', label: 'Aturan Skor Risiko', shortLabel: 'Risiko', group: '4. PENGATURAN & SISTEM', icon: <Settings2 size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'audit', label: 'Log Audit Sistem', shortLabel: 'Audit', group: '4. PENGATURAN & SISTEM', icon: <Clock size={18} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'profile', label: 'Profil & Keamanan', shortLabel: 'Profil', group: '4. PENGATURAN & SISTEM', icon: <UserCheck size={18} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING', 'INVENTORY'] },
+    // GRUP 4: PENGATURAN
+    { id: 'templates', label: 'Kop Surat & Logo', shortLabel: 'Kop Surat', group: '4. PENGATURAN', icon: <Palette size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'approval', label: 'Kelola Akun Staf', shortLabel: 'Akun Staf', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'risk-config', label: 'Aturan Poin Kehadiran', shortLabel: 'Aturan Poin', group: '4. PENGATURAN', icon: <Settings2 size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'audit', label: 'Riwayat Aktivitas', shortLabel: 'Riwayat', group: '4. PENGATURAN', icon: <Clock size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'profile', label: 'Profil Saya', shortLabel: 'Profil', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING', 'INVENTORY'] },
   ];
   const sidebarItems = ALL_ITEMS.filter(i => user && i.roles.includes(user.role));
   const currentTabMeta = sidebarItems.find(i => i.id === activeTab) ?? sidebarItems[0];
@@ -457,7 +457,7 @@ export const AdminDashboard: React.FC = () => {
         sidebarHeader={
             <div>
                 <h2 className="text-xs font-extrabold tracking-tight text-slate-800 leading-tight mb-0.5 uppercase">
-                  Navigasi Modul &amp; QA
+                  PT Guci Emas Pratama
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
@@ -517,7 +517,7 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="clean-card bg-[var(--bg-card)] p-4 rounded-lg border border-rose-200 bg-rose-50/20">
-                  <span className="text-xs font-semibold text-rose-700 block flex items-center gap-1"><ShieldAlert size={14} /> Anomali Spasial</span>
+                  <span className="text-xs font-semibold text-rose-700 block flex items-center gap-1"><ShieldAlert size={14} /> Perlu Dicek (Di Luar Area)</span>
                   <div className="flex items-baseline justify-between mt-1">
                     <span className="text-2xl font-bold font-mono text-rose-700">{kpi.flaggedJobs}</span>
                     <span className="text-xs font-medium text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">{kpi.highRiskCount} Risiko Tinggi</span>
@@ -530,12 +530,12 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex items-start sm:items-center gap-3">
                     <div className="w-8 h-8 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><ShieldAlert size={18} /></div>
                     <div>
-                      <h3 className="font-semibold text-sm text-rose-950">Perhatian Audit — {kpi.flaggedJobs} Laporan Memerlukan Tinjauan</h3>
-                      <p className="text-xs text-rose-800 mt-0.5">Terdeteksi ketidaksesuaian koordinat geofence atau durasi pengerjaan di luar standar.</p>
+                      <h3 className="font-semibold text-sm text-rose-950">Ada {kpi.flaggedJobs} Laporan Teknisi yang Perlu Dicek</h3>
+                      <p className="text-xs text-rose-800 mt-0.5">Ada foto check-in di luar titik lokasi proyek atau durasi pengerjaan yang terlalu singkat.</p>
                     </div>
                   </div>
                   <button onClick={() => setActiveTab('anomalies')} className="self-start sm:self-auto text-xs font-semibold px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-md transition-colors whitespace-nowrap">
-                    Tinjau Laporan Anomali
+                    Lihat Laporan
                   </button>
                 </div>
               )}
