@@ -1,4 +1,4 @@
-export type UserRole = "SUPERADMIN" | "ADMIN" | "MARKETING" | "INVENTORY" | "TEKNISI_LAPANGAN";
+export type UserRole = "MASTER_SUPER_ADMIN" | "SUPERADMIN" | "ADMIN" | "MARKETING" | "INVENTORY" | "TEKNISI_LAPANGAN";
 
 export interface AppUser {
     uid: string;
@@ -16,8 +16,11 @@ export interface AppUser {
 export interface Company {
     id: string;
     name: string;
+    slug?: string;
+    status?: "ACTIVE" | "TRIAL" | "SUSPENDED" | "EXPIRED";
     isActive: boolean;
     plan: "free" | "pro";
+    maxTechnicians?: number;
     expiredAt?: Date;
 }
 
@@ -232,7 +235,11 @@ export interface Quotation {
     diskonUpahRp?: number;
     diskonPct: number;
     ppn: boolean;
+    ppnScheme?: "non_ppn" | "ppn_12_dpp_nilai_lain";
     ppnDppFaktor?: number;
+    approvalSignatureBase64?: string;
+    approvalSignedAt?: string;
+    approvalSignedByRole?: string;
     // Garansi dalam Tahun maupun Bulan (Custom / Preset)
     garansiTahun?: number;
     garansiNilai?: number;
@@ -386,6 +393,8 @@ export interface Project {
   nextServiceDate?: string | null;
   scheduledStartTime: string;
   notes?: string | null;
+  contractValue?: number;
+  quotationId?: string | null;
   createdBy: string;
   createdByName?: string;
   createdAt: string;
@@ -465,6 +474,7 @@ export interface WorkReport {
   customerFeedback?: string | null;
   customerSignature?: string | null;
   notes?: string | null;
+  teamMembers?: { id?: string; name: string; role?: string; isManual?: boolean }[];
   photos: DocumentationPhoto[];
   createdAt: string;
   updatedAt: string;

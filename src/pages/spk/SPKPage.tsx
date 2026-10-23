@@ -246,7 +246,7 @@ function InfoBlock({ icon, label, value }: { icon: React.ReactNode; label: strin
 export function SPKPage() {
     const { user } = useAuthStore();
     const companyId = user?.companyId ?? "";
-    const canCreate = user?.role !== "TEKNISI_LAPANGAN" && user?.role !== "SUPERADMIN";
+    const canCreate = user?.role !== "TEKNISI_LAPANGAN";
 
     const [spkList, setSpkList] = useState<SPK[]>([]);
     const [loading, setLoading] = useState(true);

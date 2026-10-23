@@ -50,9 +50,10 @@ import { TrackingPage } from '../../pages/tracking/TrackingPage';
 import { CashflowPage } from '../../pages/cashflow/CashflowPage';
 import { PerformaPage } from '../../pages/performance/PerformaPage';
 import { SPKPage } from '../../pages/spk/SPKPage';
+import { CompaniesPage } from '../../pages/super-admin/CompaniesPage';
 
 
-type Tab = 'dashboard' | 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile' | 'inventory' | 'quotation' | 'kontrol-rayap' | 'templates' | 'customers' | 'order-tracking' | 'cashflow' | 'performa' | 'spk-cms';
+type Tab = 'dashboard' | 'reports' | 'anomalies' | 'projects' | 'executors' | 'audit' | 'risk-config' | 'tracking' | 'approval' | 'profile' | 'inventory' | 'quotation' | 'kontrol-rayap' | 'templates' | 'customers' | 'order-tracking' | 'cashflow' | 'performa' | 'spk-cms' | 'saas-companies';
 
 const DATE_PRESETS = [
   { id: 'all', label: 'Semua' },
@@ -85,8 +86,9 @@ import { AppLayout } from '../common/AppLayout';
 import { TabContainer } from '@/shared/ui/TabContainer';
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const isSuper = user?.role === 'SUPERADMIN';
+  const isAdmin = user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
+  const isSuper = user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN';
+  const isMasterSuper = user?.role === 'MASTER_SUPER_ADMIN';
   const activeCompanyId = useAuthStore(st => st.activeCompanyId);
   // Tab awal per role: MARKETING → penawaran, INVENTORY → gudang (menu 'dashboard' memakai API admin).
   const [activeTab, setActiveTab] = useState<Tab>(user?.role === 'INVENTORY' ? 'inventory' : 'quotation');
@@ -159,7 +161,7 @@ export const AdminDashboard: React.FC = () => {
     if (!selectedReport) return;
     setPdfBusy(true);
     try {
-      const companyId = user?.role === 'SUPERADMIN' ? activeCompanyId : user?.companyId;
+      const companyId = (user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN') ? activeCompanyId : user?.companyId;
       await exportReportToPdf(selectedReport, undefined, { companyId, createdBy: user?.name ?? selectedReport.executorName });
     } catch (err) {
       console.error('[pdf] gagal membuat laporan kunjungan', err);
@@ -378,33 +380,35 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // Menu menggunakan Bahasa Indonesia sehari-hari yang mudah dipahami oleh Admin, Surveyor, Teknisi, maupun Gudang
+  const isMarketingUser = user?.role === 'MARKETING';
   const ALL_ITEMS: { id: Tab; label: string; shortLabel: string; group: string; icon: React.ReactNode; danger?: boolean; badge?: number; roles: string[] }[] = [
     // GRUP 1: PENAWARAN & PELANGGAN
-    { id: 'quotation', label: 'Buat & Cek Penawaran', shortLabel: 'Penawaran', group: '1. PENAWARAN & PELANGGAN', icon: <FileText size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'customers', label: 'Data Pelanggan', shortLabel: 'Pelanggan', group: '1. PENAWARAN & PELANGGAN', icon: <Users size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'kontrol-rayap', label: 'Jadwal Garansi Rayap', shortLabel: 'Garansi', group: '1. PENAWARAN & PELANGGAN', icon: <AlertTriangle size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'spk-cms', label: 'Perintah Kerja (SPK)', shortLabel: 'SPK', group: '1. PENAWARAN & PELANGGAN', icon: <Briefcase size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'quotation', label: 'Buat & Cek Penawaran', shortLabel: 'Penawaran', group: '1. PENAWARAN & PELANGGAN', icon: <FileText size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
+    { id: 'customers', label: 'Data Pelanggan & Kontrol', shortLabel: 'Pelanggan', group: '1. PENAWARAN & PELANGGAN', icon: <Users size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
+    { id: 'kontrol-rayap', label: 'Jadwal Garansi Rayap', shortLabel: 'Garansi', group: '1. PENAWARAN & PELANGGAN', icon: <AlertTriangle size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
+    { id: 'spk-cms', label: 'Perintah Kerja (SPK)', shortLabel: 'SPK', group: '1. PENAWARAN & PELANGGAN', icon: <Briefcase size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
 
     // GRUP 2: PEKERJAAN LAPANGAN
-    { id: 'dashboard', label: 'Ringkasan Hari Ini', shortLabel: 'Ringkasan', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'projects', label: 'Lokasi & Jadwal Proyek', shortLabel: 'Proyek', group: '2. PEKERJAAN LAPANGAN', icon: <Briefcase size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'reports', label: 'Hasil Kerja Teknisi', shortLabel: 'Hasil Kerja', group: '2. PEKERJAAN LAPANGAN', icon: <CheckCircle2 size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'anomalies', label: 'Laporan Perlu Dicek', shortLabel: 'Perlu Cek', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldAlert size={16} />, danger: true, badge: kpi.flaggedJobs > 0 ? kpi.flaggedJobs : undefined, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'executors', label: 'Kinerja Teknisi', shortLabel: 'Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <Users size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'tracking', label: 'Lacak Posisi Teknisi', shortLabel: 'Peta Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <MapPin size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
+    { id: 'dashboard', label: 'Ringkasan Hari Ini', shortLabel: 'Ringkasan', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldCheck size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'projects', label: 'Lokasi & Daftar Proyek', shortLabel: 'Proyek', group: '2. PEKERJAAN LAPANGAN', icon: <Briefcase size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY'] },
+    { id: 'reports', label: 'Hasil Kerja Teknisi', shortLabel: 'Hasil Kerja', group: '2. PEKERJAAN LAPANGAN', icon: <CheckCircle2 size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'anomalies', label: 'Laporan Perlu Dicek', shortLabel: 'Perlu Cek', group: '2. PEKERJAAN LAPANGAN', icon: <ShieldAlert size={16} />, danger: true, badge: kpi.flaggedJobs > 0 ? kpi.flaggedJobs : undefined, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'executors', label: 'Kinerja Teknisi', shortLabel: 'Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <Users size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'tracking', label: 'Lacak Posisi Teknisi', shortLabel: 'Peta Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <MapPin size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
 
     // GRUP 3: STOK OBAT & KEUANGAN
-    { id: 'inventory', label: 'Stok Obat & Alat', shortLabel: 'Stok Obat', group: '3. STOK OBAT & KEUANGAN', icon: <Package size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'INVENTORY'] },
-    { id: 'order-tracking', label: 'Tagihan & Cicilan Klien', shortLabel: 'Tagihan', group: '3. STOK OBAT & KEUANGAN', icon: <Clock size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
-    { id: 'cashflow', label: 'Pemasukan & Kas', shortLabel: 'Pemasukan', group: '3. STOK OBAT & KEUANGAN', icon: <SlidersHorizontal size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'performa', label: 'Target & Capaian Sales', shortLabel: 'Target Sales', group: '3. STOK OBAT & KEUANGAN', icon: <CheckCircle2 size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING'] },
+    { id: 'inventory', label: 'Stok Obat & Estimasi Proyek', shortLabel: 'Stok & P/L', group: '3. STOK OBAT & KEUANGAN', icon: <Package size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'INVENTORY', 'MARKETING'] },
+    { id: 'order-tracking', label: 'Tagihan & Cicilan Klien', shortLabel: 'Tagihan', group: '3. STOK OBAT & KEUANGAN', icon: <Clock size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
+    { id: 'cashflow', label: 'Pemasukan & Untung Rugi', shortLabel: 'Pemasukan', group: '3. STOK OBAT & KEUANGAN', icon: <SlidersHorizontal size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'performa', label: isMarketingUser ? 'Persentase Performa (MoM)' : 'Performa MoM & Capaian', shortLabel: 'Performa %', group: '3. STOK OBAT & KEUANGAN', icon: <CheckCircle2 size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING'] },
 
     // GRUP 4: PENGATURAN
-    { id: 'templates', label: 'Kop Surat & Logo', shortLabel: 'Kop Surat', group: '4. PENGATURAN', icon: <Palette size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'approval', label: 'Kelola Akun Staf', shortLabel: 'Akun Staf', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'risk-config', label: 'Aturan Poin Kehadiran', shortLabel: 'Aturan Poin', group: '4. PENGATURAN', icon: <Settings2 size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'audit', label: 'Riwayat Aktivitas', shortLabel: 'Riwayat', group: '4. PENGATURAN', icon: <Clock size={16} />, roles: ['ADMIN', 'SUPERADMIN'] },
-    { id: 'profile', label: 'Profil Saya', shortLabel: 'Profil', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['ADMIN', 'SUPERADMIN', 'MARKETING', 'INVENTORY'] },
+    { id: 'saas-companies', label: 'Kontrol Tenant SaaS (Master)', shortLabel: 'SaaS Master', group: '4. PENGATURAN', icon: <ShieldCheck size={16} />, roles: ['MASTER_SUPER_ADMIN'] },
+    { id: 'templates', label: 'Kop Surat & Logo', shortLabel: 'Kop Surat', group: '4. PENGATURAN', icon: <Palette size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'approval', label: 'Kelola Akun Staf', shortLabel: 'Akun Staf', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'risk-config', label: 'Aturan Poin Kehadiran', shortLabel: 'Aturan Poin', group: '4. PENGATURAN', icon: <Settings2 size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'audit', label: 'Riwayat Aktivitas', shortLabel: 'Riwayat', group: '4. PENGATURAN', icon: <Clock size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'] },
+    { id: 'profile', label: 'Profil Saya', shortLabel: 'Profil', group: '4. PENGATURAN', icon: <UserCheck size={16} />, roles: ['MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY'] },
   ];
   const sidebarItems = ALL_ITEMS.filter(i => user && i.roles.includes(user.role));
   const currentTabMeta = sidebarItems.find(i => i.id === activeTab) ?? sidebarItems[0];
@@ -456,8 +460,8 @@ export const AdminDashboard: React.FC = () => {
         dynamicIslandItems={[]}
         sidebarHeader={
             <div>
-                <h2 className="text-xs font-extrabold tracking-tight text-slate-800 leading-tight mb-0.5 uppercase">
-                  PT Guci Emas Pratama
+                <h2 className="text-xs font-black tracking-tight text-slate-900 leading-tight mb-0.5">
+                  Field<span className="text-[var(--accent)]">Work</span>
                 </h2>
                 <p className="text-[11px] text-slate-500">
                   {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
@@ -1197,6 +1201,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'performa' && <PerformaPage />}
             {activeTab === 'inventory' && <InventoryPage />}
             {activeTab === 'kontrol-rayap' && <KontrolRayapPage />}
+            {activeTab === 'saas-companies' && isMasterSuper && <CompaniesPage />}
 
             {activeTab === 'templates' && isAdmin && (
               <TemplateSettingsPanel />
@@ -1292,6 +1297,18 @@ export const AdminDashboard: React.FC = () => {
                       <div><span className="text-[var(--text-muted)] block text-[10px]">GARANSI</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.warrantyMonths} bulan</span></div>
                     )}
                     <div><span className="text-[var(--text-muted)] block text-[10px]">JADWAL</span><span className="font-bold text-[var(--text-primary)]">{selectedReport.scheduledStartTime} WIB</span></div>
+                    {selectedReport.teamMembers && selectedReport.teamMembers.length > 0 && (
+                      <div className="col-span-2 sm:col-span-4 pt-2 border-t border-[var(--border-subtle)]">
+                        <span className="text-[var(--text-muted)] block text-[10px] mb-1">TIM TEKNISI YANG BERTUGAS (1 TIM)</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedReport.teamMembers.map((tm, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-bold">
+                              {tm.name} {tm.isManual ? '(Input Manual)' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>

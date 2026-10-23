@@ -37,7 +37,7 @@ export async function postLocation(input: PostLocationInput): Promise<{ success:
 
 export async function fetchLatestLocations(): Promise<UserLocation[]> {
   const st = useAuthStore.getState();
-  const companyId = st.user?.role === 'SUPERADMIN' ? (st.activeCompanyId || st.user.companyId) : st.user?.companyId;
+  const companyId = (st.user?.role === 'MASTER_SUPER_ADMIN' || st.user?.role === 'SUPERADMIN') ? (st.activeCompanyId || st.user.companyId) : st.user?.companyId;
 
   let usersQuery = supabase.from('users').select('id, name, company_id');
   if (companyId) usersQuery = usersQuery.eq('company_id', companyId);

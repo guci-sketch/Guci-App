@@ -52,7 +52,7 @@ const PEST_HELP = `Sintaks: "# Judul" · "#_ Judul bergaris bawah" · "## Sub-ju
 export function TemplateSettingsPanel() {
   const { user } = useAuth();
   const activeCompanyId = useAuthStore(s => s.activeCompanyId);
-  const companyId = user?.role === 'SUPERADMIN' ? activeCompanyId : user?.companyId ?? null;
+  const companyId = (user?.role === 'MASTER_SUPER_ADMIN' || (user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN')) ? activeCompanyId : user?.companyId ?? null;
 
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -166,7 +166,7 @@ export function TemplateSettingsPanel() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(isGuciName(settings.companyName) || user?.role === 'SUPERADMIN') && (
+          {(isGuciName(settings.companyName) || (user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN')) && (
             <button onClick={loadGuciPreset} className="px-3 py-2 text-xs font-bold rounded-lg border border-slate-300 hover:bg-slate-50">Muat contoh Guci</button>
           )}
           <button onClick={handleSave} disabled={saving || !dirty}

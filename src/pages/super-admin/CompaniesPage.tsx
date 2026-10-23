@@ -1,373 +1,335 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import {
     Building2, Plus, RefreshCw, CheckCircle2, XCircle,
-    AlertCircle, Loader2, ShieldCheck, Users,
+    AlertCircle, Loader2, ShieldCheck, Users, Crown, Lock, Unlock,
 } from "lucide-react";
 import {
-    getCompanies, setCompanyActive, createCompany,
+    getCompanies, setCompanyStatus, createCompany,
 } from '@/shared/api/companyService';
-import type { Company } from '@/entities/types';
-
-// ─── BADGE ───────────────────────────────────────────────────────────────────
-
-function ActiveBadge({ isActive }: { isActive: boolean }) {
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
-            ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
-            {isActive ? "Aktif" : "Nonaktif"}
-        </span>
-    );
-}
-
-function PlanBadge({ plan }: { plan: Company["plan"] }) {
-    return (
-        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold
-            ${plan === "pro" ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
-            {plan === "pro" ? "⭐ PRO" : "FREE"}
-        </span>
-    );
-}
-
-// ─── ADD COMPANY MODAL ───────────────────────────────────────────────────────
-
-function AddCompanyModal({
-    open, onClose, onSaved,
-}: { open: boolean; onClose: () => void; onSaved: () => void }) {
-    const [name, setName] = useState("");
-    const [plan, setPlan] = useState<Company["plan"]>("free");
-    const [saving, setSaving] = useState(false);
-    const [err, setErr] = useState("");
-
-    const handleSave = async () => {
-        if (!name.trim()) { setErr("Nama perusahaan wajib diisi."); return; }
-        setSaving(true);
-        try {
-            await createCompany({ name: name.trim(), plan });
-            setName(""); setPlan("free"); setErr("");
-            onSaved();
-        } catch (e) {
-            setErr(e instanceof Error ? e.message : "Gagal menyimpan.");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    if (!open) return null;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
-                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <Building2 size={18} className="text-indigo-600" /> Tambah Perusahaan
-                </h3>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-                            Nama Perusahaan *
-                        </label>
-                        <input
-                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            placeholder="PT Contoh Indonesia"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-                            Plan
-                        </label>
-                        <div className="flex gap-3">
-                            {(["free", "pro"] as const).map(p => (
-                                <button key={p} type="button" onClick={() => setPlan(p)}
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-semibold transition-all
-                                        ${plan === p
-                                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                                            : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
-                                    {p === "pro" ? "⭐ PRO" : "FREE"}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {err && (
-                        <p className="flex items-center gap-1.5 text-xs text-red-600">
-                            <AlertCircle size={12} /> {err}
-                        </p>
-                    )}
-                </div>
-
-                <div className="flex justify-end gap-2 mt-6">
-                    <button onClick={onClose}
-                        className="px-4 py-2 text-sm rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium">
-                        Batal
-                    </button>
-                    <button onClick={handleSave} disabled={saving}
-                        className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
-                        {saving && <Loader2 size={13} className="animate-spin" />}
-                        Simpan
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── CONFIRM MODAL ───────────────────────────────────────────────────────────
-
-function ConfirmModal({
-    company, onClose, onConfirm,
-}: { company: Company | null; onClose: () => void; onConfirm: () => void }) {
-    if (!company) return null;
-    const willActive = !company.isActive;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 mx-auto
-                    ${willActive ? "bg-emerald-100" : "bg-red-100"}`}>
-                    {willActive
-                        ? <CheckCircle2 size={24} className="text-emerald-600" />
-                        : <XCircle size={24} className="text-red-600" />}
-                </div>
-                <h3 className="text-base font-bold text-slate-900 text-center mb-2">
-                    {willActive ? "Aktifkan Perusahaan?" : "Nonaktifkan Perusahaan?"}
-                </h3>
-                <p className="text-sm text-slate-500 text-center mb-6">
-                    <strong>{company.name}</strong>
-                    {willActive
-                        ? " akan bisa mengakses sistem kembali."
-                        : " dan semua user-nya tidak akan bisa login."}
-                </p>
-                <div className="flex gap-3">
-                    <button onClick={onClose}
-                        className="flex-1 py-2 text-sm rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium">
-                        Batal
-                    </button>
-                    <button onClick={onConfirm}
-                        className={`flex-1 py-2 text-sm rounded-lg text-white font-medium
-                            ${willActive ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}>
-                        {willActive ? "Aktifkan" : "Nonaktifkan"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── MAIN PAGE ───────────────────────────────────────────────────────────────
+import { getUsersByCompany, setUserActive } from '@/shared/api/userService';
+import { useAuthStore } from '@/app/store/authStore';
+import type { Company, AppUser } from '@/entities/types';
 
 export function CompaniesPage() {
-    const navigate = useNavigate();
+    const { user, activeCompanyId, setActiveCompanyId } = useAuthStore();
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [selectedCompanyUsers, setSelectedCompanyUsers] = useState<Record<string, AppUser[]>>({});
     const [loading, setLoading] = useState(true);
-    const [addOpen, setAddOpen] = useState(false);
-    const [confirmTarget, setConfirmTarget] = useState<Company | null>(null);
-    const [toggling, setToggling] = useState<string | null>(null);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [showAdd, setShowAdd] = useState(false);
+    const [newName, setNewName] = useState("");
+    const [newPlan, setNewPlan] = useState<"free" | "pro">("pro");
+    const [error, setError] = useState("");
 
     const load = async () => {
         setLoading(true);
+        setError("");
         try {
-            const data = await getCompanies();
-            setCompanies(data);
+            const list = await getCompanies();
+            setCompanies(list);
+            const usersMap: Record<string, AppUser[]> = {};
+            for (const c of list) {
+                try {
+                    usersMap[c.id] = await getUsersByCompany(c.id);
+                } catch {
+                    usersMap[c.id] = [];
+                }
+            }
+            setSelectedCompanyUsers(usersMap);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Gagal memuat daftar perusahaan SaaS.");
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        void load();
+    }, []);
 
-    const handleToggle = async () => {
-        if (!confirmTarget) return;
-        setToggling(confirmTarget.id);
-        setConfirmTarget(null);
+    const handleChangeCompanyStatus = async (companyId: string, status: "ACTIVE" | "TRIAL" | "SUSPENDED" | "EXPIRED") => {
+        setBusyId(companyId);
         try {
-            await setCompanyActive(confirmTarget.id, !confirmTarget.isActive);
+            await setCompanyStatus(companyId, status);
             await load();
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Gagal mengubah status perusahaan.");
         } finally {
-            setToggling(null);
+            setBusyId(null);
         }
     };
 
-    const totalActive = companies.filter(c => c.isActive).length;
-    const totalPro = companies.filter(c => c.plan === "pro").length;
+    const handleToggleSuperadminUser = async (u: AppUser) => {
+        if (u.email.toLowerCase() === "lieziragroup@gmail.com") return;
+        setBusyId(u.uid);
+        try {
+            await setUserActive(u.uid, !u.isActive);
+            await load();
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Gagal mengubah status akun.");
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    const handleCreateTenant = async () => {
+        if (!newName.trim()) return;
+        setBusyId("create");
+        try {
+            await createCompany({ name: newName.trim(), plan: newPlan, status: "ACTIVE" });
+            setNewName("");
+            setShowAdd(false);
+            await load();
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Gagal membuat tenant perusahaan.");
+        } finally {
+            setBusyId(null);
+        }
+    };
 
     return (
-        <div className="p-4 md:p-6 max-w-screen-lg mx-auto space-y-5">
-            {/* Header */}
-            <div className="flex items-start justify-between">
-                <div>
-                    <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <Building2 size={20} className="text-indigo-600" />
-                        Manajemen Perusahaan
-                    </h1>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                        Kelola akses perusahaan yang terdaftar di sistem
-                    </p>
+        <div className="space-y-5">
+            <div className="clean-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-emerald-200 bg-gradient-to-r from-emerald-50/70 via-white to-amber-50/40">
+                <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-[var(--accent)] text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Crown size={22} />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h1 className="text-base sm:text-lg font-extrabold text-[var(--text-primary)]">
+                                Master Super Admin — Kontrol Multi-Tenant SaaS FieldWork
+                            </h1>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-800 text-white">
+                                EKSKLUSIF: {user?.email}
+                            </span>
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                            Kelola status langganan seluruh Perusahaan Tenant (Active, Trial, atau Suspend) serta kendalikan akun Superadmin (Direktur) masing-masing perusahaan.
+                        </p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={load}
-                        className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        onClick={load}
+                        className="p-2 rounded-xl border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                        title="Segarkan Tenant"
+                    >
+                        <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
                     </button>
-                    <button onClick={() => setAddOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
-                        <Plus size={16} />
-                        Tambah Perusahaan
+                    <button
+                        onClick={() => setShowAdd(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold shadow-xs"
+                    >
+                        <Plus size={14} /> Tambah Perusahaan SaaS
                     </button>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-                {[
-                    { label: "Total Perusahaan", value: companies.length, color: "#4f46e5" },
-                    { label: "Aktif", value: totalActive, color: "#059669" },
-                    { label: "Plan PRO", value: totalPro, color: "#7c3aed" },
-                ].map(s => (
-                    <div key={s.label} className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-                        <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                        <div className="text-xs text-slate-400 mt-1">{s.label}</div>
-                    </div>
-                ))}
-            </div>
+            {error && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                    <AlertCircle size={15} /> {error}
+                </div>
+            )}
 
-            {/* Table */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                {loading ? (
-                    <div className="flex items-center justify-center py-16 text-slate-400">
-                        <Loader2 size={20} className="animate-spin mr-2" /> Memuat data...
-                    </div>
-                ) : companies.length === 0 ? (
-                    <div className="text-center py-16 text-slate-400">
-                        <Building2 size={36} className="mx-auto mb-3 opacity-30" />
-                        <p className="font-medium text-slate-500">Belum ada perusahaan</p>
-                        <p className="text-sm mt-1">Klik "Tambah Perusahaan" untuk mendaftarkan.</p>
-                    </div>
-                ) : (
-                    <>
-                    {/* Desktop table */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full border-collapse">
-                            <thead>
-                                <tr>
-                                    {["Perusahaan", "Plan", "Status", "Company ID", "User", "Aksi"].map(h => (
-                                        <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-400 border-b border-slate-100 bg-slate-50 whitespace-nowrap">
-                                            {h}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {companies.map(company => (
-                                    <tr key={company.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                                    <ShieldCheck size={14} className="text-indigo-600" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-semibold text-slate-900">{company.name}</div>
-                                                    {company.expiredAt && (
-                                                        <div className="text-xs text-slate-400">
-                                                            Exp: {company.expiredAt.toLocaleDateString("id-ID")}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <PlanBadge plan={company.plan} />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <ActiveBadge isActive={company.isActive} />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <code className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono">
-                                                {company.id}
-                                            </code>
-                                        </td>
-                                        <td className="px-4 py-3">
+            {loading ? (
+                <div className="py-16 text-center text-sm text-[var(--text-muted)] flex items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin text-[var(--accent)]" /> Memuat daftar perusahaan tenant SaaS...
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4">
+                    {companies.map(c => {
+                        const cUsers = selectedCompanyUsers[c.id] || [];
+                        const directors = cUsers.filter(u => u.role === "SUPERADMIN" || u.role === "ADMIN");
+                        const isCurrentTenant = activeCompanyId === c.id;
+                        const st = c.status || (c.isActive ? "ACTIVE" : "SUSPENDED");
+
+                        return (
+                            <div
+                                key={c.id}
+                                className={`clean-card p-4 sm:p-5 space-y-4 border-l-4 ${
+                                    st === "SUSPENDED"
+                                        ? "border-l-red-600 bg-red-50/20"
+                                        : st === "TRIAL"
+                                        ? "border-l-amber-500"
+                                        : "border-l-emerald-600"
+                                }`}
+                            >
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <Building2 size={18} className="text-[var(--accent)]" />
+                                            <h2 className="text-base font-bold text-[var(--text-primary)]">{c.name}</h2>
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
+                                                st === "ACTIVE"
+                                                    ? "bg-emerald-100 text-emerald-800"
+                                                    : st === "TRIAL"
+                                                    ? "bg-amber-100 text-amber-800"
+                                                    : "bg-red-600 text-white"
+                                            }`}>
+                                                {st === "ACTIVE" ? "ACTIVE (Aktif)" : st === "TRIAL" ? "TRIAL (Masa Uji)" : "SUSPENDED (Ditangguhkan)"}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                PLAN: {c.plan.toUpperCase()}
+                                            </span>
+                                            {isCurrentTenant && (
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-700 text-white">
+                                                    Sedang Dipantau
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-[var(--text-muted)] font-mono mt-1">
+                                            Tenant ID: {c.id} • Total Akun Terdaftar: {cUsers.length} user
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveCompanyId(c.id)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                isCurrentTenant
+                                                    ? "bg-slate-900 text-white border-slate-900"
+                                                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            {isCurrentTenant ? "✓ Tenant Aktif" : "Masuk / Pantau Tenant Ini"}
+                                        </button>
+
+                                        {st !== "ACTIVE" && (
                                             <button
-                                                onClick={() => navigate(`/super-admin/companies/${company.id}/users`)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
-                                                <Users size={12} /> Kelola User
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <button
-                                                onClick={() => setConfirmTarget(company)}
-                                                disabled={toggling === company.id}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
-                                                    ${company.isActive
-                                                        ? "bg-red-50 text-red-600 hover:bg-red-100"
-                                                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}
-                                                    disabled:opacity-40`}
+                                                type="button"
+                                                disabled={busyId === c.id}
+                                                onClick={() => handleChangeCompanyStatus(c.id, "ACTIVE")}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
                                             >
-                                                {toggling === company.id
-                                                    ? <Loader2 size={12} className="animate-spin" />
-                                                    : company.isActive
-                                                        ? <XCircle size={12} />
-                                                        : <CheckCircle2 size={12} />}
-                                                {toggling === company.id
-                                                    ? "Memproses..."
-                                                    : company.isActive ? "Nonaktifkan" : "Aktifkan"}
+                                                <Unlock size={13} /> Aktifkan Perusahaan
                                             </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        )}
 
-                    {/* Mobile cards */}
-                    <div className="md:hidden divide-y divide-slate-100">
-                        {companies.map(company => (
-                            <div key={company.id} className="p-4 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                                    <ShieldCheck size={16} className="text-indigo-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900 truncate">{company.name}</p>
-                                    {company.expiredAt && (
-                                        <p className="text-xs text-slate-400">Exp: {company.expiredAt.toLocaleDateString("id-ID")}</p>
-                                    )}
-                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                        <PlanBadge plan={company.plan} />
-                                        <ActiveBadge isActive={company.isActive} />
+                                        {st !== "SUSPENDED" && (
+                                            <button
+                                                type="button"
+                                                disabled={busyId === c.id}
+                                                onClick={() => handleChangeCompanyStatus(c.id, "SUSPENDED")}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold"
+                                            >
+                                                <Lock size={13} /> Suspend Perusahaan
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-1 shrink-0">
-                                    <button onClick={() => navigate(`/super-admin/companies/${company.id}/users`)}
-                                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
-                                        <Users size={11} /> Users
-                                    </button>
-                                    <button onClick={() => setConfirmTarget(company)} disabled={toggling === company.id}
-                                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 ${company.isActive ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}>
-                                        {toggling === company.id ? <Loader2 size={11} className="animate-spin" /> : company.isActive ? <XCircle size={11} /> : <CheckCircle2 size={11} />}
-                                        {toggling === company.id ? "Proses..." : company.isActive ? "Nonaktifkan" : "Aktifkan"}
-                                    </button>
+
+                                {/* Daftar Akun Superadmin (Direktur) & Admin Perusahaan */}
+                                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                                        <Users size={13} /> Akun Superadmin (Direktur) &amp; Staf Perusahaan ({cUsers.length})
+                                    </span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                        {cUsers.map(u => {
+                                            const isOwner = u.email.toLowerCase() === "lieziragroup@gmail.com";
+                                            return (
+                                                <div
+                                                    key={u.uid}
+                                                    className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                                                        u.isActive ? "bg-white border-slate-200" : "bg-red-50/50 border-red-200"
+                                                    }`}
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="font-bold text-[var(--text-primary)] truncate">{u.name}</div>
+                                                        <div className="text-[10.5px] font-mono text-[var(--text-muted)] truncate">{u.email}</div>
+                                                        <div className="flex items-center gap-1.5 mt-1">
+                                                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[9.5px] font-bold">
+                                                                {u.role}
+                                                            </span>
+                                                            <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
+                                                                u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-700"
+                                                            }`}>
+                                                                {u.isActive ? "Aktif" : "Suspended"}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {!isOwner && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={busyId === u.uid}
+                                                            onClick={() => handleToggleSuperadminUser(u)}
+                                                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold shrink-0 ${
+                                                                u.isActive
+                                                                    ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                                                                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                                            }`}
+                                                        >
+                                                            {u.isActive ? "Suspend" : "Aktifkan"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                    </>
-                )}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
-            {/* Modals */}
-            <AddCompanyModal
-                open={addOpen}
-                onClose={() => setAddOpen(false)}
-                onSaved={async () => { setAddOpen(false); await load(); }}
-            />
-            <ConfirmModal
-                company={confirmTarget}
-                onClose={() => setConfirmTarget(null)}
-                onConfirm={handleToggle}
-            />
+            {showAdd && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                    <div className="clean-card max-w-md w-full p-6 space-y-4">
+                        <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                            <Building2 size={18} className="text-[var(--accent)]" /> Tambah Perusahaan Tenant SaaS Baru
+                        </h3>
+                        <div className="space-y-3 text-xs">
+                            <div>
+                                <label className="block font-bold text-[var(--text-secondary)] mb-1">Nama Perusahaan Tenant *</label>
+                                <input
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                    placeholder="Contoh: PT Mitra Pestindo Nusantara"
+                                    className="w-full px-3 py-2 border border-[var(--border-subtle)] rounded-xl text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block font-bold text-[var(--text-secondary)] mb-1">Paket Langganan SaaS</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(["pro", "free"] as const).map(p => (
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            onClick={() => setNewPlan(p)}
+                                            className={`py-2 rounded-xl border font-bold uppercase ${
+                                                newPlan === p
+                                                    ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)]"
+                                                    : "border-slate-200 bg-white text-slate-600"
+                                            }`}
+                                        >
+                                            {p === "pro" ? "PRO Enterprise" : "Basic / Trial"}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowAdd(false)}
+                                className="flex-1 py-2.5 rounded-xl bg-[var(--bg-tertiary)] text-xs font-semibold text-[var(--text-secondary)]"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCreateTenant}
+                                disabled={busyId === "create"}
+                                className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold"
+                            >
+                                {busyId === "create" ? "Menyimpan..." : "Buat Tenant SaaS"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

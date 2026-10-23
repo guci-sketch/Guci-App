@@ -3,8 +3,8 @@ import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
 
 /**
- * Khusus SUPERADMIN: memilih perusahaan yang sedang dikelola. Pilihan dikirim backend sebagai header X-Company-Id
- * dan dipakai halaman Template & Pengaturan. Role lain tidak melihat komponen ini (perusahaannya tetap).
+ * Khusus SUPERADMIN: memilih perusahaan (tenant) yang sedang dikelola di FieldWork.
+ * Otomatis memilih perusahaan pertama (PT Guci Emas Pratama) bila belum ada yang dipilih.
  */
 export function CompanyPicker() {
   const activeCompanyId = useAuthStore(s => s.activeCompanyId);
@@ -15,22 +15,29 @@ export function CompanyPicker() {
   useEffect(() => {
     supabase.from('companies').select('id, company_name').order('company_name').then(({ data, error: err }) => {
       if (err) { setError(err.message); return; }
-      setCompanies(data ?? []);
-      // Pilihan lama yang sudah tidak ada (perusahaan dihapus) dibersihkan.
-      if (activeCompanyId && !(data ?? []).some(c => c.id === activeCompanyId)) setActiveCompanyId(null);
+      const list = data ?? [];
+      setCompanies(list);
+      if (list.length > 0 && (!activeCompanyId || !list.some(c => c.id === activeCompanyId))) {
+        setActiveCompanyId(list[0].id);
+      }
     });
   }, [activeCompanyId, setActiveCompanyId]);
 
+  if (companies.length <= 1) return null;
+
   return (
-    <div className="mt-3">
-      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Perusahaan yang dikelola</label>
+    <div className="mt-2">
+      <label className="block text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] mb-1">
+        Tenant Perusahaan
+      </label>
       <select
         value={activeCompanyId ?? ''}
         onChange={e => setActiveCompanyId(e.target.value || null)}
-        className="w-full px-2 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white"
+        className="w-full px-2 py-1 text-[11px] font-semibold rounded-lg border border-[#e8e5e0] bg-[#faf9f7] text-[#2d2a26] focus:outline-none focus:border-[var(--accent)]"
       >
-        <option value="">— Pilih perusahaan —</option>
-        {companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+        {companies.map(c => (
+          <option key={c.id} value={c.id}>{c.company_name}</option>
+        ))}
       </select>
       {error && <p className="text-[10px] text-red-600 mt-1">{error}</p>}
     </div>

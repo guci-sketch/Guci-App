@@ -36,16 +36,31 @@ function toLog(data: any): NomorSuratLog {
  */
 export function ensureStageInNomorSurat(noSurat: string, stage: NomorStage, kategori: KategoriSurat): string {
     if (!noSurat) return noSurat;
-    if (noSurat.includes(`-${stage}/`)) return noSurat;
-    // Jika masih berformat lama seperti "GP-AR/PH/2026/10/0001" -> ubah menjadi "GP-DRF/AR/PH/2026/10/0001"
+    // Jika stage === 'APR' (Approved): hilangkan kode -DRF atau -APR sehingga menjadi bersih (contoh: GP/AR/PH/2026/10/0001)
+    if (stage === 'APR') {
+        const mStage = noSurat.match(/^([A-Z0-9]+)-(DRF|APR)\/(AR|PCO)\/(.*)$/);
+        if (mStage) {
+            return `${mStage[1]}/${kategori || mStage[3]}/${mStage[4]}`;
+        }
+        const mLegacy = noSurat.match(/^([A-Z0-9]+)-(AR|PCO)\/(.*)$/);
+        if (mLegacy) {
+            return `${mLegacy[1]}/${mLegacy[2]}/${mLegacy[3]}`;
+        }
+        return noSurat.replace(/-DRF\//g, '/').replace(/-APR\//g, '/');
+    }
+    // Jika stage === 'DRF' (Draft): pastikan memakai -DRF/ (contoh: GP-DRF/AR/PH/2026/10/0001)
+    if (noSurat.includes('-DRF/')) return noSurat;
+    const mClean = noSurat.match(/^([A-Z0-9]+)\/(AR|PCO)\/(.*)$/);
+    if (mClean) {
+        return `${mClean[1]}-DRF/${mClean[2]}/${mClean[3]}`;
+    }
     const m = noSurat.match(/^([A-Z0-9]+)-(AR|PCO)\/(.*)$/);
     if (m) {
-        return `${m[1]}-${stage}/${m[2]}/${m[3]}`;
+        return `${m[1]}-DRF/${m[2]}/${m[3]}`;
     }
-    // Jika berformat "GP-DRF/..." dan diminta "APR"
     const mStage = noSurat.match(/^([A-Z0-9]+)-(DRF|APR)\/(AR|PCO)\/(.*)$/);
     if (mStage) {
-        return `${mStage[1]}-${stage}/${kategori || mStage[3]}/${mStage[4]}`;
+        return `${mStage[1]}-DRF/${kategori || mStage[3]}/${mStage[4]}`;
     }
     return noSurat;
 }

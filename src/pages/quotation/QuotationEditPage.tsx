@@ -51,7 +51,7 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
     const id = quotationIdProp ?? params.id;
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+    const isAdmin = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
 
     const goBack = () => {
         if (onSavedSuccess) onSavedSuccess();
@@ -72,7 +72,8 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
 
     // Editable fields
     const [nama, setNama] = useState("");
-    const [alamatLines, setAlamatLines] = useState<string[]>([""]);
+    const [alamatLines, setAlamatLines] = useState<string[]>(["", ""]);
+    const [approvalSig, setApprovalSig] = useState<string>("");
     const [up, setUp] = useState("");
     const [wa, setWa] = useState("");
     const [objekPekerjaan, setObjekPekerjaan] = useState("");
@@ -113,7 +114,8 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                 if (!q) { handleCancel(); return; }
                 setQuotation(q);
                 setNama(q.kepadaNama);
-                setAlamatLines(q.kepadaAlamatLines?.length ? q.kepadaAlamatLines : [""]);
+                setAlamatLines([q.kepadaAlamatLines?.[0] ?? "", q.kepadaAlamatLines?.[1] ?? ""]);
+                setApprovalSig(q.approvalSignatureBase64 ?? "");
                 setUp(q.kepadaUp ?? "");
                 setWa(q.kepadaWa ?? "");
                 setObjekPekerjaan(q.objekPekerjaan ?? "");
@@ -179,6 +181,18 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
         ppnDppFaktor: ppnDppFaktor || undefined,
     });
     const totalFinal = calc.total + pembulatanRp;
+
+    const generateStampSignatureBase64 = (signerName: string, signerRole: string) => {
+        const dateStr = new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="130" viewBox="0 0 420 130">
+            <rect width="416" height="126" x="2" y="2" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" stroke-dasharray="6,4"/>
+            <text x="20" y="28" font-family="monospace" font-size="10" font-weight="bold" fill="#15803d">BUKTI APPROVAL INTERNAL FIELDWORK (NON-DOWNLOAD)</text>
+            <path d="M35 82 C 75 38, 115 95, 160 54 C 195 25, 225 88, 275 48 C 305 32, 340 68, 380 45" fill="none" stroke="#1a5c38" stroke-width="3.2" stroke-linecap="round"/>
+            <text x="20" y="102" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${signerName.replace(/[<>&"']/g, "")} (${signerRole})</text>
+            <text x="20" y="118" font-family="monospace" font-size="10" fill="#475569">Disetujui: ${dateStr} WIB</text>
+        </svg>`;
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    };
 
     // Recalculate unit prices based on new warranty duration (Years or Months)
     const handleApplyWarrantyToPrices = (nextNilai: number, nextUnit: GaransiUnit) => {
@@ -355,10 +369,13 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
             await updateQuotationData(id, fields, logEntry);
 
             const mergedQuotation: Quotation = { ...quotation, ...fields };
+            const finalSig = approvalSig || generateStampSignatureBase64(user.name, user.role);
             const { approvedNoSurat } = await approveAndIssueAprNumber({
                 quotation: mergedQuotation,
                 approvedByUid: user.uid,
                 approvedByName: user.name,
+                approvalSignatureBase64: finalSig,
+                approvalSignedByRole: user.role,
             });
 
             // Generate PDF resmi dengan nomor GP-APR baru
@@ -607,75 +624,117 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                     </div>
                 </div>
 
-                {/* 3. Upah & Peralatan %, Diskon Upah %, Diskon %, PPN, & Varian PDF */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Upah & Peralatan (%)</label>
+                {/* 3. Diskon (%) & Skema PPN (Radio / Button: Non PPN vs PPN 12% DPP Nilai Lain) */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-3 border-t border-[var(--border-subtle)]">
+                    <div className="md:col-span-4">
+                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Diskon Penawaran (%)</label>
                         <input
                             type="number"
-                            className={`${inputCls} font-mono`}
-                            value={upahPeralatanPct}
-                            onChange={e => setUpahPeralatanPct(parseFloat(e.target.value) || 0)}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Diskon Upah (%)</label>
-                        <input
-                            type="number"
-                            className={`${inputCls} font-mono`}
-                            value={diskonUpahPct}
-                            onChange={e => setDiskonUpahPct(parseFloat(e.target.value) || 0)}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Diskon Tambahan (%)</label>
-                        <input
-                            type="number"
-                            className={`${inputCls} font-mono`}
+                            min={0}
+                            max={100}
+                            step={0.5}
+                            className={`${inputCls} font-mono font-bold`}
                             value={diskonPct}
-                            onChange={e => setDiskonPct(parseFloat(e.target.value) || 0)}
+                            onChange={e => setDiskonPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
                         />
+                        <p className="text-[10.5px] text-[var(--text-muted)] mt-1">Upah & Peralatan Kerja (default 25%) sudah di-take out.</p>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Skema Pajak (PPN)</label>
-                        <select
-                            value={!ppn ? "none" : ppnDppFaktor ? "dpp_11_12" : "ppn_11"}
-                            onChange={e => {
-                                const v = e.target.value;
-                                if (v === "none") { setPpn(false); setPpnDppFaktor(0); }
-                                else if (v === "ppn_11") { setPpn(true); setPpnDppFaktor(0); }
-                                else { setPpn(true); setPpnDppFaktor(11 / 12); }
-                            }}
-                            className={inputCls}
-                        >
-                            <option value="none">Belum Termasuk PPN</option>
-                            <option value="ppn_11">PPN 11%</option>
-                            <option value="dpp_11_12">DPP 11/12 + PPN 12%</option>
-                        </select>
+                    <div className="md:col-span-8">
+                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Skema PPN (Radio / Button)</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <label
+                                onClick={() => { setPpn(false); setPpnDppFaktor(0); }}
+                                className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                    !ppn
+                                        ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)] font-bold"
+                                        : "border-[var(--border-subtle)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                }`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="skema_ppn_edit"
+                                    checked={!ppn}
+                                    onChange={() => { setPpn(false); setPpnDppFaktor(0); }}
+                                    className="w-4 h-4 accent-[var(--accent)]"
+                                />
+                                <div>
+                                    <div className="text-xs font-bold">Non PPN</div>
+                                    <div className="text-[10px] text-[var(--text-muted)] font-normal">Tanpa PPN</div>
+                                </div>
+                            </label>
+                            <label
+                                onClick={() => { setPpn(true); setPpnDppFaktor(11 / 12); }}
+                                className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                    ppn
+                                        ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)] font-bold"
+                                        : "border-[var(--border-subtle)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                }`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="skema_ppn_edit"
+                                    checked={ppn}
+                                    onChange={() => { setPpn(true); setPpnDppFaktor(11 / 12); }}
+                                    className="w-4 h-4 accent-[var(--accent)]"
+                                />
+                                <div>
+                                    <div className="text-xs font-bold">PPN 12% (DPP Nilai Lain)</div>
+                                    <div className="text-[10px] text-[var(--text-muted)] font-normal">DPP 11/12 × PPN 12%</div>
+                                </div>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
-                {/* 4. Data Klien, Objek Survey & Varian Template PDF */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Nama Klien</label>
-                        <input className={inputCls} value={nama} onChange={e => setNama(e.target.value)} />
+                {/* 4. Data Klien, Alamat 1 & 2 (dengan Hint), Objek Survey & Varian Template PDF */}
+                <div className="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Nama Klien</label>
+                            <input className={inputCls} value={nama} onChange={e => setNama(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Objek Pekerjaan Survey</label>
+                            <input className={inputCls} value={objekPekerjaan} onChange={e => setObjekPekerjaan(e.target.value)} placeholder="bangunan rumah tinggal / kantor..." />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Template PDF FieldWork</label>
+                            <select
+                                value={pdfVariant}
+                                onChange={e => setPdfVariant(e.target.value as PdfTemplateVariant)}
+                                className={inputCls}
+                            >
+                                {PDF_VARIANT_OPTIONS.map(o => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Objek Pekerjaan Survey</label>
-                        <input className={inputCls} value={objekPekerjaan} onChange={e => setObjekPekerjaan(e.target.value)} placeholder="bangunan rumah tinggal / kantor..." />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Template PDF Guci Emas</label>
-                        <select
-                            value={pdfVariant}
-                            onChange={e => setPdfVariant(e.target.value as PdfTemplateVariant)}
-                            className={inputCls}
-                        >
-                            {PDF_VARIANT_OPTIONS.map(o => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-0.5">
+                                Alamat 1 (Nama Jalan, Perumahan, No. Blok)
+                            </label>
+                            <p className="text-[10px] text-[var(--text-muted)] mb-1">Hint: Isi nama jalan, perumahan/gedung, dan nomor blok</p>
+                            <input
+                                className={inputCls}
+                                value={alamatLines[0] ?? ""}
+                                onChange={e => setAlamatLines([e.target.value, alamatLines[1] ?? ""])}
+                                placeholder="Contoh: Perumahan Griya Indah, Jl. Melati Raya Blok C2 No. 14"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-0.5">
+                                Alamat 2 (Kecamatan, Kelurahan, Kota, Provinsi)
+                            </label>
+                            <p className="text-[10px] text-[var(--text-muted)] mb-1">Hint: Isi kelurahan, kecamatan, kota/kabupaten, dan provinsi</p>
+                            <input
+                                className={inputCls}
+                                value={alamatLines[1] ?? ""}
+                                onChange={e => setAlamatLines([alamatLines[0] ?? "", e.target.value])}
+                                placeholder="Contoh: Kel. Serua, Kec. Ciputat, Kota Tangerang Selatan, Banten"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -746,7 +805,58 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                     </div>
                 )}
 
-                {/* Action Footer: Simpan Ulang Draft (GP-DRF) vs Approve & Terbitkan GP-APR */}
+                {/* 6. Section Approval (TTD Bukti Approval Internal - Non-Downloadable & Penghapusan Kode DRF) */}
+                {isAdmin && (
+                    <div
+                        className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-3 select-none"
+                        onContextMenu={e => e.preventDefault()}
+                    >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                                    <ShieldCheck size={15} className="text-emerald-700" />
+                                    Section Approval (Bukti TTD Approval Internal - Non-Download)
+                                </h3>
+                                <p className="text-[11px] text-emerald-800 mt-0.5">
+                                    Tanda tangan di bawah ini dikunci sebagai <strong>bukti persetujuan internal (tidak dapat diunduh)</strong>. Saat klik <strong>Approve</strong>, kode <code>-DRF</code> otomatis dihapus menjadi <strong>{quotation.noSurat.replace(/-DRF\//g, "/").replace(/-APR\//g, "/")}</strong>.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => user && setApprovalSig(generateStampSignatureBase64(user.name, user.role))}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shrink-0"
+                            >
+                                {approvalSig ? "Perbarui Paraf Bukti Approval" : "Bubuhkan Paraf Bukti Approval"}
+                            </button>
+                        </div>
+
+                        {approvalSig ? (
+                            <div
+                                className="relative rounded-xl border border-emerald-300 bg-white p-3 overflow-hidden select-none"
+                                onContextMenu={e => e.preventDefault()}
+                            >
+                                <img
+                                    src={approvalSig}
+                                    alt="Bukti TTD Approval Non-Download"
+                                    draggable={false}
+                                    onContextMenu={e => e.preventDefault()}
+                                    className="max-h-28 mx-auto pointer-events-none select-none"
+                                />
+                                <div className=" inset-0 pointer-events-none flex items-center justify-center">
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-900/60 bg-emerald-50/80 px-2.5 py-0.5 rounded border border-emerald-200">
+                                        BUKTI APPROVAL INTERNAL • NON-DOWNLOADABLE
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-dashed border-emerald-300 bg-white/70 p-3 text-center text-xs text-emerald-800">
+                                Klik <strong>&ldquo;Bubuhkan Paraf Bukti Approval&rdquo;</strong> atau langsung klik tombol <strong>Approve</strong> di bawah untuk mengesahkan penawaran dan menghapus kode <code>DRF</code>.
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Action Footer: Simpan Ulang Draft (GP-DRF) vs Approve & Hilangkan DRF */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-[var(--border-subtle)]">
                     <button
                         type="button"
@@ -775,7 +885,7 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold shadow-xs disabled:opacity-50"
                             >
                                 {approving ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
-                                Simpan & Approve (Terbitkan GP-APR + PDF)
+                                Simpan & Approve (Hilangkan DRF & Sahkan)
                             </button>
                         )}
                     </div>

@@ -150,7 +150,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
 
     // ── Step 2 State: Data Klien vs Objek & Lokasi Survey ─────────────────────
     const [kepadaNama, setKepadaNama] = useState("");
-    const [kepadaAlamat, setKepadaAlamat] = useState<string[]>([""]);
+    const [kepadaAlamat, setKepadaAlamat] = useState<string[]>(["", ""]);
     const [kepadaUp, setKepadaUp] = useState("");
     const [kepadaWa, setKepadaWa] = useState("");
     const [objekPekerjaan, setObjekPekerjaan] = useState("");
@@ -629,7 +629,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                         </p>
                         <p>1. Jika customer meminta negosiasi harga (misal turun garansi dari {formatWarrantyDurationText(garansiNilai, garansiUnit)} menjadi 1 tahun atau minta diskon), konfirmasikan ke Admin.</p>
                         <p>2. Admin dapat langsung melakukan <strong>Adjustment Garansi / Harga</strong> dan menyimpan ulang draft <code>{savedResult.noSurat}</code>.</p>
-                        <p>3. Saat disetujui Admin, nomor otomatis berubah menjadi <strong>GP-APR/{kategori}/{tipe}/...</strong> dan PDF resmi langsung siap diunduh.</p>
+                        <p>3. Saat disetujui (Approve), kode <strong>-DRF</strong> otomatis dihapus menjadi nomor surat resmi <strong>GP/{kategori}/{tipe}/...</strong>.</p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
@@ -677,7 +677,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             Input Hasil Survey & Automation Quotation
                         </h2>
                         <p className="text-xs text-[var(--text-muted)]">
-                            PT Guci Emas Pratama — Alur Surveyor/Marketing <span className="font-mono font-bold text-amber-700">GP-DRF</span> → Approval Admin <span className="font-mono font-bold text-emerald-700">GP-APR</span>
+                            FieldWork — Alur Draft Survey <span className="font-mono font-bold text-amber-700">GP-DRF/...</span> → Approved Resmi <span className="font-mono font-bold text-emerald-700">GP/...</span>
                         </p>
                     </div>
                 </div>
@@ -849,7 +849,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                                     </span>
                                     <ArrowRight size={14} className="text-[var(--text-muted)]" />
                                     <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-[var(--status-approved-bg)] text-[var(--status-approved-text)] border border-emerald-300">
-                                        Saat Approve: {(noPreview || `GP-DRF/${kategori}/${tipe}/...`).replace("-DRF/", "-APR/")}
+                                        Saat Approve (DRF Hilang): {(noPreview || `GP-DRF/${kategori}/${tipe}/...`).replace("-DRF/", "/")}
                                     </span>
                                 </div>
                             </div>
@@ -884,40 +884,32 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             </Field>
                         </div>
 
-                        <Field label="Alamat Surat Klien (Bisa beberapa baris)" required error={errors.alamat}>
-                            <div className="space-y-2">
-                                {kepadaAlamat.map((line, i) => (
-                                    <div key={i} className="flex gap-2">
-                                        <input
-                                            className={inputCls}
-                                            value={line}
-                                            onChange={e => {
-                                                const copy = [...kepadaAlamat];
-                                                copy[i] = e.target.value;
-                                                setKepadaAlamat(copy);
-                                            }}
-                                            placeholder={i === 0 ? "Baris 1: 18 Office Park Lt. 10 Unit A, Jl. TB Simatupang No. 18" : "Baris 2: Kebagusan, Pasar Minggu - Jakarta Selatan"}
-                                        />
-                                        {i > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setKepadaAlamat(kepadaAlamat.filter((_, idx) => idx !== i))}
-                                                className="p-2 rounded-xl border border-[var(--border-subtle)] text-red-500 hover:bg-red-50"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() => setKepadaAlamat([...kepadaAlamat, ""])}
-                                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
-                                >
-                                    <Plus size={13} /> Tambah Baris Alamat Surat
-                                </button>
-                            </div>
-                        </Field>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Field
+                                label="Alamat 1 (Nama Jalan, Perumahan / Gedung, No. Blok)"
+                                required
+                                error={errors.alamat}
+                                hint="Isi nama jalan, nama perumahan atau gedung, nomor rumah, dan blok"
+                            >
+                                <input
+                                    className={inputCls}
+                                    value={kepadaAlamat[0] ?? ""}
+                                    onChange={e => setKepadaAlamat([e.target.value, kepadaAlamat[1] ?? ""])}
+                                    placeholder="Contoh: Perumahan Griya Indah, Jl. Melati Raya Blok C2 No. 14"
+                                />
+                            </Field>
+                            <Field
+                                label="Alamat 2 (Kecamatan, Kelurahan, Kota, Provinsi)"
+                                hint="Isi kelurahan, kecamatan, kota/kabupaten, dan provinsi"
+                            >
+                                <input
+                                    className={inputCls}
+                                    value={kepadaAlamat[1] ?? ""}
+                                    onChange={e => setKepadaAlamat([kepadaAlamat[0] ?? "", e.target.value])}
+                                    placeholder="Contoh: Kel. Serua, Kec. Ciputat, Kota Tangerang Selatan, Banten"
+                                />
+                            </Field>
+                        </div>
 
                         <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-4">
                             <div className="flex items-center justify-between">
@@ -998,7 +990,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                                 {WARRANTY_PRESET_OPTIONS.map(opt => {
                                     const active = garansiPresetId === opt.id;
                                     return (
@@ -1223,54 +1215,79 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             </div>
                         </div>
 
-                        {/* Skema Upah & Peralatan Kerja (%) + Diskon Upah (%) + Pajak PPN */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-[var(--border-subtle)]">
-                            <Field
-                                label="Upah & Peralatan Kerja (%)"
-                                hint="Contoh Bank Victoria: 25% dari subtotal"
-                            >
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    className={`${inputCls} font-mono`}
-                                    value={upahPeralatanPct}
-                                    onChange={e => setUpahPeralatanPct(parseFloat(e.target.value) || 0)}
-                                />
-                            </Field>
-
-                            <Field
-                                label="Diskon Upah & Peralatan (%)"
-                                hint="Contoh Bank Victoria: 15% pengurang"
-                            >
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    className={`${inputCls} font-mono`}
-                                    value={diskonUpahPct}
-                                    onChange={e => setDiskonUpahPct(parseFloat(e.target.value) || 0)}
-                                />
-                            </Field>
-
-                            <Field label="Skema Pajak (PPN)">
-                                <select
-                                    value={!ppn ? "none" : ppnDppFaktor ? "dpp_11_12" : "ppn_11"}
-                                    onChange={e => {
-                                        const v = e.target.value;
-                                        if (v === "none") { setPpn(false); setPpnDppFaktor(0); }
-                                        else if (v === "ppn_11") { setPpn(true); setPpnDppFaktor(0); }
-                                        else { setPpn(true); setPpnDppFaktor(11 / 12); }
-                                    }}
-                                    className={inputCls}
+                        {/* Diskon Penawaran (%) & Skema PPN (Radio / Button: Non PPN vs PPN 12% DPP Nilai Lain) */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-3 border-t border-[var(--border-subtle)] items-start">
+                            <div className="md:col-span-4">
+                                <Field
+                                    label="Diskon Penawaran (%)"
+                                    hint="Potongan harga langsung dari subtotal pekerjaan (opsional)"
                                 >
-                                    <option value="none">Belum Termasuk PPN (Non-PPN)</option>
-                                    <option value="ppn_11">PPN 11% Standar</option>
-                                    <option value="dpp_11_12">DPP Nilai Lain (11/12) + PPN 12% (Standar PLN/BUMN)</option>
-                                </select>
-                            </Field>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step={0.5}
+                                            className={`${inputCls} font-mono font-bold pr-9`}
+                                            value={diskonPct}
+                                            onChange={e => setDiskonPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                                            placeholder="0"
+                                        />
+                                        <span className="absolute right-3 top-2.5 text-xs font-bold text-[var(--text-muted)]">%</span>
+                                    </div>
+                                </Field>
+                            </div>
+
+                            <div className="md:col-span-8">
+                                <Field
+                                    label="Skema PPN (Pilih Salah Satu)"
+                                    hint="Upah & Peralatan Kerja (default 25%) sudah di-take out dari input manual. Pilih skema pajak penawaran:"
+                                >
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <label
+                                            onClick={() => { setPpn(false); setPpnDppFaktor(0); }}
+                                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                                !ppn
+                                                    ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)] font-bold shadow-2xs"
+                                                    : "border-[var(--border-subtle)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="skema_ppn_form"
+                                                checked={!ppn}
+                                                onChange={() => { setPpn(false); setPpnDppFaktor(0); }}
+                                                className="w-4 h-4 accent-[var(--accent)]"
+                                            />
+                                            <div>
+                                                <div className="text-xs font-bold">Non PPN</div>
+                                                <div className="text-[10.5px] text-[var(--text-muted)] font-normal">Harga bersih tanpa PPN</div>
+                                            </div>
+                                        </label>
+
+                                        <label
+                                            onClick={() => { setPpn(true); setPpnDppFaktor(11 / 12); }}
+                                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                                ppn
+                                                    ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent)] font-bold shadow-2xs"
+                                                    : "border-[var(--border-subtle)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="skema_ppn_form"
+                                                checked={ppn}
+                                                onChange={() => { setPpn(true); setPpnDppFaktor(11 / 12); }}
+                                                className="w-4 h-4 accent-[var(--accent)]"
+                                            />
+                                            <div>
+                                                <div className="text-xs font-bold">PPN 12% (DPP Nilai Lain)</div>
+                                                <div className="text-[10.5px] text-[var(--text-muted)] font-normal">DPP 11/12 × Tarif PPN 12%</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </Field>
+                            </div>
                         </div>
 
                         {/* Jika Varian Jadwal Fogging 12 Bulan (Contoh PDF 0015 Ibu Dita) */}
@@ -1337,6 +1354,12 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                                 <div className="flex justify-between text-[var(--text-secondary)]">
                                     <span>Upah & Peralatan Kerja ({upahPeralatanPct}%)</span>
                                     <span className="font-mono tabular-nums">+ {fmtIDR(calc.upahPeralatanRp)}</span>
+                                </div>
+                            )}
+                            {calc.diskonRp > 0 && (
+                                <div className="flex justify-between text-red-600">
+                                    <span>Diskon Penawaran ({diskonPct}%)</span>
+                                    <span className="font-mono tabular-nums">- {fmtIDR(calc.diskonRp)}</span>
                                 </div>
                             )}
                             {calc.diskonUpahRp > 0 && (

@@ -30,9 +30,17 @@ export interface EvidencePayload {
   customerSignature?: string;
 }
 
+export interface TeamMemberEntry {
+  id?: string;
+  name: string;
+  role?: string;
+  isManual?: boolean;
+}
+
 export interface TreatmentInput {
   applicationMethod: ApplicationMethod;
   chemicalName: string;
+  teamMembers?: TeamMemberEntry[];
   activeIngredient?: string;
   dosage: string;
   treatmentAreaSqm?: number;
@@ -155,6 +163,7 @@ export function mapDbWorkReportFull(row: any): WorkReport {
     customerFeedback: row.customer_feedback ?? null,
     customerSignature: row.customer_signature ?? null,
     notes: row.notes ?? null,
+    teamMembers: Array.isArray(row.team_members) ? row.team_members : [],
     photos,
     createdAt: row.created_at,
     updatedAt: row.updated_at || row.created_at,
@@ -371,6 +380,23 @@ export async function submitTreatment(reportId: string, input: TreatmentInput): 
     .from('treatment_records')
     .upsert(payload, { onConflict: 'work_report_id' });
 
+  if (error) throw new Error(error.message);
+
+  if (input.teamMembers) {
+    await supabase
+      .from('work_reports')
+      .update({ team_members: input.teamMembers, updated_at: new Date().toISOString() })
+      .eq('id', reportId);
+  }
+
+  return fetchWorkReport(reportId);
+}
+
+export async function updateWorkReportTeam(reportId: string, teamMembers: TeamMemberEntry[]): Promise<WorkReport> {
+  const { error } = await supabase
+    .from('work_reports')
+    .update({ team_members: teamMembers, updated_at: new Date().toISOString() })
+    .eq('id', reportId);
   if (error) throw new Error(error.message);
   return fetchWorkReport(reportId);
 }

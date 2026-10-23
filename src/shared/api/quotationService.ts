@@ -26,7 +26,7 @@ export function base64ToBlob(base64: string, type = "application/pdf"): Blob {
 function toQuotation(data: any): Quotation {
     const p = data.payload ?? {};
     const noSurat: string = p.noSurat ?? "";
-    const inferredStage = p.stage ?? (noSurat.includes("-APR/") ? "APR" : "DRF");
+    const inferredStage = p.stage ?? ((data.status === "approved" || data.status === "sent_to_client" || data.status === "deal" || (!noSurat.includes("-DRF/") && noSurat.includes("/"))) ? "APR" : "DRF");
     return {
         id: data.id,
         ...p,
@@ -168,15 +168,19 @@ export async function approveAndIssueAprNumber(params: {
     quotation: Quotation;
     approvedByUid: string;
     approvedByName: string;
+    approvalSignatureBase64?: string;
+    approvalSignedByRole?: string;
 }): Promise<{ approvedNoSurat: string; draftNoSurat: string }> {
-    const { quotation, approvedByUid, approvedByName } = params;
+    const { quotation, approvedByUid, approvedByName, approvalSignatureBase64, approvalSignedByRole } = params;
     const currentNo = quotation.noSurat;
     const draftNoSurat = quotation.draftNoSurat ?? currentNo;
 
-    // Jika sudah memiliki nomor GP-APR (misal di-reapprove setelah revisi), pertahankan nomor GP-APR tersebut
-    let approvedNoSurat = quotation.approvedNoSurat ?? (currentNo.includes("-APR/") ? currentNo : "");
+    // Hilangkan kode -DRF (maupun -APR lama) sehingga nomor surat resmi bersih (contoh: GP/AR/PH/2026/10/0001)
+    let approvedNoSurat = (quotation.approvedNoSurat || currentNo)
+        .replace(/-DRF\//g, "/")
+        .replace(/-APR\//g, "/");
 
-    if (!approvedNoSurat) {
+    if (!approvedNoSurat || approvedNoSurat.includes("-DRF/")) {
         const aprLog = await commitNomorSurat({
             kategori: quotation.kategori,
             tipe: quotation.tipeKontrak,
@@ -187,11 +191,31 @@ export async function approveAndIssueAprNumber(params: {
             companyId: quotation.companyId,
             stage: "APR",
         });
-        approvedNoSurat = aprLog.noSurat;
+        approvedNoSurat = aprLog.noSurat.replace(/-DRF\//g, "/").replace(/-APR\//g, "/");
         await supabase
             .from("nomor_surat_logs")
-            .update({ status: "approved", quoId: quotation.id })
+            .update({ status: "approved", quoId: quotation.id, noSurat: approvedNoSurat, stage: "APR", draftNoSurat })
             .eq("id", aprLog.id);
+    } else {
+        // Update log nomor surat yang sudah terkait dengan quotation ini agar bersih tanpa -DRF
+        await supabase
+            .from("nomor_surat_logs")
+            .update({ status: "approved", noSurat: approvedNoSurat, stage: "APR", draftNoSurat })
+            .eq("quoId", quotation.id);
+    }
+
+    const extra: Record<string, unknown> = {
+        noSurat: approvedNoSurat,
+        draftNoSurat,
+        approvedNoSurat,
+        stage: "APR",
+    };
+    if (approvalSignatureBase64) {
+        extra.approvalSignatureBase64 = approvalSignatureBase64;
+        extra.approvalSignedAt = new Date().toISOString();
+    }
+    if (approvalSignedByRole) {
+        extra.approvalSignedByRole = approvalSignedByRole;
     }
 
     await updateQuotationStatus(
@@ -200,12 +224,7 @@ export async function approveAndIssueAprNumber(params: {
         approvedByName,
         undefined,
         undefined,
-        {
-            noSurat: approvedNoSurat,
-            draftNoSurat,
-            approvedNoSurat,
-            stage: "APR",
-        },
+        extra,
     );
 
     return { approvedNoSurat, draftNoSurat };

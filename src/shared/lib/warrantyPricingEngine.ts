@@ -281,13 +281,10 @@ export interface WarrantyPresetOption {
 }
 
 export const WARRANTY_PRESET_OPTIONS: WarrantyPresetOption[] = [
-    { id: '0_tahun',  label: 'Tanpa Garansi', sublabel: 'Non-Garansi / Pipa',      nilai: 0, unit: 'tahun' },
-    { id: '6_bulan',  label: '6 Bulan',       sublabel: 'Garansi 6 Bulan',         nilai: 6, unit: 'bulan' },
-    { id: '1_tahun',  label: '1 Tahun',       sublabel: 'Nego Ekonomis (12 Bln)',  nilai: 1, unit: 'tahun' },
-    { id: '2_tahun',  label: '2 Tahun',       sublabel: 'Nego Menengah (24 Bln)',  nilai: 2, unit: 'tahun' },
-    { id: '3_tahun',  label: '3 Tahun',       sublabel: 'Standar Pasca-Konstruksi',nilai: 3, unit: 'tahun' },
-    { id: '5_tahun',  label: '5 Tahun',       sublabel: 'Standar Pra-Konstruksi',  nilai: 5, unit: 'tahun' },
-    { id: 'custom',   label: 'Custom...',     sublabel: 'Isi Bulan / Tahun Bebas', nilai: 2, unit: 'tahun', isCustom: true },
+    { id: '1_tahun',  label: '1 Tahun - Garansi',   sublabel: 'Garansi 1 Tahun (12 Bln)', nilai: 1, unit: 'tahun' },
+    { id: '3_tahun',  label: '3 Tahun - Garansi',   sublabel: 'Standar Pasca-Konstruksi', nilai: 3, unit: 'tahun' },
+    { id: '5_tahun',  label: '5 Tahun - Garansi',   sublabel: 'Standar Pra-Konstruksi',   nilai: 5, unit: 'tahun' },
+    { id: 'custom',   label: 'Customize - Garansi', sublabel: 'Atur Tahun / Bulan Bebas', nilai: 2, unit: 'tahun', isCustom: true },
 ];
 
 /**

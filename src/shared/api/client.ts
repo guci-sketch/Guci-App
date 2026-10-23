@@ -21,7 +21,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const st = useAuthStore.getState();
-  if (st.user?.role === 'SUPERADMIN' && st.activeCompanyId) headers['X-Company-Id'] = st.activeCompanyId;
+  if ((st.user?.role === 'MASTER_SUPER_ADMIN' || st.user?.role === 'SUPERADMIN') && st.activeCompanyId) headers['X-Company-Id'] = st.activeCompanyId;
   return headers;
 }
 

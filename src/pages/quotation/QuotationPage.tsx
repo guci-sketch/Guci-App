@@ -1,3 +1,4 @@
+import { supabase } from '@/shared/lib/supabase';
 import React, { useState, useEffect } from "react";
 import { SignatureModal } from '@/widgets/common/SignatureModal';
 import { useCompanyTemplate } from '@/shared/hooks/useCompanyTemplate';
@@ -29,7 +30,7 @@ import type { Quotation, QuotationStatus, KategoriSurat, TipeKontrak } from '@/e
 const STATUS_CFG: Record<QuotationStatus, { label: string; icon: React.ReactNode; bg: string; text: string; dot: string }> = {
     draft:          { label: "Draft (GP-DRF)",        icon: <FileX2 size={12} />,       bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
     pending:        { label: "Menunggu Verifikasi",   icon: <Clock size={12} />,        bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
-    approved:       { label: "Approved (GP-APR)",     icon: <CheckCircle2 size={12} />, bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
+    approved:       { label: "Approved (Resmi)",      icon: <CheckCircle2 size={12} />, bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
     rejected:       { label: "Perlu Revisi",          icon: <XCircle size={12} />,      bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
     sent_to_client: { label: "Dikirim ke Klien",      icon: <Send size={12} />,         bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
     deal:           { label: "Deal Kontrak ✓",        icon: <CheckCircle2 size={12} />, bg: "#d1fae5", text: "#065f46", dot: "#059669" },
@@ -78,15 +79,17 @@ export function QuotationPage() {
     const [page, setPage] = useState(1);
 
     const [approveTarget, setApproveTarget] = useState<Quotation | null>(null);
+    const [approvalModalSig, setApprovalModalSig] = useState<string>("");
+    const [viewProofTarget, setViewProofTarget] = useState<Quotation | null>(null);
     const [rejectTarget, setRejectTarget] = useState<Quotation | null>(null);
     const [rejectReason, setRejectReason] = useState("");
     const [rejectNotes, setRejectNotes] = useState("");
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     const canSeeAll = user?.role !== "MARKETING";
-    const canApprove = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
-    const canCreate = user?.role === "SUPERADMIN" || user?.role === "ADMIN" || user?.role === "MARKETING";
-    const canDelete = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+    const canApprove = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+    const canCreate = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN" || user?.role === "MARKETING";
+    const canDelete = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
 
     const load = async () => {
         if (!user) return;
@@ -175,16 +178,31 @@ export function QuotationPage() {
         }
     };
 
-    // Approve: Konversi GP-DRF -> GP-APR + Auto-Generate PDF Resmi
+    const generateQuickApprovalStamp = (signerName: string, signerRole: string) => {
+        const dateStr = new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="130" viewBox="0 0 420 130">
+            <rect width="416" height="126" x="2" y="2" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" stroke-dasharray="6,4"/>
+            <text x="20" y="28" font-family="monospace" font-size="10" font-weight="bold" fill="#15803d">BUKTI APPROVAL INTERNAL FIELDWORK (NON-DOWNLOAD)</text>
+            <path d="M35 82 C 75 38, 115 95, 160 54 C 195 25, 225 88, 275 48 C 305 32, 340 68, 380 45" fill="none" stroke="#1a5c38" stroke-width="3.2" stroke-linecap="round"/>
+            <text x="20" y="102" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${signerName.replace(/[<>&"']/g, "")} (${signerRole})</text>
+            <text x="20" y="118" font-family="monospace" font-size="10" fill="#475569">Disetujui: ${dateStr} WIB</text>
+        </svg>`;
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+    };
+
+    // Approve: Hilangkan kode -DRF -> Nomor Resmi GP/... + Simpan Bukti Approval Non-Download + Auto-Sync Proyek
     const handleApprove = async () => {
         if (!approveTarget || !user) return;
         setActionLoading(approveTarget.id);
         try {
             const full = (await getQuotationById(approveTarget.id)) ?? approveTarget;
+            const sigProof = approvalModalSig || generateQuickApprovalStamp(user.name, user.role);
             const { approvedNoSurat } = await approveAndIssueAprNumber({
                 quotation: full,
                 approvedByUid: user.uid,
                 approvedByName: user.name,
+                approvalSignatureBase64: sigProof,
+                approvalSignedByRole: user.role,
             });
 
             const pdfBlob = await generateCompanyQuotationPDF({
@@ -231,8 +249,31 @@ export function QuotationPage() {
 
             const pdfBase64 = await blobToBase64(pdfBlob);
             await attachPdfToQuotation(full.id, pdfBase64);
-
+            try {
+                const warrantyMonths = (full.garansiUnit === "bulan" ? (full.garansiNilai ?? 0) : ((full.garansiNilai ?? full.garansiTahun ?? 0) * 12));
+                await supabase.from("projects").upsert({
+                    id: full.id,
+                    company_id: full.companyId,
+                    project_name: `${full.kepadaNama} - ${full.perihal || approvedNoSurat}`,
+                    client_name: full.kepadaNama,
+                    address: full.lokasiPekerjaan || (full.kepadaAlamatLines || []).join(", ") || "-",
+                    latitude: -6.283812,
+                    longitude: 106.796641,
+                    radius: 120,
+                    work_date: new Date().toISOString().slice(0, 10),
+                    work_type: full.perihal || "Layanan Pest / Termite Control",
+                    service_type: full.kategori === "AR" ? "TERMITE_CONTROL" : "GENERAL_PEST_CONTROL",
+                    focus_target: full.focusTarget || full.hasilSurvey || "Sesuai Penawaran " + approvedNoSurat,
+                    warranty_months: warrantyMonths,
+                    contract_value: full.total,
+                    quotation_id: full.id,
+                    notes: `No. Surat Resmi: ${approvedNoSurat} | Nilai Kontrak: Rp ${(full.total || 0).toLocaleString("id-ID")}`,
+                }, { onConflict: "id" });
+            } catch {
+                // Abaikan jika proyek sudah ada
+            }
             setApproveTarget(null);
+            setApprovalModalSig("");
             await load();
         } catch (err) {
             alert(err instanceof Error ? err.message : "Gagal menyetujui penawaran.");
@@ -398,7 +439,7 @@ export function QuotationPage() {
                     onClick={() => { setFilterStatus("approved"); setPage(1); }}
                     className={`clean-card p-3.5 text-left border-emerald-200 bg-emerald-50/35 transition-all cursor-pointer ${filterStatus === "approved" ? "ring-2 ring-emerald-600" : "hover:border-emerald-300"}`}
                 >
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-800 block">2. Approved (GP-APR)</span>
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-800 block">2. Approved (Resmi Tanpa DRF)</span>
                     <div className="text-xl font-bold font-mono text-emerald-800 mt-0.5 tabular-nums">{statsApproved}</div>
                     <span className="text-[10.5px] text-emerald-700">Klik untuk PDF &amp; Kirim WA &rarr;</span>
                 </button>
@@ -447,7 +488,7 @@ export function QuotationPage() {
                         >
                             <option value="all">Semua Status</option>
                             <option value="pending">Draft / Menunggu (GP-DRF)</option>
-                            <option value="approved">Disetujui (GP-APR)</option>
+                            <option value="approved">Disetujui (Resmi)</option>
                             <option value="sent_to_client">Dikirim ke Klien</option>
                             <option value="deal">Deal ✓</option>
                             <option value="rejected">Perlu Revisi</option>
@@ -480,7 +521,7 @@ export function QuotationPage() {
                         <table className="w-full text-left border-collapse min-w-[920px]">
                             <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)] text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                                 <tr>
-                                    <th className="px-4 py-3">Nomor Surat (DRF / APR)</th>
+                                    <th className="px-4 py-3">Nomor Surat (DRF / Resmi)</th>
                                     <th className="px-4 py-3">Kategori & Layanan</th>
                                     <th className="px-4 py-3">Klien & Objek Survey</th>
                                     <th className="px-4 py-3">Garansi</th>
@@ -613,14 +654,14 @@ export function QuotationPage() {
                                                         </button>
                                                     )}
 
-                                                    {/* Tanda Tangan Digital */}
+                                                    {/* Bukti TTD Approval Internal (Non-Download) */}
                                                     {isApproved && (
                                                         <button
-                                                            onClick={() => setSignatureTarget(q)}
-                                                            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50"
-                                                            title="Bubuhkan Tanda Tangan Digital"
+                                                            onClick={() => setViewProofTarget(q)}
+                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold"
+                                                            title="Lihat Bukti TTD Approval (Non-Download)"
                                                         >
-                                                            <PenLine size={15} />
+                                                            <PenLine size={12} /> Bukti Approve
                                                         </button>
                                                     )}
 
@@ -686,29 +727,85 @@ export function QuotationPage() {
                 )}
             </div>
 
-            {/* Modal Konfirmasi Approve (Konversi GP-DRF -> GP-APR) */}
+            {/* Modal Section Approval (TTD Bukti Approval Non-Downloadable & Penghapusan Kode DRF) */}
             {approveTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-                    <div className="clean-card max-w-md w-full p-6 space-y-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                            <CheckCircle2 size={26} />
+                    <div
+                        className="clean-card max-w-lg w-full p-6 space-y-4 select-none"
+                        onContextMenu={e => e.preventDefault()}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                <CheckCircle2 size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-[var(--text-primary)]">
+                                    Section Approval Penawaran (Bukti TTD Internal)
+                                </h3>
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                    Klien: <strong>{approveTarget.kepadaNama}</strong> · Nilai: <strong>{formatRupiah(approveTarget.total)}</strong>
+                                </p>
+                            </div>
                         </div>
-                        <div className="text-center space-y-1">
-                            <h3 className="text-base font-bold text-[var(--text-primary)]">
-                                Setujui & Terbitkan Nomor Resmi GP-APR?
-                            </h3>
-                            <p className="text-xs text-[var(--text-secondary)]">
-                                Draft <code className="font-mono font-bold text-amber-800">{approveTarget.noSurat}</code> untuk <strong>{approveTarget.kepadaNama}</strong> senilai <strong>{formatRupiah(approveTarget.total)}</strong> akan disetujui.
+
+                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
+                            <p className="font-bold">Perubahan Nomor Surat Otomatis (Tanpa DRF / APR):</p>
+                            <div className="flex items-center gap-2 flex-wrap font-mono text-xs">
+                                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 line-through">{approveTarget.noSurat}</span>
+                                <span>&rarr;</span>
+                                <span className="px-2.5 py-0.5 rounded bg-emerald-700 text-white font-bold">
+                                    {approveTarget.noSurat.replace(/-DRF\//g, "/").replace(/-APR\//g, "/")}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-emerald-800 pt-1">
+                                Kode <code>DRF</code> otomatis dihilangkan (tanpa tambahan <code>APR</code>) dan proyek langsung terhubung ke modul Gudang & Teknisi.
                             </p>
                         </div>
-                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">
-                            <p className="font-bold">Apa yang dilakukan sistem secara otomatis:</p>
-                            <p>1. Mengunci nomor surat resmi baru berkode <strong>GP-APR/{approveTarget.kategori}/{approveTarget.tipeKontrak}/...</strong></p>
-                            <p>2. Merender PDF resmi PT Guci Emas Pratama dengan garansi <strong>{formatWarrantyDurationText(approveTarget.garansiNilai ?? approveTarget.garansiTahun ?? 0, approveTarget.garansiUnit ?? "tahun")}</strong>.</p>
+
+                        {/* Kotak Bukti TTD Approval Non-Download */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-[var(--text-primary)]">
+                                    Tanda Tangan / Paraf Bukti Approval (Non-Downloadable) *
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => user && setApprovalModalSig(generateQuickApprovalStamp(user.name, user.role))}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[11px] font-bold"
+                                >
+                                    {approvalModalSig ? "Perbarui Paraf Saya" : "Bubuhkan Paraf Digital Saya"}
+                                </button>
+                            </div>
+
+                            {approvalModalSig ? (
+                                <div
+                                    className="relative rounded-xl border border-emerald-300 bg-white p-3 text-center select-none overflow-hidden"
+                                    onContextMenu={e => e.preventDefault()}
+                                >
+                                    <img
+                                        src={approvalModalSig}
+                                        alt="Bukti Approval Non-Download"
+                                        draggable={false}
+                                        onContextMenu={e => e.preventDefault()}
+                                        className="max-h-28 mx-auto pointer-events-none select-none"
+                                    />
+                                    <span className="inline-block mt-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                        TERKUNCI SEBAGAI BUKTI APPROVAL INTERNAL (NON-DOWNLOAD)
+                                    </span>
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => user && setApprovalModalSig(generateQuickApprovalStamp(user.name, user.role))}
+                                    className="cursor-pointer rounded-xl border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/30 p-4 text-center text-xs text-emerald-800 transition-colors"
+                                >
+                                    Klik di sini untuk membubuhkan <strong>Paraf Bukti Approval ({user?.name})</strong>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex gap-2">
+
+                        <div className="flex gap-2 pt-1">
                             <button
-                                onClick={() => setApproveTarget(null)}
+                                onClick={() => { setApproveTarget(null); setApprovalModalSig(""); }}
                                 className="flex-1 py-2.5 rounded-xl bg-[var(--bg-tertiary)] text-xs font-semibold text-[var(--text-secondary)]"
                             >
                                 Batal
@@ -719,8 +816,63 @@ export function QuotationPage() {
                                 className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold flex items-center justify-center gap-1.5"
                             >
                                 {actionLoading === approveTarget.id && <RefreshCw size={13} className="animate-spin" />}
-                                Ya, Terbitkan GP-APR
+                                Approve & Sahkan Surat
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Lihat Bukti Approval Non-Downloadable */}
+            {viewProofTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                    <div
+                        className="clean-card max-w-md w-full p-6 space-y-4 select-none"
+                        onContextMenu={e => e.preventDefault()}
+                    >
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                <CheckCircle2 size={17} className="text-emerald-600" />
+                                Bukti TTD Approval Internal (Non-Download)
+                            </h3>
+                            <button
+                                onClick={() => setViewProofTarget(null)}
+                                className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            >
+                                Tutup
+                            </button>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                            <div>No. Surat Resmi: <strong className="font-mono">{viewProofTarget.noSurat}</strong></div>
+                            {viewProofTarget.draftNoSurat && (
+                                <div>Asal Draft: <span className="font-mono text-amber-800">{viewProofTarget.draftNoSurat}</span></div>
+                            )}
+                            <div>Disetujui Oleh: <strong>{viewProofTarget.approvedBy || "Direktur / Admin"}</strong></div>
+                        </div>
+                        <div
+                            className="rounded-xl border border-emerald-300 bg-white p-4 text-center select-none overflow-hidden"
+                            onContextMenu={e => e.preventDefault()}
+                        >
+                            {viewProofTarget.approvalSignatureBase64 ? (
+                                <img
+                                    src={viewProofTarget.approvalSignatureBase64}
+                                    alt="Bukti Approval Non-Download"
+                                    draggable={false}
+                                    onContextMenu={e => e.preventDefault()}
+                                    className="max-h-32 mx-auto pointer-events-none select-none"
+                                />
+                            ) : (
+                                <img
+                                    src={generateQuickApprovalStamp(viewProofTarget.approvedBy || "H. Fakhrurrazi, S.E.", viewProofTarget.approvalSignedByRole || "SUPERADMIN")}
+                                    alt="Bukti Approval Non-Download"
+                                    draggable={false}
+                                    onContextMenu={e => e.preventDefault()}
+                                    className="max-h-32 mx-auto pointer-events-none select-none"
+                                />
+                            )}
+                            <p className="text-[10px] font-mono font-bold text-emerald-800 mt-2">
+                                DOKUMEN BUKTI PERSETUJUAN INTERNAL • TIDAK DAPAT DIUNDUH
+                            </p>
                         </div>
                     </div>
                 </div>

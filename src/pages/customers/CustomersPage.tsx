@@ -86,14 +86,20 @@ const STATUS_LABEL: Record<string, string> = {
 
 function WarrantyBadge({ w }: { w: WarrantyInfo | null }) {
     if (!w) return null;
-    const expiring = w.isActive && w.daysRemaining <= 90;
-    const cls = !w.isActive ? "bg-slate-100 border-slate-200 text-slate-400"
-        : expiring ? "bg-amber-50 border-amber-200 text-amber-700"
-        : "bg-emerald-50 border-emerald-200 text-emerald-700";
+    const expiring = w.isActive && w.daysRemaining <= 60;
+    const cls = !w.isActive
+        ? "bg-red-600 border-red-700 text-white shadow-2xs"
+        : expiring
+        ? "bg-amber-500 border-amber-600 text-white shadow-2xs"
+        : "bg-emerald-100 border-emerald-300 text-emerald-800";
     return (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
-            {w.isActive ? <Shield size={10} /> : <Clock size={10} />}
-            {w.isActive ? `Garansi aktif · ${w.daysRemaining} hari lagi` : "Garansi habis"}
+        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
+            {!w.isActive ? <AlertTriangle size={10} /> : expiring ? <Clock size={10} /> : <Shield size={10} />}
+            {!w.isActive
+                ? "MERAH: Garansi Terlewat / Habis"
+                : expiring
+                ? `KUNING: Segera Habis (${w.daysRemaining} hari lagi)`
+                : `HIJAU: Garansi Aktif (${w.daysRemaining} hari lagi)`}
         </span>
     );
 }
@@ -176,8 +182,18 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
     customer: DerivedCustomer; expanded: boolean; onToggle: () => void; onAddChecklist: () => void;
 }) {
     const lastCl = [...customer.checklists].sort((a, b) => b.tanggal.getTime() - a.tanggal.getTime())[0];
+    const latestW = customer.activeWarranty ?? customer.warranties[0] ?? null;
+    const isOverdue = (latestW && !latestW.isActive) || lastCl?.hasilKontrol === "darurat";
+    const isExpiring = (latestW && latestW.isActive && latestW.daysRemaining <= 60) || lastCl?.hasilKontrol === "perlu_tindak_lanjut";
+    const borderColorCls = isOverdue
+        ? "border-l-4 border-l-red-600 border-red-200 bg-red-50/20"
+        : isExpiring
+        ? "border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/20"
+        : latestW?.isActive
+        ? "border-l-4 border-l-emerald-500 border-slate-200 bg-white"
+        : "border-slate-200 bg-white";
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className={`border rounded-2xl overflow-hidden shadow-sm ${borderColorCls}`}>
             <button onClick={onToggle} className="w-full px-5 py-4 flex items-start gap-4 text-left hover:bg-slate-50 transition-colors">
                 <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
                     {customer.name.charAt(0).toUpperCase()}
@@ -185,7 +201,7 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <p className="text-sm font-bold text-slate-900">{customer.name}</p>
-                        <WarrantyBadge w={customer.activeWarranty} />
+                        <WarrantyBadge w={customer.activeWarranty ?? customer.warranties[0] ?? null} />
                     </div>
                     {customer.address && (
                         <p className="text-xs text-slate-400 truncate flex items-center gap-1 mb-0.5">
@@ -223,8 +239,19 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
                         )}
                     </div>
                 </div>
-                <div className="shrink-0 text-slate-400 mt-1">
-                    {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                <div className="shrink-0 flex items-center gap-2 mt-1">
+                    <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={e => { e.stopPropagation(); onAddChecklist(); }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-bold flex items-center gap-1"
+                        title="Catat / Handle Jadwal Kontrol Pelanggan"
+                    >
+                        <ClipboardCheck size={11} /> Handle Kontrol
+                    </span>
+                    <span className="text-slate-400">
+                        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </span>
                 </div>
             </button>
 

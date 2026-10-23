@@ -24,7 +24,7 @@ export interface CreateProjectInput {
 
 function resolveActiveCompanyId(): string | null {
   const st = useAuthStore.getState();
-  if (st.user?.role === 'SUPERADMIN') {
+  if ((st.user?.role === 'MASTER_SUPER_ADMIN' || st.user?.role === 'SUPERADMIN')) {
     return st.activeCompanyId || st.user.companyId || null;
   }
   return st.user?.companyId || null;

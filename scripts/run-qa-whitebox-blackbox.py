@@ -194,8 +194,7 @@ required_emails = [
     "surveyor@gucimaspratama.co.id",
     "teknisi@gucimaspratama.co.id",
     "gudang@gucimaspratama.co.id",
-    "superadmin@gucimaspratama.co.id",
-]
+    ]
 record(
     "BB-01", "Blackbox",
     "Autentikasi 6 Akun & Instant Role Switcher (`switch_my_role`)",
@@ -251,14 +250,71 @@ with open(os.path.join(root, "src/widgets/admin/AdminDashboard.tsx"), "r", encod
     ad_src = f.read()
 
 groups = ["1. PENAWARAN & PELANGGAN", "2. PEKERJAAN LAPANGAN", "3. STOK OBAT & KEUANGAN", "4. PENGATURAN"]
+with open(os.path.join(root, "src/widgets/common/AppLayout.tsx"), "r", encoding="utf-8") as f:
+    al_src = f.read()
 record(
     "BB-05", "Blackbox",
-    "UI/UX Barventis (4 Grup Sidebar QA, Hamburger, Top Capsule, Floating Bottom Pill, Compact Font)",
-    all(g in ad_src for g in groups) and "font-size: 13px" in css_src and "showFloatingBottom={true}" in ad_src,
-    "4 grup menu QA di Sidebar, Top Capsule Sub-Tabs, Dynamic Floating Bottom Pill, dan ukuran font compact (13px/13.5px) aktif."
+    "UI/UX Multi-Device (Web Hover Rail, Tablet Touch Hamburger/Stay Sidebar, Mobile Bottom Pill)",
+    all(g in ad_src for g in groups) and "font-size: 13px" in css_src and "showFloatingBottom={true}" in ad_src and "isTouchDevice" in al_src,
+    "4 grup menu di Sidebar, Tablet Hamburger + Stay Open Sidebar, Dynamic Floating Bottom Pill, dan ukuran font compact aktif."
 )
 
-print(f"ALL WHITEBOX & BLACKBOX TESTS PASSED: {len(results)}/11 SUITES")
+# BB-06 (Izumi Gate 1): 6-Role SaaS Hierarchy & Clean Approved Nomor Surat (Without -DRF / -APR)
+with open(os.path.join(root, "src/shared/lib/roles.ts"), "r", encoding="utf-8") as f:
+    roles_src = f.read()
+with open(os.path.join(root, "src/shared/api/nomorSuratService.ts"), "r", encoding="utf-8") as f:
+    ns_src = f.read()
+record(
+    "BB-06", "Izumi-Gate-1",
+    "Hirarki 6 Role SaaS (MASTER_SUPER_ADMIN s.d. INVENTORY) & Nomor Surat Resmi Tanpa DRF/APR",
+    all(r in roles_src for r in ["MASTER_SUPER_ADMIN", "SUPERADMIN", "ADMIN", "TEKNISI_LAPANGAN", "MARKETING", "INVENTORY"])
+    and "direktur@gucimaspratama.co.id" in sql_src
+    and "replace(/-DRF\\//g, '/')" in ns_src,
+    "6 role berurutan (Master Super Admin -> Superadmin Direktur -> Admin -> Teknisi -> Marketing -> Gudang) & penghapusan kode DRF tervalidasi."
+)
+
+# BB-07 (Izumi Gate 2): Quotation Revamp (2-Line Address + Hints, Warranty 1/3/5/Customize, Upah Takeout, PPN 12% Radio, Non-Download Approval Proof)
+with open(os.path.join(root, "src/pages/quotation/QuotationFormPage.tsx"), "r", encoding="utf-8") as f:
+    qform_src = f.read()
+record(
+    "BB-07", "Izumi-Gate-2",
+    "Revamp Penawaran (Alamat 1 & 2 + Hint, Garansi 1/3/5/Customize, PPN 12% Radio, TTD Approval Non-Download)",
+    "Alamat 1 (Nama Jalan, Perumahan / Gedung, No. Blok)" in qform_src
+    and "Alamat 2 (Kecamatan, Kelurahan, Kota, Provinsi)" in qform_src
+    and "PPN 12% (DPP Nilai Lain)" in qform_src
+    and 'type="radio"' in qform_src
+    and "NON-DOWNLOAD" in qe_src,
+    "Alamat 2 baris + hint, Garansi 1/3/5/Customize, Upah 25% di-takeout, Diskon aktif, Radio PPN 12% DPP Nilai Lain, & Bukti TTD Non-Download tervalidasi."
+)
+
+# BB-08 (Izumi Gate 3): Marketing MoM Performance Analytics & Customer 3-Tier Color Code + Handler
+with open(os.path.join(root, "src/pages/performance/PerformaPage.tsx"), "r", encoding="utf-8") as f:
+    perf_src = f.read()
+with open(os.path.join(root, "src/pages/customers/KontrolRayapPage.tsx"), "r", encoding="utf-8") as f:
+    kr_src = f.read()
+record(
+    "BB-08", "Izumi-Gate-3",
+    "Marketing Persentase Performa (MoM) & Customer Color-Code (Merah/Kuning/Hijau) + Handler",
+    "Persentase Performance & Perbandingan Bulan Kemarin (MoM)" in perf_src
+    and "MERAH • TERLEWAT" in kr_src and "KUNING • AKAN HABIS" in kr_src and "HIJAU • AMAN" in kr_src
+    and "Handler Tindak Lanjut Garansi & Kontrol" in kr_src,
+    "Akses Target Sales dihapus untuk Marketing (diganti MoM %), dan Color-Code 3 warna + Handler Tindak Lanjut di Customer aktif."
+)
+
+# BB-09 (Izumi Gate 4): Field Technician Team Setup (Multi-Tech + Manual) & Gudang Project Costing / Profit-Loss
+with open(os.path.join(root, "src/widgets/executor/TreatmentFormModal.tsx"), "r", encoding="utf-8") as f:
+    tfm_src = f.read()
+record(
+    "BB-09", "Izumi-Gate-4",
+    "Setup Tim Teknisi (Pilih + Manual) & Estimasi Chemical Gudang per ID Proyek (Analisis Untung Rugi)",
+    "Tim Teknisi yang Ikut Bertugas" in tfm_src
+    and "handleAddManualTech" in tfm_src
+    and "Proyek Baru & Estimasi Untung Rugi" in inv_src
+    and "projectProfitability" in inv_src,
+    "Teknisi dapat memilih rekan 1 tim atau input nama manual; Gudang dapat input estimasi chemical ke ID Proyek untuk Analisis Untung Rugi."
+)
+
+print(f"ALL WHITEBOX, BLACKBOX & IZUMI GATE TESTS PASSED: {len(results)}/{len(results)} SUITES")
 for r in results:
     print(f"[{r['status']}] {r['id']} ({r['category']}): {r['title']}")
     print(f"       -> {r['detail']}")

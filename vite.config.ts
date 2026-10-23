@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'PT Guci Emas Pratama — CMS & Fieldwork',
-        short_name: 'Guci Emas',
+        name: 'FieldWork — Sistem Operasional & Penawaran',
+        short_name: 'FieldWork',
         description: 'Sistem Otomasi Penawaran (AR & PCO), SPK, dan Dokumentasi Lapangan PT Guci Emas Pratama.',
         theme_color: '#1a5c38',
         background_color: '#faf9f7',

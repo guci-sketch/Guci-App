@@ -34,11 +34,12 @@ interface HeaderProps {
 }
 
 const ROLE_OPTIONS: { value: UserRole; label: string; short: string }[] = [
-  { value: 'ADMIN',            label: 'Admin Utama (Semua Menu)',    short: 'ADMIN' },
-  { value: 'MARKETING',        label: 'Surveyor / Marketing',        short: 'SURVEYOR' },
-  { value: 'TEKNISI_LAPANGAN', label: 'Teknisi Lapangan',            short: 'TEKNISI' },
-  { value: 'INVENTORY',        label: 'Bagian Gudang Obat',          short: 'GUDANG' },
-  { value: 'SUPERADMIN',       label: 'Super Admin (Pusat)',         short: 'SUPERADMIN' },
+  { value: 'MASTER_SUPER_ADMIN', label: '1. Master Super Admin (SaaS Owner)', short: 'MASTER SAAS' },
+  { value: 'SUPERADMIN',         label: '2. Superadmin (Direktur Perusahaan)', short: 'DIREKTUR' },
+  { value: 'ADMIN',              label: '3. Admin (Staf Operasional)',         short: 'ADMIN' },
+  { value: 'TEKNISI_LAPANGAN',   label: '4. Teknisi Lapangan (Check-in/Tim)',  short: 'TEKNISI' },
+  { value: 'MARKETING',          label: '5. Marketing / Surveyor',             short: 'MARKETING' },
+  { value: 'INVENTORY',          label: '6. Gudang (Chemical & Estimasi)',     short: 'GUDANG' },
 ];
 
 export const Header: React.FC<HeaderProps> = ({
@@ -132,10 +133,11 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={onMenuToggle}
                 aria-label="Buka Navigasi Sidebar"
-                title="Buka / Tutup Menu Modul"
-                className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center shadow-2xs transition-colors shrink-0 cursor-pointer"
+                title="Buka / Tutup Detail Menu Sidebar (Mobile, Tablet, & Desktop)"
+                className="h-8 px-2.5 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer"
               >
                 {mobileMenuOpen ? <X size={15} /> : <Menu size={15} />}
+                <span className="text-[11px] font-bold hidden sm:inline xl:hidden">Menu</span>
               </button>
             )}
 
@@ -187,24 +189,30 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Quick QA Role Switcher Pill */}
-            <div className="flex items-center gap-1 bg-emerald-50/80 border border-emerald-300 rounded-lg px-2 h-8 text-[11px]">
-              <Repeat size={12} className="text-[var(--accent)] shrink-0" />
-              <span className="text-[10px] font-bold text-emerald-900 hidden xl:inline">Role:</span>
-              <select
-                value={currentUser.role}
-                disabled={switchingRole}
-                onChange={e => handleRoleSwitch(e.target.value as UserRole)}
-                className="bg-transparent font-bold text-[11px] text-[var(--accent)] focus:outline-none cursor-pointer pr-0.5 max-w-[85px] sm:max-w-[125px] truncate"
-                title="Ganti Role instan untuk QA (1 Akun Semua Role)"
-              >
-                {ROLE_OPTIONS.map(r => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Role Switcher Eksklusif untuk Akun Superadmin Utama (lieziragroup@gmail.com) */}
+            {currentUser.email?.toLowerCase() === 'lieziragroup@gmail.com' ? (
+              <div className="flex items-center gap-1 bg-emerald-50/90 border border-emerald-300 rounded-lg px-2 h-8 text-[11px]">
+                <Repeat size={12} className="text-[var(--accent)] shrink-0" />
+                <span className="text-[10px] font-bold text-emerald-900 hidden xl:inline">Mode Uji:</span>
+                <select
+                  value={currentUser.role}
+                  disabled={switchingRole}
+                  onChange={e => handleRoleSwitch(e.target.value as UserRole)}
+                  className="bg-transparent font-bold text-[11px] text-[var(--accent)] focus:outline-none cursor-pointer pr-0.5 max-w-[95px] sm:max-w-[140px] truncate"
+                  title="Eksklusif Superadmin (lieziragroup@gmail.com): Ganti tampilan role"
+                >
+                  {ROLE_OPTIONS.map(r => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span className="hidden sm:inline-flex items-center px-2.5 h-8 rounded-lg bg-[#faf9f7] border border-[#e8e5e0] text-[10.5px] font-bold text-[#5a554f]">
+                {ROLE_OPTIONS.find(r => r.value === currentUser.role)?.short ?? currentUser.role}
+              </span>
+            )}
 
             {/* Tombol Panduan QA (Ikon Buku Hijau ala Barventis) */}
             <button

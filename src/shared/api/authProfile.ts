@@ -34,7 +34,7 @@ export async function fetchAppUser(uid: string): Promise<ProfileResult> {
     if (!u.is_active) return { user: null, message: 'Akun Anda dinonaktifkan. Hubungi administrator perusahaan.' };
 
     const role = mapDbRole(u.role);
-    if (role !== 'SUPERADMIN') {
+    if (role !== 'MASTER_SUPER_ADMIN' && role !== 'SUPERADMIN') {
         const { data: company } = await supabase.from('companies').select('status').eq('id', u.company_id).maybeSingle();
         if (!company || !ALLOWED_COMPANY_STATUS.includes(company.status)) {
             return { user: null, message: 'Langganan perusahaan Anda tidak aktif. Hubungi Super Admin.' };

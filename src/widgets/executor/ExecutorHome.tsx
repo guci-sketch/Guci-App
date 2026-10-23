@@ -2,7 +2,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WorkReport, Project, DocumentationPhoto, PhotoType, PhotoTag } from '@/entities/types';
 import { useAuth } from '@/app/providers/AuthContext';
-import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut, submitTreatment, TreatmentInput } from '@/shared/api/workReports';
+import { fetchMyWorkReports, checkIn, addProgressPhoto, checkOut, submitTreatment, updateWorkReportTeam, TreatmentInput, TeamMemberEntry } from '@/shared/api/workReports';
+import { supabase } from '@/shared/lib/supabase';
 import { createProject, fetchMyProjects, CreateProjectInput } from '@/shared/api/projects';
 import { ApiError } from '@/shared/api/client';
 import { getQueueLength, enqueue, enqueueTreatment, enqueueGps, syncQueue } from '@/shared/utils/offlineQueue';
@@ -56,6 +57,8 @@ export const ExecutorHome: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [successFeedback, setSuccessFeedback] = useState<{ title: string; subtitle: string; stats?: string } | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [companyTechs, setCompanyTechs] = useState<{ id: string; name: string }[]>([]);
+  const [quickManualName, setQuickManualName] = useState('');
   const [showGpsPrompt, setShowGpsPrompt] = useState(false);
   const [gpsPermissionStatus, setGpsPermissionStatus] = useState<string>('unknown');
 
@@ -159,7 +162,35 @@ export const ExecutorHome: React.FC = () => {
   useEffect(() => {
     loadData();
     getQueueLength().then(setPendingCount);
-  }, [loadData]);
+    if (user?.companyId) {
+      supabase
+        .from('users')
+        .select('id, name, role')
+        .eq('company_id', user.companyId)
+        .eq('is_active', true)
+        .then(({ data }) => {
+          setCompanyTechs(
+            (data || []).filter((u: any) => u.role === 'TEKNISI_LAPANGAN').map((u: any) => ({ id: u.id, name: u.name }))
+          );
+        });
+    }
+  }, [loadData, user?.companyId]);
+
+  const handleToggleQuickTeamMember = async (rep: WorkReport, member: TeamMemberEntry) => {
+    const current = rep.teamMembers && rep.teamMembers.length > 0
+      ? rep.teamMembers
+      : user ? [{ id: user.uid, name: user.name, role: 'Ketua Tim', isManual: false }] : [];
+    const exists = current.some(m => (member.id && m.id === member.id) || m.name.toLowerCase() === member.name.toLowerCase());
+    const next = exists
+      ? current.filter(m => !((member.id && m.id === member.id) || m.name.toLowerCase() === member.name.toLowerCase()))
+      : [...current, member];
+    setReports(prev => prev.map(r => r.id === rep.id ? { ...r, teamMembers: next } : r));
+    try {
+      await updateWorkReportTeam(rep.id, next);
+    } catch {
+      // ignore if offline
+    }
+  };
 
   const attemptSync = useCallback(async () => {
     if (await getQueueLength() === 0) return;
@@ -529,6 +560,64 @@ export const ExecutorHome: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Setup Tim Teknisi (Pilih Rekan / Input Manual) Sebelum Check-In */}
+                <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 mb-4 space-y-2 text-xs">
+                  <div className="font-bold text-emerald-950 flex items-center justify-between">
+                    <span>Tim Teknisi Bertugas (1 Tim):</span>
+                    <span className="text-[10.5px] font-mono text-emerald-800">
+                      {(readyJob.teamMembers?.length ? readyJob.teamMembers : [{ name: user.name }]).length} Orang
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {companyTechs.map(t => {
+                      const activeList = readyJob.teamMembers?.length ? readyJob.teamMembers : [{ id: user.uid, name: user.name }];
+                      const isSel = activeList.some(m => m.id === t.id || m.name.toLowerCase() === t.name.toLowerCase());
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => handleToggleQuickTeamMember(readyJob, { id: t.id, name: t.name, isManual: false })}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                            isSel ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-slate-700 border-emerald-200'
+                          }`}
+                        >
+                          {isSel ? '✓ ' : '+ '}{t.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={quickManualName}
+                      onChange={e => setQuickManualName(e.target.value)}
+                      placeholder="Ketik nama teknisi/helper manual jika tidak ada..."
+                      className="flex-1 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-white text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!quickManualName.trim()) return;
+                        handleToggleQuickTeamMember(readyJob, { name: quickManualName.trim(), isManual: true });
+                        setQuickManualName('');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-700 text-white text-[11px] font-bold shrink-0"
+                    >
+                      + Manual
+                    </button>
+                  </div>
+                  {(readyJob.teamMembers?.filter(m => m.isManual) ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {readyJob.teamMembers!.filter(m => m.isManual).map((m, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10.5px] font-bold">
+                          {m.name} (Manual)
+                          <button type="button" onClick={() => handleToggleQuickTeamMember(readyJob, m)} className="text-amber-800 hover:text-red-600">✕</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button onClick={() => setActiveCameraAction({ type: 'CHECK_IN', report: readyJob })} className="w-full h-11 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
                   <Camera size={18} /> Ambil Foto &amp; Check-In
                 </button>
@@ -769,6 +858,7 @@ export const ExecutorHome: React.FC = () => {
         <TreatmentFormModal
           serviceType={treatmentFormReport.serviceType}
           existing={treatmentFormReport.treatmentRecord}
+          initialTeamMembers={treatmentFormReport.teamMembers}
           onSubmit={handleTreatmentSubmit}
           onSkip={() => { setActiveCameraAction({ type: 'CHECK_OUT', report: treatmentFormReport }); setTreatmentFormReport(null); }}
           onClose={() => setTreatmentFormReport(null)}

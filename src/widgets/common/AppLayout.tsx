@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-import { X, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
+import { X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { DynamicIslandNav, NavItem } from './DynamicIslandNav';
 
 export interface SidebarItem {
@@ -27,14 +27,13 @@ export interface AppLayoutProps {
 }
 
 /**
- * AppLayout dengan Animasi Sidebar bergaya Supabase Studio:
- * - Di Desktop (lg:): Rail kiri tetap berukuran 56px (`w-14`) di dalam layout utama sehingga konten halaman
- *   TIDAK bergeser/melompat saat sidebar dibuka.
- * - Saat kursor diarahkan (hover) ke rail sidebar, panel melebar dengan transisi fisik halus ala Supabase
- *   (`cubic-bezier(0.16, 1, 0.3, 1)`, 200ms) dari 56px ke 248px di atas kanvas dengan bayangan lembut.
- * - Posisi ikon terkunci presisi di kolom kiri (36x36px) sehingga ikon tidak pernah bergeser naik/turun/kiri/kanan;
- *   hanya teks menu dan badge yang muncul mengalir (fade + slide) di sebelah kanan ikon.
- * - Dilengkapi tombol pengatur di bagian bawah sidebar (Pin Terbuka / Buka Saat Hover) persis seperti Supabase Dashboard.
+ * AppLayout FieldWork — Responsive Multi-Device (Desktop, Tablet, & Mobile):
+ * - Desktop (Mouse Hover): Rail kiri 56px melebar halus ke 252px saat hover (`cubic-bezier(0.16, 1, 0.3, 1)`, 200ms)
+ *   atau dapat dikunci tetap terbuka (Stay Open).
+ * - Tablet View (Touch Screen 768px - 1180px): Karena perangkat Tablet tidak memiliki hover kursor, tersedia tombol
+ *   Hamburger ("Menu") di Header dan tombol Toggle di atas rail yang membuka Sidebar secara penuh (252px) dan
+ *   tetap terbuka (Stay / Absolute Overlay) sampai pengguna memilih menu atau menutupnya.
+ * - Mobile View (< 768px): Slide-over drawer 260px + Floating Bottom Navigation Pill.
  */
 export function AppLayout({
     sidebarItems,
@@ -49,17 +48,28 @@ export function AppLayout({
 }: AppLayoutProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
     const [isPinnedDesktop, setIsPinnedDesktop] = useState<boolean>(() => {
         try {
-            return localStorage.getItem('gep_sidebar_pinned') === 'true';
+            const saved = localStorage.getItem('gep_sidebar_pinned');
+            if (saved !== null) return saved === 'true';
+            // Pada perangkat Tablet layar sentuh (>= 768px & <= 1180px), default stay open jika dibuka
+            return false;
         } catch {
             return false;
         }
     });
     const hoverTimeoutRef = useRef<number | null>(null);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            const touchMatch = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+            setIsTouchDevice(touchMatch);
+        }
+    }, []);
+
     const isSidebarOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-    // Sidebar tampil melebar jika sedang di-hover di desktop, di-pin di desktop, atau dibuka lewat tombol hamburger
+    // Sidebar tampil penuh (252px) jika dibuka via Hamburger (Mobile/Tablet), sedang di-hover (Desktop), atau di-Pin (Stay Open)
     const isExpanded = isSidebarOpen || isHovered || isPinnedDesktop;
 
     const setSidebarOpen = (val: boolean) => {
@@ -78,9 +88,8 @@ export function AppLayout({
     };
 
     const handleMouseEnter = () => {
-        if (window.innerWidth < 1024) return;
+        if (typeof window !== 'undefined' && (window.innerWidth < 1024 || isTouchDevice)) return;
         if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
-        // Hover intent 35ms seperti Supabase Studio agar gerakan kursor cepat tidak memicu kedipan
         hoverTimeoutRef.current = window.setTimeout(() => {
             setIsHovered(true);
         }, 35);
@@ -155,6 +164,11 @@ export function AppLayout({
     }, [isSidebarOpen]);
 
     const handleTabClick = (id: string) => {
+        // Pada Tablet landscape (layar sentuh >= 1024px), jika sidebar masih tertutup (56px), tap pertama membuka sidebar
+        if (isTouchDevice && !isExpanded && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+            setSidebarOpen(true);
+            return;
+        }
         onTabChange(id);
         setSidebarOpen(false);
     };
@@ -175,10 +189,18 @@ export function AppLayout({
 
     return (
         <div className="flex flex-col h-screen bg-[var(--bg-primary)] font-sans overflow-hidden">
-            {header}
+            {/* Header offset pada layar >= 1024px agar tombol Hamburger tidak pernah tertutup oleh rail sidebar */}
+            <div
+                className={cn(
+                    ' transition-[padding] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0',
+                    isPinnedDesktop ? 'lg:pl-[252px]' : 'lg:pl-14'
+                )}
+            >
+                {header}
+            </div>
 
             <div className="flex flex-1 overflow-hidden relative">
-                {/* Mobile & Tablet Drawer Backdrop */}
+                {/* Backdrop saat Sidebar dibuka secara Absolute/Overlay di Mobile maupun Tablet */}
                 <AnimatePresence>
                     {isSidebarOpen && (
                         <motion.div
@@ -186,45 +208,56 @@ export function AppLayout({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.18, ease: 'easeOut' }}
-                            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1.5px] lg:hidden"
+                            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1.5px]"
                             onClick={() => setSidebarOpen(false)}
                         />
                     )}
                 </AnimatePresence>
 
-                {/* Supabase-Style Expandable Sidebar Rail */}
+                {/* Supabase-Style Expandable Sidebar Rail + Tablet Stay/Absolute Support */}
                 <motion.aside
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                     initial={false}
                     animate={{
-                        width: isExpanded ? 248 : 56,
+                        width: isExpanded ? 252 : 56,
                     }}
                     transition={{
                         type: 'tween',
                         duration: 0.2,
-                        ease: [0.16, 1, 0.3, 1], // Kurva eksponensial halus khas Supabase Studio
+                        ease: [0.16, 1, 0.3, 1],
                     }}
                     className={cn(
                         'fixed inset-y-0 left-0 z-50 bg-white border-r border-[#e8e5e0] flex flex-col select-none overflow-hidden',
                         'transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
                         isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
                         isExpanded && !isPinnedDesktop
-                            ? 'shadow-[6px_0_28px_rgba(45,42,38,0.10)]'
+                            ? 'shadow-[8px_0_30px_rgba(45,42,38,0.12)]'
                             : 'shadow-none'
                     )}
                 >
-                    {/* Top Brand Rail Header — Ikon GP Terkunci di Kiri (36x36px) */}
+                    {/* Top Brand Rail Header — Klik pada logo FW di Tablet/Desktop dapat membuka/mengunci Sidebar */}
                     <div className="h-12 px-2.5 border-b border-[#e8e5e0] flex items-center justify-between shrink-0">
                         <div className="flex items-center min-w-0">
-                            <div className="w-9 h-9 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs">
-                                GP
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                                        setSidebarOpen(!isSidebarOpen);
+                                    } else {
+                                        setSidebarOpen(!isSidebarOpen);
+                                    }
+                                }}
+                                title="Buka / Tutup Detail Menu Sidebar"
+                                className="w-9 h-9 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs tracking-tighter cursor-pointer"
+                            >
+                                FW
+                            </button>
                             <div
                                 className={cn(
                                     'ml-2.5 overflow-hidden whitespace-nowrap transition-all duration-150 ease-out',
                                     isExpanded
-                                        ? 'opacity-100 translate-x-0 w-[170px]'
+                                        ? 'opacity-100 translate-x-0 w-[166px]'
                                         : 'opacity-0 -translate-x-1.5 w-0 pointer-events-none'
                                 )}
                             >
@@ -232,10 +265,13 @@ export function AppLayout({
                             </div>
                         </div>
 
-                        {isSidebarOpen && (
+                        {isExpanded && (
                             <button
                                 type="button"
-                                onClick={() => setSidebarOpen(false)}
+                                onClick={() => {
+                                    setSidebarOpen(false);
+                                    setIsHovered(false);
+                                }}
                                 className="lg:hidden w-7 h-7 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef] shrink-0"
                                 aria-label="Tutup Menu"
                             >
@@ -244,14 +280,13 @@ export function AppLayout({
                         )}
                     </div>
 
-                    {/* Daftar Menu dengan Posisi Ikon Terkunci (Tidak Bergeser Saat Hover) */}
+                    {/* Daftar Menu dengan Posisi Ikon Terkunci (Tidak Bergeser Saat Hover / Buka) */}
                     <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-2 no-scrollbar">
                         {groupedItems.map((group, groupIdx) => (
                             <div key={group.name} className="space-y-0.5">
-                                {/* Header Grup: Garis halus saat tertutup, teks kategori saat melebar (Tinggi tetap 20px agar ikon tidak melompat) */}
                                 <div className="h-5 flex items-center px-1.5 overflow-hidden">
                                     {isExpanded ? (
-                                        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] whitespace-nowrap animate-in fade-in duration-150">
+                                        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] whitespace-nowrap">
                                             {group.name}
                                         </span>
                                     ) : groupIdx > 0 ? (
@@ -279,7 +314,6 @@ export function AppLayout({
                                                     : 'text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[#2d2a26] font-medium'
                                             )}
                                         >
-                                            {/* Indikator Garis Aktif di Sisi Kiri */}
                                             {active && (
                                                 <motion.div
                                                     layoutId="supabase-sidebar-active-pill"
@@ -291,7 +325,6 @@ export function AppLayout({
                                                 />
                                             )}
 
-                                            {/* Kolom Ikon Tetap 36px (Membuat ikon tidak pernah bergeser saat sidebar melebar/menyempit) */}
                                             <div
                                                 className={cn(
                                                     'w-9 h-9 flex items-center justify-center shrink-0 [&_svg]:w-[16px] [&_svg]:h-[16px] transition-transform duration-150 group-hover/item:scale-105',
@@ -305,7 +338,6 @@ export function AppLayout({
                                                 {item.icon}
                                             </div>
 
-                                            {/* Label Menu & Badge (Hanya muncul mengalir di kanan ikon) */}
                                             <div
                                                 className={cn(
                                                     'flex-1 flex items-center justify-between pr-2.5 min-w-0 overflow-hidden whitespace-nowrap transition-all duration-150 ease-out',
@@ -338,16 +370,22 @@ export function AppLayout({
                         ))}
                     </div>
 
-                    {/* Footer Pengatur Sidebar ala Supabase Studio (Pin Terbuka vs Buka Saat Disentuh Kursor) */}
-                    <div className="hidden lg:flex h-10 px-2 border-t border-[#e8e5e0] items-center bg-[#faf9f7] shrink-0">
+                    {/* Footer Pengatur Sidebar (Bisa dikunci Stay Open di Tablet maupun Desktop) */}
+                    <div className="flex h-10 px-2 border-t border-[#e8e5e0] items-center bg-[#faf9f7] shrink-0">
                         <button
                             type="button"
-                            onClick={togglePinDesktop}
-                            title={isPinnedDesktop ? 'Ubah ke mode Buka Saat Kursor Menyentuh (Hover)' : 'Kunci Sidebar Agar Selalu Terbuka'}
+                            onClick={() => {
+                                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                                    setSidebarOpen(!isSidebarOpen);
+                                } else {
+                                    togglePinDesktop();
+                                }
+                            }}
+                            title={isPinnedDesktop ? 'Ubah ke Mode Ringkas / Hover' : 'Kunci Sidebar Agar Tetap Terbuka (Stay Open)'}
                             className="w-full h-7 flex items-center rounded-md text-[11px] text-[#5a554f] hover:text-[#2d2a26] hover:bg-[#f5f3ef] transition-colors cursor-pointer overflow-hidden"
                         >
                             <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[#8a8580]">
-                                {isPinnedDesktop ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+                                {isPinnedDesktop || isSidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
                             </div>
                             <span
                                 className={cn(
@@ -355,24 +393,23 @@ export function AppLayout({
                                     isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-1.5 pointer-events-none'
                                 )}
                             >
-                                {isPinnedDesktop ? 'Mode: Selalu Terbuka' : 'Mode: Buka Saat Hover'}
+                                {isPinnedDesktop ? 'Sidebar: Terkunci (Stay)' : 'Kunci Sidebar (Stay Open)'}
                             </span>
                         </button>
                     </div>
                 </motion.aside>
 
-                {/* Main Content Area: Margin kiri tetap 56px (lg:ml-14) saat mode hover sehingga halaman tidak pernah bergeser/melompat */}
+                {/* Main Content Area: Responsive & Anti-Overlap */}
                 <main
                     className={cn(
-                        'flex-1 overflow-y-auto relative bg-[var(--bg-primary)] page-fade-in w-full pb-20 transition-[margin] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
-                        isPinnedDesktop ? 'lg:ml-[248px]' : 'lg:ml-14'
+                        'flex-1 min-w-0 overflow-y-auto overflow-x-hidden relative bg-[var(--bg-primary)] page-fade-in w-full pb-24 transition-[margin] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                        isPinnedDesktop ? 'lg:ml-[252px]' : 'lg:ml-14'
                     )}
                 >
                     {children}
                 </main>
             </div>
 
-            {/* Dynamic Floating Bottom Pill */}
             {dynamicIslandItems && dynamicIslandItems.length > 0 && (
                 <DynamicIslandNav
                     items={dynamicIslandItems}

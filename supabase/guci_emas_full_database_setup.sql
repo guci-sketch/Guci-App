@@ -63,9 +63,78 @@ ON CONFLICT (name) DO NOTHING;
 -- ====================================================================================================
 -- BAGIAN 2: TIPE ENUMERASI (ENUM TYPES)
 -- ====================================================================================================
-DO $$ BEGIN
-  CREATE TYPE public.user_role AS ENUM ('SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Migrasi Tipe Enum `public.user_role` Tanpa `ALTER TYPE ... ADD VALUE`
+-- Menghindari error PostgreSQL 55P04 ("unsafe use of new value MASTER_SUPER_ADMIN of enum type user_role")
+-- saat dijalankan sekaligus dalam satu transaksi di Supabase SQL Editor.
+DO $$
+DECLARE
+  r record;
+  t text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type typ
+    JOIN pg_namespace nsp ON nsp.oid = typ.typnamespace
+    WHERE nsp.nspname = 'public' AND typ.typname = 'user_role'
+  ) THEN
+    CREATE TYPE public.user_role AS ENUM (
+      'MASTER_SUPER_ADMIN',
+      'SUPERADMIN',
+      'ADMIN',
+      'MARKETING',
+      'INVENTORY',
+      'TEKNISI_LAPANGAN'
+    );
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM pg_enum e
+    JOIN pg_type typ ON typ.oid = e.enumtypid
+    JOIN pg_namespace nsp ON nsp.oid = typ.typnamespace
+    WHERE nsp.nspname = 'public'
+      AND typ.typname = 'user_role'
+      AND e.enumlabel = 'MASTER_SUPER_ADMIN'
+  ) THEN
+    FOREACH t IN ARRAY ARRAY[
+      'companies','users','quotations','spk','inventory_items','inventory_logs','company_settings',
+      'nomor_surat_logs','order_tracking','performa_targets','customer_checklists','invites',
+      'projects','work_reports','treatment_records','documentation_photos','risk_events','risk_config','audit_logs','user_locations'
+    ] LOOP
+      IF to_regclass('public.' || t) IS NOT NULL THEN
+        FOR r IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = t LOOP
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, t);
+        END LOOP;
+      END IF;
+    END LOOP;
+
+    DROP FUNCTION IF EXISTS public.register_guci_emas_user(text, text, public.user_role, text, text);
+    DROP FUNCTION IF EXISTS public.upsert_demo_account_guci_emas(uuid, text, text, text, public.user_role, text, text);
+    DROP TYPE IF EXISTS public.user_role_v2;
+
+    CREATE TYPE public.user_role_v2 AS ENUM (
+      'MASTER_SUPER_ADMIN',
+      'SUPERADMIN',
+      'ADMIN',
+      'MARKETING',
+      'INVENTORY',
+      'TEKNISI_LAPANGAN'
+    );
+
+    IF to_regclass('public.users') IS NOT NULL THEN
+      ALTER TABLE public.users ALTER COLUMN role DROP DEFAULT;
+      ALTER TABLE public.users
+        ALTER COLUMN role TYPE public.user_role_v2
+        USING (role::text::public.user_role_v2);
+    END IF;
+
+    IF to_regclass('public.audit_logs') IS NOT NULL THEN
+      ALTER TABLE public.audit_logs ALTER COLUMN user_role DROP DEFAULT;
+      ALTER TABLE public.audit_logs
+        ALTER COLUMN user_role TYPE public.user_role_v2
+        USING (user_role::text::public.user_role_v2);
+    END IF;
+
+    DROP TYPE public.user_role CASCADE;
+    ALTER TYPE public.user_role_v2 RENAME TO user_role;
+  END IF;
+END $$;
 
 DO $$ BEGIN
   CREATE TYPE public.company_status AS ENUM ('TRIAL', 'ACTIVE', 'SUSPENDED', 'EXPIRED');
@@ -124,9 +193,11 @@ CREATE TABLE IF NOT EXISTS public.companies (
   company_slug varchar NOT NULL UNIQUE,
   status public.company_status NOT NULL DEFAULT 'TRIAL',
   subscription_plan varchar NOT NULL DEFAULT 'BASIC',
+  max_technicians int4 NOT NULL DEFAULT 20,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS max_technicians int4 NOT NULL DEFAULT 20;
 
 -- 3.2. Tabel Pengguna (Surveyor/Marketing = 'MARKETING', Admin = 'ADMIN', Teknisi = 'TEKNISI_LAPANGAN')
 CREATE TABLE IF NOT EXISTS public.users (
@@ -175,10 +246,14 @@ CREATE TABLE IF NOT EXISTS public.projects (
   scheduled_start_time time NOT NULL DEFAULT '08:00',
   notes text,
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  contract_value numeric NOT NULL DEFAULT 0,
+  quotation_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   locked_at timestamptz
 );
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS contract_value numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS quotation_id uuid;
 
 -- 3.5. Tabel Laporan Kerja Lapangan (Work Reports)
 CREATE TABLE IF NOT EXISTS public.work_reports (
@@ -210,9 +285,11 @@ CREATE TABLE IF NOT EXISTS public.work_reports (
   customer_feedback text,
   customer_signature text,
   notes text,
+  team_members jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.work_reports ADD COLUMN IF NOT EXISTS team_members jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 -- 3.6. Tabel Catatan Penggunaan Chemical & Metode Treatment
 CREATE TABLE IF NOT EXISTS public.treatment_records (
@@ -294,9 +371,11 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
   satuan varchar NOT NULL,
   stok numeric NOT NULL DEFAULT 0,
   min_alert numeric NOT NULL DEFAULT 0,
+  harga_satuan numeric NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS harga_satuan numeric NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.inventory_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -306,10 +385,16 @@ CREATE TABLE IF NOT EXISTS public.inventory_logs (
   qty_masuk numeric NOT NULL DEFAULT 0,
   qty_keluar numeric NOT NULL DEFAULT 0,
   sisa_stok numeric NOT NULL DEFAULT 0,
+  project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL,
   proyek varchar,
+  tipe_catatan varchar NOT NULL DEFAULT 'REALISASI',
+  biaya_total numeric NOT NULL DEFAULT 0,
   keterangan text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL;
+ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS tipe_catatan varchar NOT NULL DEFAULT 'REALISASI';
+ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS biaya_total numeric NOT NULL DEFAULT 0;
 
 -- 3.11. Tabel Quotations (Automation Quotation Engine: GP-DRF -> GP-APR, AR & PCO, Garansi Bulan/Tahun)
 CREATE TABLE IF NOT EXISTS public.quotations (
@@ -526,9 +611,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT u.role::text FROM public.users u WHERE u.id = auth.uid() AND u.is_active
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_master_superadmin() RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT coalesce((SELECT u.role::text = 'MASTER_SUPER_ADMIN' FROM public.users u WHERE u.id = auth.uid() AND u.is_active), false)
+$$;
+
 CREATE OR REPLACE FUNCTION public.is_superadmin() RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT coalesce((SELECT u.role::text = 'SUPERADMIN' FROM public.users u WHERE u.id = auth.uid() AND u.is_active), false)
+  SELECT coalesce((SELECT u.role::text IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN') FROM public.users u WHERE u.id = auth.uid() AND u.is_active), false)
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_company_admin(p_company uuid) RETURNS boolean
@@ -536,7 +626,10 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.is_active
-      AND (u.role::text = 'SUPERADMIN' OR (u.role::text = 'ADMIN' AND u.company_id = p_company))
+      AND (
+        u.role::text = 'MASTER_SUPER_ADMIN'
+        OR (u.role::text IN ('SUPERADMIN', 'ADMIN') AND u.company_id = p_company)
+      )
   )
 $$;
 
@@ -545,7 +638,10 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.is_active
-      AND (u.role::text = 'SUPERADMIN' OR (u.company_id = p_company AND u.role::text = ANY (p_roles)))
+      AND (
+        u.role::text = 'MASTER_SUPER_ADMIN'
+        OR (u.company_id = p_company AND (u.role::text = 'SUPERADMIN' OR u.role::text = ANY (p_roles)))
+      )
   )
 $$;
 
@@ -563,44 +659,55 @@ CREATE OR REPLACE FUNCTION public.process_inventory_mutation(
   p_type text,
   p_notes text DEFAULT NULL,
   p_pencatat_id uuid DEFAULT NULL,
-  p_proyek text DEFAULT NULL
+  p_proyek text DEFAULT NULL,
+  p_project_id uuid DEFAULT NULL,
+  p_tipe_catatan text DEFAULT 'REALISASI'
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_current numeric;
   v_new numeric;
+  v_harga numeric := 0;
   v_company uuid;
   v_log_id uuid;
+  v_catatan text := upper(coalesce(nullif(btrim(p_tipe_catatan), ''), 'REALISASI'));
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Belum login' USING ERRCODE = '28000'; END IF;
   IF p_quantity IS NULL OR p_quantity <= 0 THEN RAISE EXCEPTION 'Quantity must be greater than 0'; END IF;
   IF p_type NOT IN ('IN', 'OUT') THEN RAISE EXCEPTION 'Type must be IN or OUT'; END IF;
 
-  SELECT stok, company_id INTO v_current, v_company FROM public.inventory_items WHERE id = p_item_id FOR UPDATE;
+  SELECT stok, company_id, coalesce(harga_satuan, 0) INTO v_current, v_company, v_harga
+  FROM public.inventory_items WHERE id = p_item_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Item not found'; END IF;
 
   IF NOT public.has_company_role(v_company, 'ADMIN', 'INVENTORY') THEN
     RAISE EXCEPTION 'Tidak berwenang mengubah stok perusahaan ini' USING ERRCODE = '42501';
   END IF;
 
-  IF p_type = 'IN' THEN
+  IF v_catatan = 'ESTIMASI' THEN
+    -- Catatan estimasi gudang untuk ID Proyek tidak memotong stok fisik secara langsung sebelum realisasi
+    v_new := v_current;
+  ELSIF p_type = 'IN' THEN
     v_new := v_current + p_quantity;
+    UPDATE public.inventory_items SET stok = v_new, updated_at = now() WHERE id = p_item_id;
   ELSE
     v_new := v_current - p_quantity;
     IF v_new < 0 THEN RAISE EXCEPTION 'Insufficient stock'; END IF;
+    UPDATE public.inventory_items SET stok = v_new, updated_at = now() WHERE id = p_item_id;
   END IF;
 
-  UPDATE public.inventory_items SET stok = v_new, updated_at = now() WHERE id = p_item_id;
-
-  INSERT INTO public.inventory_logs (item_id, company_id, tanggal, qty_masuk, qty_keluar, sisa_stok, proyek, keterangan, created_at)
+  INSERT INTO public.inventory_logs (
+    item_id, company_id, tanggal, qty_masuk, qty_keluar, sisa_stok,
+    project_id, proyek, tipe_catatan, biaya_total, keterangan, created_at
+  )
   VALUES (
     p_item_id, v_company, current_date,
     CASE WHEN p_type = 'IN'  THEN p_quantity ELSE 0 END,
     CASE WHEN p_type = 'OUT' THEN p_quantity ELSE 0 END,
-    v_new, p_proyek, p_notes, now()
+    v_new, p_project_id, p_proyek, v_catatan, (p_quantity * v_harga), p_notes, now()
   )
   RETURNING id INTO v_log_id;
 
-  RETURN jsonb_build_object('success', true, 'log_id', v_log_id, 'new_stock', v_new);
+  RETURN jsonb_build_object('success', true, 'log_id', v_log_id, 'new_stock', v_new, 'biaya_total', (p_quantity * v_harga));
 END $$;
 
 -- 8.2. RPC Persetujuan / Review Laporan Kerja Lapangan
@@ -741,10 +848,12 @@ BEGIN
   v_year  := to_char(now() AT TIME ZONE p_tz, 'YYYY');
   v_month := to_char(now() AT TIME ZONE p_tz, 'MM');
 
-  IF v_stage = 'LEGACY' THEN
-    v_stem := v_prefix || '-' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
+  IF v_stage = 'DRF' THEN
+    -- Saat masih Draft memakai kode -DRF (contoh: GP-DRF/AR/PH/2026/10/0001)
+    v_stem := v_prefix || '-DRF/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
   ELSE
-    v_stem := v_prefix || '-' || v_stage || '/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
+    -- Saat Approved (APR), kode DRF hilang tanpa tambahan APR (contoh: GP/AR/PH/2026/10/0001)
+    v_stem := v_prefix || '/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
   END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended(v_company::text || '|' || v_stem, 0));
@@ -842,14 +951,14 @@ BEGIN
 END $$;
 
 -- 8.7. Hak Eksekusi RPC
-REVOKE EXECUTE ON FUNCTION public.process_inventory_mutation(uuid, numeric, text, text, uuid, text) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION public.process_inventory_mutation(uuid, numeric, text, text, uuid, text, uuid, text) FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.process_status_approval(uuid, text, text) FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.quotation_patch(uuid, text, jsonb) FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.generate_nomor_surat(text, text, text, text, text, boolean, text, text) FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.accept_invite(text, text, text) FROM public, anon;
 REVOKE EXECUTE ON FUNCTION public.company_settings_patch(uuid, jsonb) FROM public, anon;
 
-GRANT EXECUTE ON FUNCTION public.process_inventory_mutation(uuid, numeric, text, text, uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.process_inventory_mutation(uuid, numeric, text, text, uuid, text, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.process_status_approval(uuid, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.quotation_patch(uuid, text, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.generate_nomor_surat(text, text, text, text, text, boolean, text, text) TO authenticated;
@@ -1043,8 +1152,8 @@ CREATE POLICY risk_events_all ON public.risk_events FOR ALL TO authenticated
 CREATE POLICY risk_config_select ON public.risk_config FOR SELECT TO authenticated
   USING (true);
 CREATE POLICY risk_config_write ON public.risk_config FOR ALL TO authenticated
-  USING (public.current_app_role() IN ('ADMIN', 'SUPERADMIN'))
-  WITH CHECK (public.current_app_role() IN ('ADMIN', 'SUPERADMIN'));
+  USING (public.current_app_role() IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'))
+  WITH CHECK (public.current_app_role() IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'));
 
 CREATE POLICY audit_logs_select ON public.audit_logs FOR SELECT TO authenticated
   USING (company_id = public.current_company_id() OR public.is_superadmin());
@@ -1058,7 +1167,7 @@ CREATE POLICY user_locations_select ON public.user_locations FOR SELECT TO authe
       AND (u.company_id = public.current_company_id() OR public.is_superadmin())
   ));
 CREATE POLICY user_locations_insert ON public.user_locations FOR INSERT TO authenticated
-  WITH CHECK (user_id = auth.uid() OR public.current_app_role() IN ('ADMIN', 'SUPERADMIN'));
+  WITH CHECK (user_id = auth.uid() OR public.current_app_role() IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'));
 
 -- 9.10. RPC Manajemen Pengguna via Admin (Mendukung Buat, Aktif/Suspend, & Hapus User Langsung dari Frontend)
 CREATE OR REPLACE FUNCTION public.admin_upsert_company_user(
@@ -1091,9 +1200,13 @@ CREATE OR REPLACE FUNCTION public.admin_set_user_active(p_user_id uuid, p_active
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_co_id uuid;
+  v_email text;
 BEGIN
-  SELECT company_id INTO v_co_id FROM public.users WHERE id = p_user_id;
+  SELECT company_id, lower(email) INTO v_co_id, v_email FROM public.users WHERE id = p_user_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
+  IF v_email = 'lieziragroup@gmail.com' THEN
+    RAISE EXCEPTION 'Akun Superadmin Utama (lieziragroup@gmail.com) dilindungi dan tidak dapat dinonaktifkan' USING ERRCODE = '42501';
+  END IF;
   IF NOT public.is_company_admin(v_co_id) THEN
     RAISE EXCEPTION 'Tidak berwenang mengubah status user' USING ERRCODE = '42501';
   END IF;
@@ -1105,9 +1218,13 @@ CREATE OR REPLACE FUNCTION public.admin_delete_company_user(p_user_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_co_id uuid;
+  v_email text;
 BEGIN
-  SELECT company_id INTO v_co_id FROM public.users WHERE id = p_user_id;
+  SELECT company_id, lower(email) INTO v_co_id, v_email FROM public.users WHERE id = p_user_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
+  IF v_email = 'lieziragroup@gmail.com' THEN
+    RAISE EXCEPTION 'Akun Superadmin Utama (lieziragroup@gmail.com) dilindungi dan tidak dapat dihapus' USING ERRCODE = '42501';
+  END IF;
   IF NOT public.is_company_admin(v_co_id) THEN
     RAISE EXCEPTION 'Tidak berwenang menghapus user' USING ERRCODE = '42501';
   END IF;
@@ -1247,13 +1364,13 @@ DECLARE
 BEGIN
   SELECT id INTO v_co_id FROM public.companies WHERE company_slug = 'guci-emas-pratama';
   IF v_co_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.inventory_items WHERE company_id = v_co_id) THEN
-    INSERT INTO public.inventory_items (company_id, nama, kategori, satuan, stok, min_alert) VALUES
-      (v_co_id, 'Cypergard 100 EC (Cypermethrin)', 'Termitisida / Insektisida', 'Botol 500ml', 40, 10),
-      (v_co_id, 'Safe 1 200 SL (Imidakloprid)', 'Termitisida Anti Rayap', 'Botol 500ml', 35, 10),
-      (v_co_id, 'Demand CS (Lambda Cyhalothrin)', 'Insektisida Residual PCO', 'Liter', 20, 5),
-      (v_co_id, 'Klerat Wax Block (Brodifacum)', 'Rodentisida Umpan Tikus', 'Kg', 50, 10),
-      (v_co_id, 'Lem Tikus / Glue Trap Board', 'Peralatan Rodent Control', 'Pcs', 120, 30),
-      (v_co_id, 'Pipa PVC AW Ø 1/2 Inch (Jalur Pipanisasi)', 'Material Pipanisasi Rayap', 'Batang (4m)', 80, 20);
+    INSERT INTO public.inventory_items (company_id, nama, kategori, satuan, stok, min_alert, harga_satuan) VALUES
+      (v_co_id, 'Cypergard 100 EC (Cypermethrin)', 'Termitisida / Insektisida', 'Botol 500ml', 40, 10, 185000),
+      (v_co_id, 'Safe 1 200 SL (Imidakloprid)', 'Termitisida Anti Rayap', 'Botol 500ml', 35, 10, 210000),
+      (v_co_id, 'Demand CS (Lambda Cyhalothrin)', 'Insektisida Residual PCO', 'Liter', 20, 5, 650000),
+      (v_co_id, 'Klerat Wax Block (Brodifacum)', 'Rodentisida Umpan Tikus', 'Kg', 50, 10, 145000),
+      (v_co_id, 'Lem Tikus / Glue Trap Board', 'Peralatan Rodent Control', 'Pcs', 120, 30, 15000),
+      (v_co_id, 'Pipa PVC AW Ø 1/2 Inch (Jalur Pipanisasi)', 'Material Pipanisasi Rayap', 'Batang (4m)', 80, 20, 42000);
   END IF;
 END $$;
 
@@ -1277,9 +1394,16 @@ BEGIN
 
   SELECT id INTO v_auth_id FROM auth.users WHERE lower(email) = lower(btrim(p_email)) LIMIT 1;
 
+  v_user_id := coalesce(
+    v_auth_id,
+    (SELECT id FROM public.users WHERE lower(email) = lower(btrim(p_email)) LIMIT 1),
+    gen_random_uuid()
+  );
+  DELETE FROM public.users WHERE lower(email) = lower(btrim(p_email)) AND id <> v_user_id;
+
   INSERT INTO public.users (id, company_id, name, email, nip, password_hash, role, phone, is_active)
   VALUES (
-    coalesce(v_auth_id, gen_random_uuid()),
+    v_user_id,
     v_co_id,
     btrim(p_name),
     lower(btrim(p_email)),
@@ -1289,16 +1413,15 @@ BEGIN
     nullif(btrim(p_phone), ''),
     true
   )
-  ON CONFLICT (email) DO UPDATE
-    SET id         = coalesce(v_auth_id, public.users.id),
-        company_id = EXCLUDED.company_id,
+  ON CONFLICT (id) DO UPDATE
+    SET company_id = EXCLUDED.company_id,
         name       = EXCLUDED.name,
+        email      = EXCLUDED.email,
         role       = EXCLUDED.role,
         phone      = coalesce(EXCLUDED.phone, public.users.phone),
         nip        = coalesce(EXCLUDED.nip, public.users.nip),
         is_active  = true,
-        updated_at = now()
-  RETURNING id INTO v_user_id;
+        updated_at = now();
 
   RETURN jsonb_build_object(
     'user_id', v_user_id,
@@ -1343,7 +1466,7 @@ BEGIN
 
   IF v_is_first_user THEN
     v_role := 'ADMIN';
-  ELSIF v_meta_role IN ('SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN') THEN
+  ELSIF v_meta_role IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN') THEN
     v_role := v_meta_role::public.user_role;
   ELSE
     RETURN new;
@@ -1403,6 +1526,7 @@ CREATE OR REPLACE FUNCTION public.upsert_demo_account_guci_emas(
 DECLARE
   v_co_id uuid;
   v_actual_uid uuid := p_uid;
+  v_clean_email text := lower(btrim(p_email));
   v_has_full_auth boolean;
   v_has_provider_id boolean;
 BEGIN
@@ -1411,9 +1535,13 @@ BEGIN
     RAISE EXCEPTION 'Perusahaan PT Guci Emas Pratama belum ada';
   END IF;
 
-  -- Cek apakah email sudah ada di auth.users
-  SELECT id INTO v_actual_uid FROM auth.users WHERE lower(email) = lower(btrim(p_email)) LIMIT 1;
+  -- 1. Cek apakah email sudah ada di auth.users; jika belum, gunakan p_uid
+  SELECT id INTO v_actual_uid FROM auth.users WHERE lower(email) = v_clean_email LIMIT 1;
   v_actual_uid := coalesce(v_actual_uid, p_uid);
+
+  -- Bersihkan potensi duplikat email pada id berbeda di auth.users & public.users
+  DELETE FROM public.users WHERE lower(email) = v_clean_email AND id <> v_actual_uid;
+  DELETE FROM auth.users   WHERE lower(email) = v_clean_email AND id <> v_actual_uid;
 
   -- Deteksi apakah ini tabel `auth.users` penuh milik Supabase Cloud (memiliki kolom encrypted_password)
   SELECT EXISTS (
@@ -1432,13 +1560,13 @@ BEGIN
         v_actual_uid,
         'authenticated',
         'authenticated',
-        lower(btrim(p_email)),
+        v_clean_email,
         crypt(p_password, gen_salt('bf')),
         now(),
         '{"provider":"email","providers":["email"]}'::jsonb,
         jsonb_build_object(
           'sub', v_actual_uid::text,
-          'email', lower(btrim(p_email)),
+          'email', v_clean_email,
           'name', p_name,
           'role', p_role::text,
           'phone', p_phone,
@@ -1451,12 +1579,13 @@ BEGIN
       );
     ELSE
       UPDATE auth.users
-         SET encrypted_password     = crypt(p_password, gen_salt('bf')),
+         SET email                  = v_clean_email,
+             encrypted_password     = crypt(p_password, gen_salt('bf')),
              email_confirmed_at     = coalesce(email_confirmed_at, now()),
              raw_app_meta_data      = '{"provider":"email","providers":["email"]}'::jsonb,
              raw_user_meta_data     = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
                'sub', v_actual_uid::text,
-               'email', lower(btrim(p_email)),
+               'email', v_clean_email,
                'name', p_name,
                'role', p_role::text,
                'email_verified', true
@@ -1476,7 +1605,7 @@ BEGIN
     EXCEPTION WHEN undefined_column THEN NULL;
     END;
 
-    -- Isi auth.identities apabila tabelnya tersedia di Supabase
+    -- Isi atau perbarui auth.identities apabila tabelnya tersedia di Supabase
     IF to_regclass('auth.identities') IS NOT NULL THEN
       SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -1490,7 +1619,7 @@ BEGIN
             gen_random_uuid(),
             v_actual_uid,
             v_actual_uid::text,
-            jsonb_build_object('sub', v_actual_uid::text, 'email', lower(btrim(p_email)), 'email_verified', true, 'phone_verified', false),
+            jsonb_build_object('sub', v_actual_uid::text, 'email', v_clean_email, 'email_verified', true, 'phone_verified', false),
             'email',
             now(), now(), now()
           );
@@ -1499,11 +1628,16 @@ BEGIN
           VALUES (
             v_actual_uid::text,
             v_actual_uid,
-            jsonb_build_object('sub', v_actual_uid::text, 'email', lower(btrim(p_email)), 'email_verified', true, 'phone_verified', false),
+            jsonb_build_object('sub', v_actual_uid::text, 'email', v_clean_email, 'email_verified', true, 'phone_verified', false),
             'email',
             now(), now(), now()
           );
         END IF;
+      ELSE
+        UPDATE auth.identities
+           SET identity_data = jsonb_build_object('sub', v_actual_uid::text, 'email', v_clean_email, 'email_verified', true, 'phone_verified', false),
+               updated_at    = now()
+         WHERE user_id = v_actual_uid AND provider = 'email';
       END IF;
     END IF;
   ELSE
@@ -1511,7 +1645,7 @@ BEGIN
     INSERT INTO auth.users (id, email, raw_user_meta_data)
     VALUES (
       v_actual_uid,
-      lower(btrim(p_email)),
+      v_clean_email,
       jsonb_build_object('name', p_name, 'role', p_role::text)
     )
     ON CONFLICT (id) DO UPDATE
@@ -1519,44 +1653,74 @@ BEGIN
           raw_user_meta_data = EXCLUDED.raw_user_meta_data;
   END IF;
 
-  -- Upsert ke public.users
-  INSERT INTO public.users (id, company_id, name, email, nip, password_hash, role, phone, is_active)
-  VALUES (
-    v_actual_uid,
-    v_co_id,
-    p_name,
-    lower(btrim(p_email)),
-    p_nip,
-    'managed-by-supabase-auth',
-    p_role,
-    p_phone,
-    true
-  )
-  ON CONFLICT (email) DO UPDATE
-    SET id         = v_actual_uid,
-        company_id = v_co_id,
-        name       = EXCLUDED.name,
-        nip        = EXCLUDED.nip,
-        role       = EXCLUDED.role,
-        phone      = EXCLUDED.phone,
-        is_active  = true,
-        updated_at = now();
+  -- Bebaskan kemungkinan konflik NIP pada baris lain di public.users
+  IF p_nip IS NOT NULL THEN
+    UPDATE public.users
+       SET nip = NULL
+     WHERE nip = p_nip
+       AND id <> v_actual_uid
+       AND lower(email) <> v_clean_email;
+  END IF;
+
+  -- Upsert aman ke public.users (menangani baik konflik `id` maupun konflik `email` tanpa error 23505)
+  IF EXISTS (SELECT 1 FROM public.users WHERE id = v_actual_uid) THEN
+    UPDATE public.users
+       SET company_id = v_co_id,
+           name       = p_name,
+           email      = v_clean_email,
+           nip        = p_nip,
+           role       = p_role,
+           phone      = p_phone,
+           is_active  = true,
+           updated_at = now()
+     WHERE id = v_actual_uid;
+  ELSIF EXISTS (SELECT 1 FROM public.users WHERE lower(email) = v_clean_email) THEN
+    UPDATE public.users
+       SET id         = v_actual_uid,
+           company_id = v_co_id,
+           name       = p_name,
+           nip        = p_nip,
+           role       = p_role,
+           phone      = p_phone,
+           is_active  = true,
+           updated_at = now()
+     WHERE lower(email) = v_clean_email;
+  ELSE
+    INSERT INTO public.users (id, company_id, name, email, nip, password_hash, role, phone, is_active)
+    VALUES (
+      v_actual_uid,
+      v_co_id,
+      p_name,
+      v_clean_email,
+      p_nip,
+      'managed-by-supabase-auth',
+      p_role,
+      p_phone,
+      true
+    );
+  END IF;
 END $$;
 
 REVOKE EXECUTE ON FUNCTION public.upsert_demo_account_guci_emas(uuid, text, text, text, public.user_role, text, text) FROM public, anon, authenticated;
 
--- RPC Ganti Role Instan (Memungkinkan 1 akun seperti lieziragroup@gmail.com mencoba SEMUA role:
--- ADMIN, MARKETING / Surveyor, TEKNISI_LAPANGAN, INVENTORY / Gudang, maupun SUPERADMIN)
+-- RPC Ganti Role Eksklusif Pemilik Sistem (HANYA diizinkan untuk akun Superadmin Utama: lieziragroup@gmail.com)
 CREATE OR REPLACE FUNCTION public.switch_my_role(p_new_role text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$
 DECLARE
   v_uid uuid := auth.uid();
+  v_email text;
   v_role public.user_role;
   v_co_id uuid;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Belum login' USING ERRCODE = '28000';
   END IF;
+
+  SELECT lower(email) INTO v_email FROM public.users WHERE id = v_uid;
+  IF coalesce(v_email, '') <> 'lieziragroup@gmail.com' THEN
+    RAISE EXCEPTION 'Akses ditolak: Hanya Superadmin utama (lieziragroup@gmail.com) yang diizinkan mengganti role' USING ERRCODE = '42501';
+  END IF;
+
   BEGIN
     v_role := upper(btrim(p_new_role))::public.user_role;
   EXCEPTION WHEN invalid_text_representation THEN
@@ -1569,7 +1733,6 @@ BEGIN
    WHERE id = v_uid
   RETURNING company_id INTO v_co_id;
 
-  -- Jika beralih ke TEKNISI_LAPANGAN, tautkan tugas demo ke akun ini agar halaman Teknisi langsung menampilkan daftar proyek & SPK
   IF v_role = 'TEKNISI_LAPANGAN' AND v_co_id IS NOT NULL THEN
     UPDATE public.work_reports
        SET executor_id = v_uid
@@ -1589,28 +1752,41 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.switch_my_role(text) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.switch_my_role(text) TO authenticated;
 
--- 11.0. AKUN UTAMA ALL-ROLE (1 Akun Bisa Semua Role): lieziragroup@gmail.com (Password: Rafi0502!)
+-- 11.0. AKUN MASTER SUPER ADMIN EKSKLUSIF PEMILIK SAAS: lieziragroup@gmail.com (Password: Rafi0502!)
 SELECT public.upsert_demo_account_guci_emas(
   '00000000-0000-4000-b000-000000000000'::uuid,
   'lieziragroup@gmail.com',
   'Rafi0502!',
-  'Rafi — Master All-Role (Guci Emas)',
-  'ADMIN',
+  'Rafi (Master Super Admin - FieldWork)',
+  'MASTER_SUPER_ADMIN',
   '0817 0795 959',
-  'GEP-ALL-000'
+  'FW-MSA-000'
 );
 
--- 11.1. Eksekusi Pembuatan 5 Akun Demo PT Guci Emas Pratama (Password: GuciEmas123!)
+-- 11.1. Eksekusi Pembuatan 5 Akun Peran Perusahaan PT Guci Emas Pratama (Password: GuciEmas123!)
+-- 1) SUPERADMIN (Direktur Perusahaan)
+SELECT public.upsert_demo_account_guci_emas(
+  '00000000-0000-4000-b000-000000000005'::uuid,
+  'direktur@gucimaspratama.co.id',
+  'GuciEmas123!',
+  'H. Fakhrurrazi, S.E. (Direktur / Superadmin)',
+  'SUPERADMIN',
+  '0817 0795 959',
+  'GEP-DIR-001'
+);
+
+-- 2) ADMIN (Staf Admin Operasional Perusahaan)
 SELECT public.upsert_demo_account_guci_emas(
   '00000000-0000-4000-b000-000000000001'::uuid,
   'admin@gucimaspratama.co.id',
   'GuciEmas123!',
-  'H. Fakhrurrazi, S.E. (Admin)',
+  'Nadya Putri (Admin Operasional)',
   'ADMIN',
-  '0817 0795 959',
+  '0817 0795 958',
   'GEP-ADM-001'
 );
 
+-- 3) MARKETING / SURVEYOR
 SELECT public.upsert_demo_account_guci_emas(
   '00000000-0000-4000-b000-000000000002'::uuid,
   'surveyor@gucimaspratama.co.id',
@@ -1621,6 +1797,7 @@ SELECT public.upsert_demo_account_guci_emas(
   'GEP-SRV-002'
 );
 
+-- 4) TEKNISI LAPANGAN
 SELECT public.upsert_demo_account_guci_emas(
   '00000000-0000-4000-b000-000000000003'::uuid,
   'teknisi@gucimaspratama.co.id',
@@ -1631,6 +1808,7 @@ SELECT public.upsert_demo_account_guci_emas(
   'GEP-TEK-003'
 );
 
+-- 5) INVENTORY (Gudang)
 SELECT public.upsert_demo_account_guci_emas(
   '00000000-0000-4000-b000-000000000004'::uuid,
   'gudang@gucimaspratama.co.id',
@@ -1641,15 +1819,9 @@ SELECT public.upsert_demo_account_guci_emas(
   'GEP-INV-004'
 );
 
-SELECT public.upsert_demo_account_guci_emas(
-  '00000000-0000-4000-b000-000000000005'::uuid,
-  'superadmin@gucimaspratama.co.id',
-  'GuciEmas123!',
-  'Super Admin Guci Emas',
-  'SUPERADMIN',
-  '0817 0795 959',
-  'GEP-SUP-000'
-);
+-- Pastikan hanya lieziragroup@gmail.com yang memegang role MASTER_SUPER_ADMIN
+DELETE FROM public.users WHERE lower(email) = 'superadmin@gucimaspratama.co.id';
+UPDATE public.users SET role = 'SUPERADMIN' WHERE role = 'MASTER_SUPER_ADMIN' AND lower(email) <> 'lieziragroup@gmail.com';
 
 -- 11.2. Seed Data Demo Quotation (`GP-DRF` & `GP-APR`), Proyek, SPK, & Laporan Kerja Lapangan
 DO $$
@@ -1803,9 +1975,9 @@ BEGIN
     now() - interval '3 days',
     jsonb_build_object(
       'id', v_q3_id::text,
-      'noSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'noSurat', 'GP/PCO/PH/2026/10/0001',
       'draftNoSurat', 'GP-DRF/PCO/PH/2026/10/0001',
-      'approvedNoSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'approvedNoSurat', 'GP/PCO/PH/2026/10/0001',
       'stage', 'APR',
       'kategoriProyek', 'Instansi',
       'kategori', 'PCO',
@@ -1857,7 +2029,7 @@ BEGIN
     ('GP-DRF/AR/PH/2026/10/0001',  'DRF', NULL,                        'AR',  'PH', 'Penawaran Harga', 'PT Bank Victoria International Tbk', v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '2 hours', 'pending',  v_q1_id, v_co_id, false, ''),
     ('GP-DRF/AR/PH/2026/10/0002',  'DRF', NULL,                        'AR',  'PH', 'Penawaran Harga', 'PT Oreka Solusi Kreatif',              v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '1 day',   'pending',  v_q2_id, v_co_id, false, ''),
     ('GP-DRF/PCO/PH/2026/10/0001', 'DRF', NULL,                        'PCO', 'K',  'Kontrak',         'PT PLN (Persero) UP3 Bulungan',        v_surveyor_id, 'Rizky Pratama (Surveyor / Marketing)', now() - interval '3 days',  'approved', v_q3_id, v_co_id, false, ''),
-    ('GP-APR/PCO/PH/2026/10/0001', 'APR', 'GP-DRF/PCO/PH/2026/10/0001','PCO', 'K',  'Kontrak',         'PT PLN (Persero) UP3 Bulungan',        v_admin_id,    'H. Fakhrurrazi, S.E. (Admin)',         now() - interval '2 days',  'approved', v_q3_id, v_co_id, false, 'Approved dari GP-DRF/PCO/PH/2026/10/0001')
+    ('GP/PCO/PH/2026/10/0001', 'APR', 'GP-DRF/PCO/PH/2026/10/0001','PCO', 'K',  'Kontrak',         'PT PLN (Persero) UP3 Bulungan',        v_admin_id,    'H. Fakhrurrazi, S.E. (Admin)',         now() - interval '2 days',  'approved', v_q3_id, v_co_id, false, 'Approved dari GP-DRF/PCO/PH/2026/10/0001')
   ON CONFLICT ("companyId", "noSurat") DO NOTHING;
 
   -- (E) Seed Proyek Lapangan, Work Reports, & SPK untuk Teknisi Lapangan
@@ -1908,7 +2080,7 @@ BEGIN
     jsonb_build_object(
       'id', v_spk1_id::text,
       'quotationId', v_q3_id::text,
-      'quotationNoSurat', 'GP-APR/PCO/PH/2026/10/0001',
+      'quotationNoSurat', 'GP/PCO/PH/2026/10/0001',
       'customerId', 'cust-pln-bulungan',
       'customerName', 'PT PLN (Persero) UP3 Bulungan',
       'technicianId', v_teknisi_id::text,

@@ -1,18 +1,31 @@
 import type { UserRole } from '@/entities/types';
 
-/** Nilai enum `user_role` pada database live. */
-export const DB_ROLES = ['SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN'] as const;
+/** Nilai enum `user_role` pada database live (6-Role SaaS Hierarchy). */
+export const DB_ROLES = [
+    'MASTER_SUPER_ADMIN',
+    'SUPERADMIN',
+    'ADMIN',
+    'MARKETING',
+    'INVENTORY',
+    'TEKNISI_LAPANGAN',
+] as const;
 
 export function isUserRole(value: unknown): value is UserRole {
     return typeof value === 'string' && (DB_ROLES as readonly string[]).includes(value);
 }
 
-/**
- * Role DB → role aplikasi. Enum DB dan tipe UserRole identik, jadi pemetaannya identitas.
- * Versi lama memetakan nama yang TIDAK ADA di enum (ADMIN_PERUSAHAAN, TEKNISI, SPV, GUDANG) dengan
- * default TEKNISI_LAPANGAN — akibatnya ADMIN dan INVENTORY yang valid dianggap teknisi lapangan.
- * Role tidak dikenal diperlakukan sebagai hak terendah (TEKNISI_LAPANGAN) dengan peringatan.
- */
+export function isMasterSuperAdmin(role?: UserRole | string | null): boolean {
+    return role === 'MASTER_SUPER_ADMIN';
+}
+
+export function isSuperOrMaster(role?: UserRole | string | null): boolean {
+    return role === 'MASTER_SUPER_ADMIN' || role === 'SUPERADMIN';
+}
+
+export function isAdminOrAbove(role?: UserRole | string | null): boolean {
+    return role === 'MASTER_SUPER_ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN';
+}
+
 export function mapDbRole(role: unknown): UserRole {
     if (isUserRole(role)) return role;
     console.warn(`[roles] Role tidak dikenal dari database: ${String(role)} — diperlakukan sebagai TEKNISI_LAPANGAN.`);

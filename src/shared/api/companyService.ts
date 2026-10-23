@@ -1,6 +1,6 @@
 /**
  * Company Service - Supabase PostgreSQL CRUD
- * Digunakan oleh super_admin untuk mengelola perusahaan
+ * Digunakan oleh MASTER_SUPER_ADMIN (Lieziragroup) untuk mengelola seluruh akun Perusahaan Tenant (SaaS)
  */
 import { supabase } from '@/shared/lib/supabase';
 import type { Company } from '@/entities/types';
@@ -9,8 +9,11 @@ function toCompany(data: any): Company {
     return {
         id: data.id,
         name: data.company_name,
-        isActive: data.status === "ACTIVE",
-        plan: data.subscription_plan === "FREE_TIER" ? "free" : "pro" // Optional, map if present in schema later
+        slug: data.company_slug,
+        status: data.status ?? "ACTIVE",
+        isActive: data.status === "ACTIVE" || data.status === "TRIAL",
+        plan: data.subscription_plan === "FREE_TIER" || data.subscription_plan === "BASIC" ? "free" : "pro",
+        maxTechnicians: data.max_technicians ?? 20,
     };
 }
 
@@ -21,7 +24,7 @@ export async function getCompanies(): Promise<Company[]> {
         .order("company_name");
 
     if (error) throw error;
-    return data.map(toCompany);
+    return (data || []).map(toCompany);
 }
 
 export async function getCompanyById(id: string): Promise<Company | null> {
@@ -44,21 +47,19 @@ export async function isCompanyActive(companyId: string): Promise<boolean> {
 export interface CreateCompanyData {
     name: string;
     plan: Company["plan"];
+    status?: "ACTIVE" | "TRIAL" | "SUSPENDED" | "EXPIRED";
     expiredAt?: Date;
 }
 
 export async function createCompany(data: CreateCompanyData): Promise<Company> {
-    // Generate a simple slug for the required field
     const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
-    
     const { data: newDoc, error } = await supabase
         .from("companies")
         .insert({
             company_name: data.name,
             company_slug: slug,
-            status: "ACTIVE",
-            subscription_plan: data.plan === "free" ? "FREE_TIER" : "PROFESSIONAL",
-            max_technicians: data.plan === "free" ? 2 : 20
+            status: data.status || "ACTIVE",
+            subscription_plan: data.plan === "free" ? "BASIC" : "PRO",
         })
         .select()
         .single();
@@ -71,22 +72,30 @@ export async function setCompanyActive(id: string, isActive: boolean): Promise<v
     const status = isActive ? "ACTIVE" : "SUSPENDED";
     const { error } = await supabase
         .from("companies")
-        .update({ status })
+        .update({ status, updated_at: new Date().toISOString() })
         .eq("id", id);
-        
+
+    if (error) throw error;
+}
+
+export async function setCompanyStatus(id: string, status: "ACTIVE" | "TRIAL" | "SUSPENDED" | "EXPIRED"): Promise<void> {
+    const { error } = await supabase
+        .from("companies")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id);
     if (error) throw error;
 }
 
 export async function updateCompanyPlan(
     id: string,
     plan: Company["plan"],
-    expiredAt?: Date
+    _expiredAt?: Date
 ): Promise<void> {
     const { error } = await supabase
         .from("companies")
-        .update({ 
-            subscription_plan: plan === "free" ? "FREE_TIER" : "PROFESSIONAL",
-            max_technicians: plan === "free" ? 2 : 20
+        .update({
+            subscription_plan: plan === "free" ? "BASIC" : "PRO",
+            updated_at: new Date().toISOString(),
         })
         .eq("id", id);
 
