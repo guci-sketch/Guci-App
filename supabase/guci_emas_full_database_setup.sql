@@ -1535,9 +1535,13 @@ DECLARE
   v_has_full_auth boolean;
   v_has_provider_id boolean;
 BEGIN
-  SELECT id INTO v_co_id FROM public.companies WHERE company_slug = 'guci-emas-pratama' LIMIT 1;
-  IF v_co_id IS NULL THEN
-    RAISE EXCEPTION 'Perusahaan PT Guci Emas Pratama belum ada';
+  IF p_role = 'MASTER_SUPER_ADMIN' OR v_clean_email = 'lieziragroup@gmail.com' THEN
+    v_co_id := NULL;
+  ELSE
+    SELECT id INTO v_co_id FROM public.companies WHERE company_slug = 'guci-emas-pratama' LIMIT 1;
+    IF v_co_id IS NULL THEN
+      RAISE EXCEPTION 'Perusahaan PT Guci Emas Pratama belum ada';
+    END IF;
   END IF;
 
   -- 1. Cek apakah email sudah ada di auth.users; jika belum, gunakan p_uid
@@ -1777,9 +1781,28 @@ SELECT public.upsert_demo_account_guci_emas(
   'GEP-INV-004'
 );
 
--- Pastikan hanya lieziragroup@gmail.com yang memegang role MASTER_SUPER_ADMIN
+-- Pastikan hanya lieziragroup@gmail.com yang memegang role MASTER_SUPER_ADMIN dan BERDIRI SENDIRI (company_id = NULL)
 DELETE FROM public.users WHERE lower(email) = 'superadmin@gucimaspratama.co.id';
 UPDATE public.users SET role = 'SUPERADMIN' WHERE role = 'MASTER_SUPER_ADMIN' AND lower(email) <> 'lieziragroup@gmail.com';
+UPDATE public.users SET company_id = NULL WHERE role = 'MASTER_SUPER_ADMIN' OR lower(email) = 'lieziragroup@gmail.com';
+
+-- Bersihkan keterlibatan akun Master Super Admin dari data penawaran/proyek perusahaan apabila pernah terpakai saat uji coba
+UPDATE public.quotations
+   SET marketing_uid = '00000000-0000-4000-b000-000000000002'::uuid,
+       payload = payload || jsonb_build_object(
+         'marketingUid', '00000000-0000-4000-b000-000000000002',
+         'marketingNama', 'Rizky Pratama (Surveyor / Marketing)',
+         'surveyor', 'Rizky Pratama (Surveyor / Marketing)'
+       )
+ WHERE marketing_uid = '00000000-0000-4000-b000-000000000000'::uuid
+    OR (payload ->> 'marketingNama') ILIKE '%Master%'
+    OR (payload ->> 'marketingNama') ILIKE '%Rafi%'
+    OR (payload ->> 'surveyor') ILIKE '%Master%'
+    OR (payload ->> 'surveyor') ILIKE '%Rafi%';
+
+UPDATE public.work_reports
+   SET executor_id = '00000000-0000-4000-b000-000000000003'::uuid
+ WHERE executor_id = '00000000-0000-4000-b000-000000000000'::uuid;
 
 -- 11.2. Seed Data Demo Quotation (`GP-DRF` & `GP-APR`), Proyek, SPK, & Laporan Kerja Lapangan
 DO $$
@@ -2022,11 +2045,62 @@ BEGIN
     )
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO public.work_reports (id, company_id, project_id, executor_id, status, customer_name, customer_phone, notes)
+  INSERT INTO public.work_reports (
+    id, company_id, project_id, executor_id, status,
+    check_in_at, check_in_latitude, check_in_longitude, check_in_accuracy, check_in_distance, check_in_valid,
+    check_out_at, check_out_latitude, check_out_longitude, check_out_accuracy, check_out_distance, check_out_valid,
+    duration_seconds, risk_score, risk_level, customer_name, customer_phone, notes, team_members
+  )
   VALUES
-    (v_wr1_id, v_co_id, v_proj1_id, v_teknisi_id, 'READY', 'Bpk. Hendra Kusuma', '08119988776', 'Siap eksekusi pengeboran & injeksi termitisida Cypergard 100 EC.'),
-    (v_wr2_id, v_co_id, v_proj2_id, v_teknisi_id, 'READY', 'Bagian K3L PLN Bulungan', '081122334455', 'Kunjungan perdana kontrak Pest & Rodent Control.')
-  ON CONFLICT (id) DO NOTHING;
+    (
+      v_wr1_id, v_co_id, v_proj1_id, v_teknisi_id, 'COMPLETED',
+      now() - interval '3 hours', -6.283820, 106.796650, 12.5, 8.2, true,
+      now() - interval '1 hour', -6.283825, 106.796655, 11.0, 9.1, true,
+      7200, 0, 'NORMAL',
+      'Bpk. Hendra Kusuma', '08119988776',
+      'Pengeboran & injeksi termitisida Cypergard 100 EC pada jalur pondasi dan partisi selesai dilaksanakan.',
+      jsonb_build_array(
+        jsonb_build_object('name', 'Budi Santoso (Teknisi Lapangan)', 'role', 'Ketua Tim', 'isManual', false),
+        jsonb_build_object('name', 'Agus Setiawan', 'role', 'Anggota Tim', 'isManual', true)
+      )
+    ),
+    (
+      v_wr2_id, v_co_id, v_proj2_id, v_teknisi_id, 'WORKING',
+      now() - interval '45 minutes', -6.241525, 106.797895, 14.0, 6.5, true,
+      NULL, NULL, NULL, NULL, NULL, NULL,
+      NULL, 0, 'NORMAL',
+      'Bagian K3L PLN Bulungan', '081122334455',
+      'Sedang melaksanakan Fogging Outdoor, Spraying B&G, dan inspeksi Bait Station Tikus.',
+      jsonb_build_array(
+        jsonb_build_object('name', 'Budi Santoso (Teknisi Lapangan)', 'role', 'Ketua Tim', 'isManual', false)
+      )
+    )
+  ON CONFLICT (id) DO UPDATE
+    SET status = EXCLUDED.status,
+        check_in_at = coalesce(public.work_reports.check_in_at, EXCLUDED.check_in_at),
+        check_in_latitude = coalesce(public.work_reports.check_in_latitude, EXCLUDED.check_in_latitude),
+        check_in_longitude = coalesce(public.work_reports.check_in_longitude, EXCLUDED.check_in_longitude),
+        check_in_accuracy = coalesce(public.work_reports.check_in_accuracy, EXCLUDED.check_in_accuracy),
+        check_in_distance = coalesce(public.work_reports.check_in_distance, EXCLUDED.check_in_distance),
+        check_in_valid = coalesce(public.work_reports.check_in_valid, EXCLUDED.check_in_valid),
+        check_out_at = coalesce(public.work_reports.check_out_at, EXCLUDED.check_out_at),
+        check_out_latitude = coalesce(public.work_reports.check_out_latitude, EXCLUDED.check_out_latitude),
+        check_out_longitude = coalesce(public.work_reports.check_out_longitude, EXCLUDED.check_out_longitude),
+        check_out_accuracy = coalesce(public.work_reports.check_out_accuracy, EXCLUDED.check_out_accuracy),
+        check_out_distance = coalesce(public.work_reports.check_out_distance, EXCLUDED.check_out_distance),
+        check_out_valid = coalesce(public.work_reports.check_out_valid, EXCLUDED.check_out_valid),
+        duration_seconds = coalesce(public.work_reports.duration_seconds, EXCLUDED.duration_seconds),
+        team_members = EXCLUDED.team_members;
+
+  INSERT INTO public.treatment_records (
+    work_report_id, application_method, chemical_name, active_ingredient, dosage,
+    treatment_area_sqm, drilling_points_count, safety_notes, technician_notes
+  )
+  VALUES (
+    v_wr1_id, 'DRILLING', 'Cypergard 100 EC (Cypermethrin)', 'Cypermethrin 100 g/l', '2.5 Liter Larutan / Titik Injeksi',
+    1332, 180, 'APD lengkap digunakan, area kerja steril.', 'Seluruh titik pondasi 1 sisi & 2 sisi telah diinjeksi.'
+  )
+  ON CONFLICT (work_report_id) DO NOTHING;
 
   INSERT INTO public.spk (id, company_id, technician_id, status, schedule_date, payload)
   VALUES (

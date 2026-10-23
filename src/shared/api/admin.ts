@@ -226,7 +226,7 @@ export async function fetchExecutors(): Promise<ExecutorStats[]> {
       : supabase.from('work_reports').select('executor_id, status, risk_level, duration_seconds'),
   ]);
 
-  const techs = (usersData || []).filter((u: any) => u.role === 'TEKNISI_LAPANGAN' || u.role === 'ADMIN');
+  const techs = (usersData || []).filter((u: any) => (u.role === 'TEKNISI_LAPANGAN' || u.role === 'ADMIN') && String(u.email || '').toLowerCase() !== 'lieziragroup@gmail.com');
   const reps = reportsData || [];
 
   return techs.map((u: any) => {
@@ -400,13 +400,16 @@ export async function fetchUsers(): Promise<AdminUser[]> {
   let q = supabase
     .from('users')
     .select('id, name, email, nip, phone, role, is_active, created_at')
+    .neq('role', 'MASTER_SUPER_ADMIN')
     .neq('role', 'SUPERADMIN')
     .order('created_at', { ascending: false });
   if (companyId) q = q.eq('company_id', companyId);
 
   const { data, error } = await q;
   if (error || !data) return [];
-  return data as AdminUser[];
+  return (data as AdminUser[]).filter(
+    u => (u.role as string) !== 'MASTER_SUPER_ADMIN' && (u.role as string) !== 'SUPERADMIN' && u.email.toLowerCase() !== 'lieziragroup@gmail.com'
+  );
 }
 
 export interface NewUserInput {

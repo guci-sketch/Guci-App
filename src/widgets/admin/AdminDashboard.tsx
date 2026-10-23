@@ -429,9 +429,7 @@ export const AdminDashboard: React.FC = () => {
   const sidebarItems = ALL_ITEMS.filter(i => user && i.roles.includes(user.role));
   const currentTabMeta = sidebarItems.find(i => i.id === activeTab) ?? sidebarItems[0];
 
-  // Tab di dalam grup yang sama untuk ditampilkan sebagai Top Capsule Sub-Tab & Floating Bottom Pill ala Barventis
-  // Catatan: halaman `quotation` dan `inventory` sudah memiliki internal sub-tab & floating bottom sendiri.
-  const hasInternalSubTabs = activeTab === 'quotation' || activeTab === 'inventory';
+  // Sub-Menu atas & Floating Bottom Pill (Mobile/Tablet) selalu konsisten menampilkan menu pada Grup Sidebar yang sedang aktif
   const currentGroupTabs = useMemo(() => {
     if (!currentTabMeta) return [];
     return sidebarItems
@@ -487,7 +485,7 @@ export const AdminDashboard: React.FC = () => {
         }
     >
       <div className="p-3 sm:p-4 space-y-3.5 max-w-7xl w-full mx-auto">
-          {!hasInternalSubTabs && currentGroupTabs.length > 1 && (
+          {currentGroupTabs.length > 1 && (
             <TabContainer
               tabs={currentGroupTabs}
               activeTab={activeTab}
@@ -571,7 +569,7 @@ export const AdminDashboard: React.FC = () => {
                   transition={{ duration: 0.25 }}
                   className="space-y-4"
                 >
-                  {(activeTab === 'reports' || activeTab === 'anomalies') && (
+                  {(activeTab === 'dashboard' || activeTab === 'reports' || activeTab === 'anomalies') && (
               <div className="space-y-4">
                 
                 {activeTab === 'anomalies' && (
@@ -1163,7 +1161,7 @@ export const AdminDashboard: React.FC = () => {
                   <div className="py-8 text-center text-xs text-[var(--text-muted)]">Tidak ada data pengguna.</div>
                 ) : (
                   <div className="space-y-3">
-                    {adminUsers.map(u => (
+                    {adminUsers.filter(u => (u.role as string) !== 'MASTER_SUPER_ADMIN' && (u.role as string) !== 'SUPERADMIN' && u.email.toLowerCase() !== 'lieziragroup@gmail.com').map(u => (
                       <div key={u.id} className={`p-4 rounded-xl border border-[var(--border-subtle)] ${u.is_active ? 'bg-[var(--bg-tertiary)]' : 'bg-red-50/50 border-red-100'} flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs`}>
                         <div>
                           <div className="flex items-center gap-2 mb-1">

@@ -39,10 +39,12 @@ export function InventoryPage() {
     const companyId = (user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN")
         ? (activeCompanyId || user?.companyId || null)
         : (user?.companyId ?? null);
-    // Direktur (SUPERADMIN) dan Marketing hanya memantau Analisis Untung Rugi Proyek & Stok secara read-only
-    const canWrite = user?.role === "ADMIN" || user?.role === "INVENTORY";
+    // Hanya pihak Gudang (INVENTORY) dan Admin Operasional (ADMIN) yang dapat melihat dan mengelola Stok Gudang.
+    // Direktur (SUPERADMIN) dan Marketing hanya memantau Analisis Untung Rugi Proyek secara read-only.
+    const isWarehouseRole = user?.role === "INVENTORY" || user?.role === "ADMIN";
+    const canWrite = isWarehouseRole;
 
-    const [tab, setTab] = useState<InvTab>(user?.role === "SUPERADMIN" ? "proyek" : "stok");
+    const [tab, setTab] = useState<InvTab>(isWarehouseRole ? "stok" : "proyek");
     const [searchQ, setSearchQ] = useState("");
     const [kategoriFilter, setKategoriFilter] = useState("ALL");
     const [items, setItems] = useState<InventoryItem[]>([]);
@@ -323,13 +325,15 @@ export function InventoryPage() {
 
     return (
         <div className="space-y-4">
-            {/* Barventis Top Capsule Sub-Tab Bar + Synchronized Bottom Floating Pill */}
-            <TabContainer
-                tabs={invTabs}
-                activeTab={tab}
-                onChange={(id) => setTab(id as InvTab)}
-                showFloatingBottom={true}
-            />
+            {/* Sub-tab internal Gudang hanya untuk role Gudang & Admin Operasional, tanpa menimpa Floating Menu utama */}
+            {isWarehouseRole && (
+                <TabContainer
+                    tabs={invTabs}
+                    activeTab={tab}
+                    onChange={(id) => setTab(id as InvTab)}
+                    showFloatingBottom={false}
+                />
+            )}
 
             {/* Header & Action Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">

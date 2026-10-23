@@ -15,7 +15,7 @@ export interface TabContainerProps {
     activeTab: string;
     onChange: (tabId: string) => void;
     className?: string;
-    /** Tampilkan juga kapsul melayang di bawah layar seperti desain Barventis (default: true). */
+    /** Tampilkan kapsul melayang di bawah layar khusus pada perangkat Mobile & Tablet (< 1024px). */
     showFloatingBottom?: boolean;
 }
 
@@ -27,11 +27,9 @@ const BADGE_TONES: Record<NonNullable<CapsuleTabItem['badgeTone']>, string> = {
 };
 
 /**
- * Komponen TabContainer bergaya Barventis (Compact & Sleek Edition):
- * 1. Top Capsule Tab Bar: latar `#f5f3ef`, tab aktif putih bersih dengan teks & ikon hijau emerald.
- * 2. Dynamic Floating Bottom Pill: melayang di bawah tengah layar (`fixed bottom-3.5 left-1/2 -translate-x-1/2`),
- *    tab aktif berupa kapsul hijau solid (`bg-[var(--accent)] text-white`) berisi ikon + label singkat,
- *    dan tab lainnya berupa tombol ikon bundar.
+ * Komponen TabContainer bergaya Barventis:
+ * 1. Top Capsule Sub-Menu Bar: tampil konsisten sesuai menu pada grup sidebar role aktif.
+ * 2. Dynamic Floating Bottom Pill: HANYA tampil pada Mobile & Tablet (`lg:hidden`), tidak tampil di Website Desktop.
  */
 export const TabContainer: React.FC<TabContainerProps> = ({
     tabs,
@@ -100,9 +98,9 @@ export const TabContainer: React.FC<TabContainerProps> = ({
 
             {showFloatingBottom && tabs.length > 1 && (
                 <div
-                    className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-[75] pointer-events-auto max-w-[94vw]"
+                    className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-[75] pointer-events-auto max-w-[94vw] lg:hidden"
                     role="navigation"
-                    aria-label="Sub-Tab Cepat"
+                    aria-label="Navigasi Sub-Menu Cepat Mobile & Tablet"
                 >
                     <motion.div
                         layout

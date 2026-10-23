@@ -313,7 +313,7 @@ export function QuotationPage() {
     if (subTab === "new") {
         return (
             <div className="space-y-4">
-                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
+                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
                 <QuotationFormPage
                     onSavedSuccess={() => { setSubTab("list"); load(); }}
                     onCancel={() => setSubTab("list")}
@@ -325,7 +325,7 @@ export function QuotationPage() {
     if (subTab === "edit" && editingQuotationId) {
         return (
             <div className="space-y-4">
-                <TabContainer tabs={hubTabs} activeTab="list" onChange={id => setSubTab(id as HubSubTab)} />
+                <TabContainer tabs={hubTabs} activeTab="list" onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
                 <QuotationEditPage
                     quotationIdProp={editingQuotationId}
                     onSavedSuccess={() => { setEditingQuotationId(null); setSubTab("list"); load(); }}
@@ -338,7 +338,7 @@ export function QuotationPage() {
     if (subTab === "pipeline") {
         return (
             <div className="space-y-4">
-                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
+                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
                 <StatusPHPage />
             </div>
         );
@@ -347,7 +347,7 @@ export function QuotationPage() {
     if (subTab === "nomor-log") {
         return (
             <div className="space-y-4">
-                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
+                <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
                 <NomorSuratLogPage />
             </div>
         );
@@ -389,7 +389,7 @@ export function QuotationPage() {
                 />
             )}
 
-            <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
+            <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
 
             <PageHeader
                 title={isDirector ? "Approval & Pemantauan Penawaran Harga (Direktur)" : "Surat Penawaran Harga — PT Guci Emas Pratama"}

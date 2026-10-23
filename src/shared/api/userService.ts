@@ -25,7 +25,7 @@ export async function getUsersByCompany(companyId: string, roleFilter?: UserRole
     const { data, error } = await q;
     if (error) throw error;
 
-    return (data || []).map((d: any) => ({
+    return (data || []).filter((d: any) => d.role !== 'MASTER_SUPER_ADMIN' && String(d.email || '').toLowerCase() !== 'lieziragroup@gmail.com').map((d: any) => ({
         uid: d.id,
         email: d.email,
         name: d.name,

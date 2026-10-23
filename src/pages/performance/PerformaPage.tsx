@@ -4,9 +4,9 @@ import { getQuotations } from '@/shared/api/quotationService';
 import { supabase } from '@/shared/lib/supabase';
 import { formatRupiah } from '@/shared/lib/utils';
 import {
-    TrendingUp, Award, ChevronDown,
-    RefreshCw, Loader2, Edit2, Check, X,
-    Users, FileText, Percent, ArrowUpRight, ArrowDownRight, Minus, BarChart3,
+    TrendingUp, Award, ChevronDown, RefreshCw, Loader2,
+    SlidersHorizontal, Check, X, Percent, ArrowUpRight,
+    ArrowDownRight, Minus, BarChart3, Target, Users,
 } from "lucide-react";
 import type { Quotation } from '@/entities/types';
 
@@ -16,10 +16,12 @@ interface MarketingTarget {
     month: number;
     targetRevenue: number;
     targetCount: number;
+    targetPct?: number;
 }
 
 interface MonthPerfBucket {
     key: string;
+    shortLabel: string;
     label: string;
     year: number;
     month: number;
@@ -32,28 +34,71 @@ interface MonthPerfBucket {
     revenue: number;
 }
 
+type VisualMetric = "approval_pct" | "deal_pct" | "survey_count";
+type RangeMonths = 3 | 6 | 12;
+
+interface MoMCustomConfig {
+    rangeMonths: RangeMonths;
+    metric: VisualMetric;
+    benchmarkPct: number;
+    showTeamCards: boolean;
+}
+
+const DEFAULT_MOM_CONFIG: MoMCustomConfig = {
+    rangeMonths: 6,
+    metric: "approval_pct",
+    benchmarkPct: 60,
+    showTeamCards: true,
+};
+
+const MOM_CONFIG_STORAGE_KEY = "fw_mom_visual_config_v1";
 const MONTHS_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+
+function isMasterSuperAdminEntry(uid?: string, name?: string): boolean {
+    if (uid === "00000000-0000-4000-b000-000000000000") return true;
+    const lower = (name || "").toLowerCase();
+    return lower.includes("master super admin") || lower.includes("master all-role") || lower.includes("lieziragroup");
+}
 
 export function PerformaPage() {
     const { user, activeCompanyId } = useAuthStore();
     const isMarketing = user?.role === "MARKETING";
-    const isAdminOrSuper = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
-    const companyId = (user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN")
+    const isAdminOrSuper = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+    const companyId = user?.role === "SUPERADMIN"
         ? (activeCompanyId || user?.companyId || "")
         : (user?.companyId ?? "");
 
     const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [targets, setTargets] = useState<MarketingTarget[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Custom Setup MoM State (tersimpan di localStorage + dapat disesuaikan kapan saja)
+    const [config, setConfig] = useState<MoMCustomConfig>(() => {
+        try {
+            const raw = localStorage.getItem(MOM_CONFIG_STORAGE_KEY);
+            if (raw) return { ...DEFAULT_MOM_CONFIG, ...JSON.parse(raw) };
+        } catch { /* ignore */ }
+        return DEFAULT_MOM_CONFIG;
+    });
+    const [showSetup, setShowSetup] = useState(false);
+
     const [editingUid, setEditingUid] = useState<string | null>(null);
-    const [editRev, setEditRev] = useState("");
     const [editCnt, setEditCnt] = useState("");
+    const [editRev, setEditRev] = useState("");
     const [savingTarget, setSavingTarget] = useState(false);
 
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     const [filterYear, setFilterYear] = useState(currentYear);
     const [filterMonth, setFilterMonth] = useState(currentMonth);
+
+    const updateConfig = (patch: Partial<MoMCustomConfig>) => {
+        setConfig(prev => {
+            const next = { ...prev, ...patch };
+            try { localStorage.setItem(MOM_CONFIG_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+        });
+    };
 
     const yearOptions = useMemo(() => {
         const y: number[] = [];
@@ -72,7 +117,9 @@ export function PerformaPage() {
                 companyId,
                 byUid: isMarketing ? user?.uid : undefined,
             });
-            setQuotations(quos);
+            // Pastikan tidak pernah menyertakan data uji Master Super Admin yang berdiri sendiri
+            const cleanQuos = quos.filter(q => !isMasterSuperAdminEntry(q.marketingUid, q.surveyor || q.marketingNama));
+            setQuotations(cleanQuos);
 
             if (isAdminOrSuper) {
                 const { data: tRows } = await supabase
@@ -100,10 +147,9 @@ export function PerformaPage() {
         load();
     }, [load]);
 
-    // Hitung 6 bulan terakhir hingga periode terpilih untuk perbandingan Month-over-Month (MoM)
     const monthlyBuckets = useMemo<MonthPerfBucket[]>(() => {
         const raw: Omit<MonthPerfBucket, "momGrowthPct">[] = [];
-        for (let i = 5; i >= 0; i--) {
+        for (let i = config.rangeMonths - 1; i >= 0; i--) {
             const d = new Date(filterYear, filterMonth - 1 - i, 1);
             const y = d.getFullYear();
             const m = d.getMonth() + 1;
@@ -122,6 +168,7 @@ export function PerformaPage() {
 
             raw.push({
                 key: `${y}-${String(m).padStart(2, "0")}`,
+                shortLabel: MONTHS_ID[m - 1],
                 label: `${MONTHS_ID[m - 1]} ${y}`,
                 year: y,
                 month: m,
@@ -137,37 +184,25 @@ export function PerformaPage() {
         return raw.map((b, idx) => {
             if (idx === 0) return { ...b, momGrowthPct: null };
             const prev = raw[idx - 1];
-            const momGrowthPct = prev.approvalRatePct > 0
-                ? b.approvalRatePct - prev.approvalRatePct
-                : b.totalSurvey > 0
-                ? b.approvalRatePct
-                : 0;
+            const momGrowthPct = b.approvalRatePct - prev.approvalRatePct;
             return { ...b, momGrowthPct };
         });
-    }, [quotations, filterYear, filterMonth]);
+    }, [quotations, filterYear, filterMonth, config.rangeMonths]);
 
     const currentBucket = monthlyBuckets[monthlyBuckets.length - 1] ?? {
-        key: "", label: `${MONTHS_ID[filterMonth - 1]} ${filterYear}`, year: filterYear, month: filterMonth,
-        totalSurvey: 0, approvedCount: 0, dealCount: 0, approvalRatePct: 0, dealRatePct: 0, momGrowthPct: 0, revenue: 0,
+        key: "", shortLabel: MONTHS_ID[filterMonth - 1], label: `${MONTHS_ID[filterMonth - 1]} ${filterYear}`,
+        year: filterYear, month: filterMonth, totalSurvey: 0, approvedCount: 0, dealCount: 0,
+        approvalRatePct: 0, dealRatePct: 0, momGrowthPct: 0, revenue: 0,
     };
     const prevBucket = monthlyBuckets[monthlyBuckets.length - 2] ?? {
-        key: "", label: "Bulan Lalu", year: filterYear, month: filterMonth - 1,
-        totalSurvey: 0, approvedCount: 0, dealCount: 0, approvalRatePct: 0, dealRatePct: 0, momGrowthPct: 0, revenue: 0,
+        key: "", shortLabel: "Bln Lalu", label: "Bulan Lalu",
+        year: filterYear, month: filterMonth - 1, totalSurvey: 0, approvedCount: 0, dealCount: 0,
+        approvalRatePct: 0, dealRatePct: 0, momGrowthPct: 0, revenue: 0,
     };
 
-    const avg3MonthsApprovalPct = useMemo(() => {
-        const prev3 = monthlyBuckets.slice(-4, -1);
-        if (prev3.length === 0) return 0;
-        return Math.round(prev3.reduce((s, x) => s + x.approvalRatePct, 0) / prev3.length);
-    }, [monthlyBuckets]);
-
     const diffApprovalVsPrevMonth = currentBucket.approvalRatePct - prevBucket.approvalRatePct;
-    const diffVolumePctVsPrevMonth = prevBucket.totalSurvey > 0
-        ? Math.round(((currentBucket.totalSurvey - prevBucket.totalSurvey) / prevBucket.totalSurvey) * 100)
-        : currentBucket.totalSurvey > 0 ? 100 : 0;
-    const diffVs3MoAvg = currentBucket.approvalRatePct - avg3MonthsApprovalPct;
+    const diffVsBenchmark = currentBucket.approvalRatePct - config.benchmarkPct;
 
-    // Statistik per Marketing (untuk perbandingan persentase & khusus Admin/Direktur ada opsi Target)
     const perMarketing = useMemo(() => {
         const map = new Map<string, {
             uid: string;
@@ -184,7 +219,9 @@ export function PerformaPage() {
 
         quotations.forEach(q => {
             const uid = q.marketingUid || "mkt";
-            const nama = q.surveyor || q.marketingNama || "Marketing";
+            const nama = q.surveyor || q.marketingNama || "Surveyor / Marketing";
+            if (isMasterSuperAdminEntry(uid, nama)) return;
+
             if (!map.has(uid)) {
                 map.set(uid, {
                     uid, nama, currTotal: 0, currApproved: 0, prevTotal: 0, prevApproved: 0,
@@ -244,43 +281,69 @@ export function PerformaPage() {
         if (delta > 0) {
             return (
                 <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                    <ArrowUpRight size={12} /> +{delta}{suffix} vs bulan lalu
+                    <ArrowUpRight size={12} /> +{delta}{suffix} MoM
                 </span>
             );
         }
         if (delta < 0) {
             return (
                 <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">
-                    <ArrowDownRight size={12} /> {delta}{suffix} vs bulan lalu
+                    <ArrowDownRight size={12} /> {delta}{suffix} MoM
                 </span>
             );
         }
         return (
             <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">
-                <Minus size={12} /> Stabil (0{suffix}) vs bulan lalu
+                <Minus size={12} /> 0{suffix} MoM
             </span>
         );
     };
 
+    const maxSurveyInBuckets = useMemo(
+        () => Math.max(5, ...monthlyBuckets.map(b => b.totalSurvey)),
+        [monthlyBuckets]
+    );
+
+    const getBucketMetricValue = (b: MonthPerfBucket): number => {
+        if (config.metric === "approval_pct") return b.approvalRatePct;
+        if (config.metric === "deal_pct") return b.dealRatePct;
+        return b.totalSurvey;
+    };
+
+    const getBucketBarHeightPct = (b: MonthPerfBucket): number => {
+        if (config.metric === "survey_count") {
+            return Math.round((b.totalSurvey / maxSurveyInBuckets) * 100);
+        }
+        return Math.min(100, Math.max(0, getBucketMetricValue(b)));
+    };
+
     return (
-        <div className="space-y-5">
-            {/* Header & Filter Periode */}
+        <div className="space-y-4">
+            {/* Header Ringkas + Tombol Custom Setup MoM */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 clean-card p-4">
                 <div>
                     <h1 className="text-base sm:text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                         <BarChart3 size={20} className="text-[var(--accent)]" />
-                        {isMarketing
-                            ? "Persentase Performance & Perbandingan Bulan Kemarin (MoM)"
-                            : "Analitik Persentase Performa (MoM) & Capaian Tim"}
+                        Visual Performa Bulanan (MoM)
                     </h1>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                        {isMarketing
-                            ? "Pantau rasio keberhasilan penawaran (%) dan perbandingan performa Anda dibanding bulan-bulan sebelumnya."
-                            : "Evaluasi persentase konversi bulanan (Month-over-Month) seluruh tim Surveyor / Marketing."}
+                        Grafik ringkas perbandingan performa bulan berjalan terhadap bulan-bulan sebelumnya.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setShowSetup(v => !v)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                            showSetup
+                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                : "bg-[#faf9f7] text-[#2d2a26] border-[#e8e5e0] hover:bg-[#f5f3ef]"
+                        }`}
+                    >
+                        <SlidersHorizontal size={13} /> Custom Setup MoM
+                    </button>
+
                     <div className="relative">
                         <select
                             value={filterMonth}
@@ -307,7 +370,7 @@ export function PerformaPage() {
                     </div>
                     <button
                         onClick={load}
-                        className="p-2 rounded-xl border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                        className="p-2 rounded-xl border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
                         title="Segarkan Data"
                     >
                         <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -315,236 +378,374 @@ export function PerformaPage() {
                 </div>
             </div>
 
+            {/* Panel Custom Setup MoM */}
+            {showSetup && (
+                <div className="clean-card p-4 border-emerald-200 bg-emerald-50/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+                            <SlidersHorizontal size={14} /> Pengaturan Custom Visual MoM
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowSetup(false)}
+                            className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                        >
+                            <X size={15} />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                        {/* 1. Rentang Bulan */}
+                        <div className="bg-white p-3 rounded-xl border border-[#e8e5e0] space-y-1.5">
+                            <label className="block font-bold text-slate-700">Rentang Perbandingan Bulan</label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                                {([3, 6, 12] as RangeMonths[]).map(rm => (
+                                    <button
+                                        key={rm}
+                                        type="button"
+                                        onClick={() => updateConfig({ rangeMonths: rm })}
+                                        className={`py-1.5 rounded-lg font-bold border cursor-pointer ${
+                                            config.rangeMonths === rm
+                                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                                : "bg-[#faf9f7] text-slate-600 border-slate-200"
+                                        }`}
+                                    >
+                                        {rm} Bln
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 2. Metrik Utama Grafik */}
+                        <div className="bg-white p-3 rounded-xl border border-[#e8e5e0] space-y-1.5">
+                            <label className="block font-bold text-slate-700">Indikator Grafik Utama</label>
+                            <select
+                                value={config.metric}
+                                onChange={e => updateConfig({ metric: e.target.value as VisualMetric })}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-[#faf9f7] font-semibold text-slate-800"
+                            >
+                                <option value="approval_pct">% Persentase Approval</option>
+                                <option value="deal_pct">% Rasio Konversi Deal</option>
+                                <option value="survey_count">Jumlah Aktivitas Survey</option>
+                            </select>
+                        </div>
+
+                        {/* 3. Target Benchmark (%) */}
+                        <div className="bg-white p-3 rounded-xl border border-[#e8e5e0] space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <label className="font-bold text-slate-700">Target Benchmark (%)</label>
+                                <span className="font-mono font-bold text-[var(--accent)]">{config.benchmarkPct}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min={20}
+                                max={100}
+                                step={5}
+                                value={config.benchmarkPct}
+                                onChange={e => updateConfig({ benchmarkPct: Number(e.target.value) })}
+                                className="w-full accent-[var(--accent)] cursor-pointer"
+                            />
+                        </div>
+
+                        {/* 4. Tampilkan Kartu Tim */}
+                        <div className="bg-white p-3 rounded-xl border border-[#e8e5e0] flex flex-col justify-between">
+                            <label className="font-bold text-slate-700">Kartu Performa Surveyor</label>
+                            <button
+                                type="button"
+                                onClick={() => updateConfig({ showTeamCards: !config.showTeamCards })}
+                                className={`py-1.5 px-3 rounded-lg font-bold border text-center cursor-pointer ${
+                                    config.showTeamCards
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                        : "bg-slate-100 text-slate-600 border-slate-200"
+                                }`}
+                            >
+                                {config.showTeamCards ? "Ditampilkan" : "Disembunyikan"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="py-16 text-center text-sm text-[var(--text-muted)] flex items-center justify-center gap-2">
-                    <Loader2 size={18} className="animate-spin text-[var(--accent)]" /> Menghitung rasio performa bulanan...
+                    <Loader2 size={18} className="animate-spin text-[var(--accent)]" /> Memuat grafik performa...
                 </div>
             ) : (
                 <>
-                    {/* 4 Kartu Utama Persentase Performa & Perbandingan Bulan Kemarin */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
-                        <div className="clean-card p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                    1. Persentase Approval ({currentBucket.label})
+                    {/* 3 Kartu Visual Ringkas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                        <div className="clean-card p-4 flex items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
+                                    Approval ({currentBucket.shortLabel} {currentBucket.year})
                                 </span>
-                                <Percent size={16} className="text-[var(--accent)]" />
-                            </div>
-                            <div className="text-2xl font-bold font-mono text-[var(--text-primary)] tabular-nums">
-                                {currentBucket.approvalRatePct}%
-                            </div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                                {renderDeltaBadge(diffApprovalVsPrevMonth, "%")}
-                                <span className="text-[11px] text-[var(--text-muted)]">
-                                    Bulan lalu: <strong>{prevBucket.approvalRatePct}%</strong>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
+                                        {currentBucket.approvalRatePct}%
+                                    </span>
+                                    {renderDeltaBadge(diffApprovalVsPrevMonth, "%")}
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] block">
+                                    {currentBucket.approvedCount} disetujui dari {currentBucket.totalSurvey} survey (Bln lalu: {prevBucket.approvalRatePct}%)
                                 </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[var(--accent)] flex items-center justify-center shrink-0">
+                                <Percent size={22} />
                             </div>
                         </div>
 
-                        <div className="clean-card p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                    2. Pertumbuhan Aktivitas Survey
+                        <div className="clean-card p-4 flex items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
+                                    Pencapaian vs Target ({config.benchmarkPct}%)
                                 </span>
-                                <TrendingUp size={16} className="text-blue-600" />
-                            </div>
-                            <div className="text-2xl font-bold font-mono text-[var(--text-primary)] tabular-nums">
-                                {diffVolumePctVsPrevMonth >= 0 ? `+${diffVolumePctVsPrevMonth}%` : `${diffVolumePctVsPrevMonth}%`}
-                            </div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-[11px] text-[var(--text-secondary)]">
-                                    Bulan ini: <strong>{currentBucket.totalSurvey} survey</strong> vs Bulan lalu: <strong>{prevBucket.totalSurvey} survey</strong>
+                                <div className="flex items-baseline gap-2">
+                                    <span className={`text-2xl sm:text-3xl font-extrabold font-mono ${
+                                        diffVsBenchmark >= 0 ? "text-emerald-700" : "text-amber-600"
+                                    }`}>
+                                        {diffVsBenchmark >= 0 ? `+${diffVsBenchmark}%` : `${diffVsBenchmark}%`}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
+                                        diffVsBenchmark >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                                    }`}>
+                                        {diffVsBenchmark >= 0 ? "Capai Target" : "Di Bawah Target"}
+                                    </span>
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] block">
+                                    Benchmark: {config.benchmarkPct}% (Atur di Custom Setup)
                                 </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                                <Target size={22} />
                             </div>
                         </div>
 
-                        <div className="clean-card p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                    3. Komparasi vs Rata-Rata 3 Bulan
+                        <div className="clean-card p-4 flex items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
+                                    Pertumbuhan Aktivitas Survey
                                 </span>
-                                <Award size={16} className="text-amber-600" />
-                            </div>
-                            <div className="text-2xl font-bold font-mono text-[var(--text-primary)] tabular-nums">
-                                {diffVs3MoAvg >= 0 ? `+${diffVs3MoAvg}%` : `${diffVs3MoAvg}%`}
-                            </div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-[11px] text-[var(--text-secondary)]">
-                                    Rata-rata 3 bln terakhir: <strong>{avg3MonthsApprovalPct}%</strong>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
+                                        {currentBucket.totalSurvey}
+                                    </span>
+                                    <span className="text-xs font-semibold text-[var(--text-secondary)]">
+                                        survey (Bln lalu: {prevBucket.totalSurvey})
+                                    </span>
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] block">
+                                    Konversi Deal: <strong>{currentBucket.dealRatePct}%</strong>
                                 </span>
                             </div>
-                        </div>
-
-                        <div className="clean-card p-4 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                    4. Rasio Konversi Deal Kontrak
-                                </span>
-                                <FileText size={16} className="text-purple-600" />
-                            </div>
-                            <div className="text-2xl font-bold font-mono text-[var(--text-primary)] tabular-nums">
-                                {currentBucket.dealRatePct}%
-                            </div>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                                {renderDeltaBadge(currentBucket.dealRatePct - prevBucket.dealRatePct, "%")}
-                                <span className="text-[11px] text-[var(--text-muted)]">
-                                    {currentBucket.approvedCount} disetujui dari {currentBucket.totalSurvey}
-                                </span>
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+                                <TrendingUp size={22} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Visualisasi & Tabel Perbandingan Persentase Performa 6 Bulan Terakhir (MoM) */}
-                    <div className="clean-card overflow-hidden">
-                        <div className="p-4 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    {/* Grafik Batang Visual MoM (Interactive Visual Bar Chart) */}
+                    <div className="clean-card p-4 sm:p-5 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
                                 <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                                    Perbandingan Persentase Performa 6 Bulan Terakhir (Month-over-Month)
+                                    Grafik Perbandingan {config.rangeMonths} Bulan Terakhir ({
+                                        config.metric === "approval_pct"
+                                            ? "% Persentase Approval"
+                                            : config.metric === "deal_pct"
+                                            ? "% Konversi Deal"
+                                            : "Jumlah Survey"
+                                    })
                                 </h2>
-                                <p className="text-xs text-[var(--text-secondary)]">
-                                    Perbandingan langsung persentase keberhasilan bulan berjalan terhadap bulan-bulan kemarin
+                                <p className="text-[11px] text-[var(--text-muted)]">
+                                    Garis putus-putus hijau menunjukkan Target Benchmark ({config.benchmarkPct}%)
                                 </p>
+                            </div>
+                            <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--text-secondary)]">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-xs bg-[var(--accent)] inline-block" /> Bulan Berjalan
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-xs bg-emerald-200 inline-block" /> Bulan Sebelumnya
+                                </span>
                             </div>
                         </div>
 
-                        <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-[var(--bg-tertiary)]/40 border-b border-[var(--border-subtle)]">
-                            {monthlyBuckets.map((b, i) => {
-                                const isCurrent = i === monthlyBuckets.length - 1;
+                        {/* Area Grafik Visual */}
+                        <div className="relative h-52 pt-6 pb-2 px-2 sm:px-4 bg-[#faf9f7] rounded-2xl border border-[#e8e5e0] flex items-end justify-between gap-2 sm:gap-4">
+                            {/* Garis Benchmark Horizontal (Untuk mode persentase) */}
+                            {config.metric !== "survey_count" && (
+                                <div
+                                    className="absolute left-3 right-3 border-t-2 border-dashed border-emerald-600/50 pointer-events-none flex items-center justify-end"
+                                    style={{ bottom: `calc(${Math.min(95, Math.max(5, config.benchmarkPct))}% * 0.72 + 28px)` }}
+                                >
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-700 text-white text-[9.5px] font-mono font-bold -mt-5">
+                                        Target {config.benchmarkPct}%
+                                    </span>
+                                </div>
+                            )}
+
+                            {monthlyBuckets.map((b, idx) => {
+                                const isCurrent = idx === monthlyBuckets.length - 1;
+                                const val = getBucketMetricValue(b);
+                                const heightPct = Math.max(8, getBucketBarHeightPct(b));
+                                const suffix = config.metric === "survey_count" ? "" : "%";
+
                                 return (
-                                    <div
-                                        key={b.key}
-                                        className={`p-3 rounded-xl border ${
-                                            isCurrent
-                                                ? "border-[var(--accent)] bg-white shadow-xs ring-1 ring-[var(--accent)]/30"
-                                                : "border-[var(--border-subtle)] bg-white/80"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-secondary)]">
-                                            <span>{b.label}</span>
-                                            {isCurrent && (
-                                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px]">Bulan Ini</span>
-                                            )}
+                                    <div key={b.key} className="flex-1 flex flex-col items-center justify-end h-full min-w-0 group">
+                                        {/* Nilai di atas batang */}
+                                        <div className={`text-[11px] font-mono font-bold mb-1 ${
+                                            isCurrent ? "text-[var(--accent)]" : "text-slate-600"
+                                        }`}>
+                                            {val}{suffix}
                                         </div>
-                                        <div className="mt-2 flex items-baseline justify-between">
-                                            <span className="text-lg font-bold font-mono text-[var(--text-primary)]">{b.approvalRatePct}%</span>
-                                            <span className="text-[10.5px] text-[var(--text-muted)]">{b.approvedCount}/{b.totalSurvey} survey</span>
-                                        </div>
-                                        <div className="w-full h-2 rounded-full bg-slate-100 mt-2 overflow-hidden">
+
+                                        {/* Track & Batang Visual */}
+                                        <div className="w-full max-w-[54px] h-[72%] bg-slate-200/70 rounded-t-xl flex items-end overflow-hidden p-0.5">
                                             <div
-                                                className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
-                                                style={{ width: `${Math.min(100, Math.max(6, b.approvalRatePct))}%` }}
+                                                className={`w-full rounded-t-lg transition-all duration-300 ${
+                                                    isCurrent
+                                                        ? "bg-[var(--accent)] shadow-xs"
+                                                        : val >= config.benchmarkPct && config.metric !== "survey_count"
+                                                        ? "bg-emerald-400"
+                                                        : "bg-emerald-300/80"
+                                                }`}
+                                                style={{ height: `${heightPct}%` }}
+                                                title={`${b.label}: ${val}${suffix} (${b.approvedCount}/${b.totalSurvey} survey)`}
                                             />
                                         </div>
-                                        <div className="mt-2 text-[10px]">
-                                            {b.momGrowthPct === null ? (
-                                                <span className="text-slate-400">Bulan dasar</span>
-                                            ) : b.momGrowthPct > 0 ? (
-                                                <span className="font-bold text-emerald-700">+{b.momGrowthPct}% dibanding bln sebelumnya</span>
-                                            ) : b.momGrowthPct < 0 ? (
-                                                <span className="font-bold text-red-600">{b.momGrowthPct}% dibanding bln sebelumnya</span>
-                                            ) : (
-                                                <span className="text-slate-500">0% (stabil)</span>
-                                            )}
+
+                                        {/* Label Bulan */}
+                                        <div className={`mt-2 text-[10.5px] font-bold truncate max-w-full ${
+                                            isCurrent ? "text-[var(--accent)]" : "text-slate-600"
+                                        }`}>
+                                            {b.shortLabel}
+                                        </div>
+                                        <div className="text-[9.5px] text-slate-400 font-mono">
+                                            {b.approvedCount}/{b.totalSurvey}
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {/* Rincian Perbandingan per Marketing / Surveyor */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                                <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)] text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                    <tr>
-                                        <th className="py-3 px-4">Surveyor / Marketing</th>
-                                        <th className="py-3 px-4 text-center">Survey Bulan Lalu ({prevBucket.label})</th>
-                                        <th className="py-3 px-4 text-center">Survey Bulan Ini ({currentBucket.label})</th>
-                                        <th className="py-3 px-4 text-center">% Performa Bulan Lalu</th>
-                                        <th className="py-3 px-4 text-center">% Performa Bulan Ini</th>
-                                        <th className="py-3 px-4 text-center">Selisih MoM (%)</th>
-                                        {isAdminOrSuper && <th className="py-3 px-4 text-right">Target Admin (Khusus Manajemen)</th>}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--border-subtle)]">
-                                    {perMarketing.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={isAdminOrSuper ? 7 : 6} className="py-8 text-center text-[var(--text-muted)]">
-                                                Belum ada data aktivitas penawaran pada periode ini.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        perMarketing.map(m => {
-                                            const t = targets.find(x => x.uid === m.uid && x.year === filterYear && x.month === filterMonth);
-                                            return (
-                                                <tr key={m.uid} className="hover:bg-[var(--bg-tertiary)]/50">
-                                                    <td className="py-3 px-4 font-bold text-[var(--text-primary)]">{m.nama}</td>
-                                                    <td className="py-3 px-4 text-center font-mono">
-                                                        {m.prevApproved}/{m.prevTotal} disetujui
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center font-mono font-bold">
-                                                        {m.currApproved}/{m.currTotal} disetujui
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center font-mono text-[var(--text-secondary)]">
-                                                        {m.prevPct}%
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center font-mono font-bold text-[var(--accent)]">
-                                                        {m.currPct}%
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        {renderDeltaBadge(m.momDeltaPct, "%")}
-                                                    </td>
-                                                    {isAdminOrSuper && (
-                                                        <td className="py-3 px-4 text-right">
-                                                            {editingUid === m.uid ? (
-                                                                <div className="inline-flex items-center gap-1.5">
-                                                                    <input
-                                                                        type="number"
-                                                                        value={editCnt}
-                                                                        onChange={e => setEditCnt(e.target.value)}
-                                                                        placeholder="Target Quo"
-                                                                        className="w-20 px-2 py-1 text-xs border border-slate-300 rounded-lg"
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => handleSaveTarget(m.uid, m.nama)}
-                                                                        disabled={savingTarget}
-                                                                        className="p-1.5 rounded-lg bg-emerald-600 text-white"
-                                                                    >
-                                                                        <Check size={12} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setEditingUid(null)}
-                                                                        className="p-1.5 rounded-lg bg-slate-100 text-slate-600"
-                                                                    >
-                                                                        <X size={12} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="inline-flex items-center gap-2">
-                                                                    <span className="text-[11px] text-[var(--text-secondary)]">
-                                                                        {t?.targetCount ? `Target: ${m.currApproved}/${t.targetCount} (${Math.round((m.currApproved / t.targetCount) * 100)}%)` : "Belum diatur"}
-                                                                    </span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setEditingUid(m.uid);
-                                                                            setEditCnt(String(t?.targetCount ?? 10));
-                                                                            setEditRev(String(t?.targetRevenue ?? 0));
-                                                                        }}
-                                                                        className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
-                                                                    >
-                                                                        <Edit2 size={11} /> Atur
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
+
+                    {/* Kartu Ringkas Progress Bar per Surveyor / Marketing */}
+                    {config.showTeamCards && (
+                        <div className="clean-card p-4 sm:p-5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                    <Users size={16} className="text-[var(--accent)]" />
+                                    Performa Surveyor / Marketing ({currentBucket.label})
+                                </h2>
+                                <span className="text-[11px] text-[var(--text-muted)]">
+                                    Visual rasio keberhasilan &amp; selisih MoM
+                                </span>
+                            </div>
+
+                            {perMarketing.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-[var(--text-muted)]">
+                                    Belum ada aktivitas survey pada periode ini.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {perMarketing.map(m => {
+                                        const tgt = targets.find(t => t.uid === m.uid && t.year === filterYear && t.month === filterMonth);
+                                        const isEditing = editingUid === m.uid;
+
+                                        return (
+                                            <div key={m.uid} className="p-3.5 rounded-xl border border-[#e8e5e0] bg-[#faf9f7] space-y-2.5">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <div className="font-bold text-xs sm:text-sm text-[var(--text-primary)]">{m.nama}</div>
+                                                        <div className="text-[11px] text-[var(--text-muted)]">
+                                                            Bulan ini: <b>{m.currApproved}/{m.currTotal}</b> disetujui • Bulan lalu: <b>{m.prevPct}%</b>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <div className="text-base font-extrabold font-mono text-[var(--accent)]">{m.currPct}%</div>
+                                                        {renderDeltaBadge(m.momDeltaPct, "%")}
+                                                    </div>
+                                                </div>
+
+                                                {/* Visual Progress Bar */}
+                                                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${
+                                                            m.currPct >= config.benchmarkPct ? "bg-[var(--accent)]" : "bg-amber-500"
+                                                        }`}
+                                                        style={{ width: `${Math.min(100, Math.max(4, m.currPct))}%` }}
+                                                    />
+                                                </div>
+
+                                                {/* Target Setup Khusus Direktur / Admin */}
+                                                {isAdminOrSuper && (
+                                                    <div className="pt-1.5 border-t border-[#e8e5e0] flex items-center justify-between gap-2 text-[11px]">
+                                                        {isEditing ? (
+                                                            <div className="flex items-center gap-1.5 w-full">
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="Target Survey"
+                                                                    value={editCnt}
+                                                                    onChange={e => setEditCnt(e.target.value)}
+                                                                    className="w-24 px-2 py-1 text-xs border border-slate-300 rounded-lg bg-white"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Target Rp (Opsional)"
+                                                                    value={editRev}
+                                                                    onChange={e => setEditRev(e.target.value)}
+                                                                    className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded-lg bg-white font-mono"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={savingTarget}
+                                                                    onClick={() => handleSaveTarget(m.uid, m.nama)}
+                                                                    className="p-1.5 rounded-lg bg-emerald-600 text-white cursor-pointer"
+                                                                >
+                                                                    <Check size={12} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditingUid(null)}
+                                                                    className="p-1.5 rounded-lg bg-slate-200 text-slate-700 cursor-pointer"
+                                                                >
+                                                                    <X size={12} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-[var(--text-muted)]">
+                                                                    Target Bulanan:{" "}
+                                                                    {tgt && (tgt.targetCount > 0 || tgt.targetRevenue > 0) ? (
+                                                                        <strong className="text-slate-700">
+                                                                            {tgt.targetCount} survey {tgt.targetRevenue > 0 ? `• ${formatRupiah(tgt.targetRevenue)}` : ""}
+                                                                        </strong>
+                                                                    ) : (
+                                                                        <span>Standar ({config.benchmarkPct}%)</span>
+                                                                    )}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingUid(m.uid);
+                                                                        setEditCnt(String(tgt?.targetCount ?? 5));
+                                                                        setEditRev(String(tgt?.targetRevenue ?? 0));
+                                                                    }}
+                                                                    className="text-[var(--accent)] font-bold hover:underline cursor-pointer"
+                                                                >
+                                                                    Atur Target
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
         </div>
