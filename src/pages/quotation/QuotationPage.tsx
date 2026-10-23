@@ -1,11 +1,11 @@
 import { supabase } from '@/shared/lib/supabase';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { SignatureModal } from '@/widgets/common/SignatureModal';
 import { useCompanyTemplate } from '@/shared/hooks/useCompanyTemplate';
 import {
     FileText, Plus, Search, RefreshCw,
     CheckCircle2, XCircle, Clock, FileX2,
-    Eye, Download, Filter, ChevronLeft, ChevronRight,
+    Eye, Download, Filter,
     PenLine, MessageSquare, AlertCircle, Trash2, Send, MessageCircle, Pencil,
     SlidersHorizontal, Hash, TrendingUp, Sparkles,
 } from "lucide-react";
@@ -21,6 +21,8 @@ import { formatWarrantyDurationText } from '@/shared/lib/warrantyPricingEngine';
 import { formatDate, formatRupiah } from '@/shared/lib/utils';
 import { TabContainer } from '@/shared/ui/TabContainer';
 import { PageHeader } from '@/shared/ui/PageHeader';
+import { Pagination } from '@/shared/ui/Pagination';
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { QuotationFormPage } from './QuotationFormPage';
 import { QuotationEditPage } from './QuotationEditPage';
 import { StatusPHPage } from '../status-ph/StatusPHPage';
@@ -77,6 +79,7 @@ export function QuotationPage() {
     const [filterTipe, setFilterTipe] = useState<"all" | TipeKontrak>("all");
     const [filterStatus, setFilterStatus] = useState<"all" | QuotationStatus>("all");
     const [page, setPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(search, 300);
 
     const [approveTarget, setApproveTarget] = useState<Quotation | null>(null);
     const [approvalModalSig, setApprovalModalSig] = useState<string>("");
@@ -298,17 +301,50 @@ export function QuotationPage() {
         }
     };
 
-    const statsTotal = quotations.length;
-    const statsDraftPending = quotations.filter(q => q.status === "pending" || q.status === "draft").length;
-    const statsApproved = quotations.filter(q => q.status === "approved" || q.status === "sent_to_client").length;
-    const statsDeal = quotations.filter(q => q.status === "deal").length;
+    const { statsTotal, statsDraftPending, statsApproved, statsDeal } = useMemo(() => ({
+        statsTotal: quotations.length,
+        statsDraftPending: quotations.filter(q => q.status === "pending" || q.status === "draft").length,
+        statsApproved: quotations.filter(q => q.status === "approved" || q.status === "sent_to_client").length,
+        statsDeal: quotations.filter(q => q.status === "deal").length,
+    }), [quotations]);
+
+    // Label navigasi mengikuti konteks pengguna; izin aksi tetap dikontrol melalui canCreate/canApprove/canDelete.
+    const listTabLabel = isDirector
+        ? { label: "Pantau & Approval", shortLabel: "Approval" }
+        : user?.role === "MARKETING"
+            ? { label: "Penawaran Saya", shortLabel: "Penawaran Saya" }
+            : { label: "Daftar Penawaran", shortLabel: "Daftar" };
 
     const hubTabs = [
-        { id: "list",      label: "Daftar Penawaran", shortLabel: "Semua", icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
+        { id: "list", label: listTabLabel.label, shortLabel: listTabLabel.shortLabel, icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
         ...(canCreate ? [{ id: "new", label: "+ Buat Penawaran Baru", shortLabel: "Buat Baru", icon: <Plus size={15} /> }] : []),
-        { id: "pipeline",  label: "Status Deal & Kontrak", shortLabel: "Status Deal", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
+        { id: "pipeline", label: user?.role === "MARKETING" ? "Status Deal Saya" : "Status Deal & Kontrak", shortLabel: user?.role === "MARKETING" ? "Deal Saya" : "Status Deal", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
         { id: "nomor-log", label: "Buku Nomor Surat", shortLabel: "Nomor Surat", icon: <Hash size={15} /> },
     ];
+
+    // Memoize filtered rows; debounce avoids recalculating the full list per keystroke.
+    const displayed = useMemo(() => {
+        let rows = quotations;
+        const s = debouncedSearch.trim().toLowerCase();
+        if (s) rows = rows.filter(q =>
+            q.noSurat.toLowerCase().includes(s) ||
+            (q.draftNoSurat ?? "").toLowerCase().includes(s) ||
+            q.kepadaNama.toLowerCase().includes(s) ||
+            (q.objekPekerjaan ?? "").toLowerCase().includes(s) ||
+            q.marketingNama.toLowerCase().includes(s)
+        );
+        if (filterKat !== "all") rows = rows.filter(q => q.kategori === filterKat);
+        if (filterTipe !== "all") rows = rows.filter(q => q.tipeKontrak === filterTipe);
+        if (filterStatus !== "all") rows = rows.filter(q => q.status === filterStatus);
+        return rows;
+    }, [quotations, debouncedSearch, filterKat, filterTipe, filterStatus]);
+
+    const totalPages = Math.max(1, Math.ceil(displayed.length / PER_PAGE));
+    const paged = useMemo(() => displayed.slice((page - 1) * PER_PAGE, page * PER_PAGE), [displayed, page]);
+    useEffect(() => {
+        if (page > totalPages) setPage(totalPages);
+    }, [page, totalPages]);
+
 
     if (subTab === "new") {
         return (
@@ -352,25 +388,6 @@ export function QuotationPage() {
             </div>
         );
     }
-
-    // Filter daftar quotation
-    let displayed = [...quotations];
-    if (search) {
-        const s = search.toLowerCase();
-        displayed = displayed.filter(q =>
-            q.noSurat.toLowerCase().includes(s) ||
-            (q.draftNoSurat ?? "").toLowerCase().includes(s) ||
-            q.kepadaNama.toLowerCase().includes(s) ||
-            (q.objekPekerjaan ?? "").toLowerCase().includes(s) ||
-            q.marketingNama.toLowerCase().includes(s)
-        );
-    }
-    if (filterKat !== "all") displayed = displayed.filter(q => q.kategori === filterKat);
-    if (filterTipe !== "all") displayed = displayed.filter(q => q.tipeKontrak === filterTipe);
-    if (filterStatus !== "all") displayed = displayed.filter(q => q.status === filterStatus);
-
-    const totalPages = Math.ceil(displayed.length / PER_PAGE);
-    const paged = displayed.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
     return (
         <div className="space-y-5">
@@ -535,7 +552,7 @@ export function QuotationPage() {
                                     <th className="px-4 py-3 text-right">Tindakan</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-[var(--border-subtle)] text-xs">
+                            <tbody key={page} className="divide-y divide-[var(--border-subtle)] text-xs result-enter">
                                 {paged.map(q => {
                                     const isPending = q.status === "pending" || q.status === "draft";
                                     const isApproved = q.status === "approved" || q.status === "sent_to_client" || q.status === "deal";
@@ -706,29 +723,8 @@ export function QuotationPage() {
                     </div>
                 )}
 
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/50 text-xs">
-                        <span className="text-[var(--text-secondary)]">
-                            Menampilkan halaman {page} dari {totalPages} ({displayed.length} penawaran)
-                        </span>
-                        <div className="flex gap-1.5">
-                            <button
-                                disabled={page === 1}
-                                onClick={() => setPage(p => p - 1)}
-                                className="p-1.5 rounded-lg border border-[var(--border-subtle)] bg-white disabled:opacity-40"
-                            >
-                                <ChevronLeft size={14} />
-                            </button>
-                            <button
-                                disabled={page === totalPages}
-                                onClick={() => setPage(p => p + 1)}
-                                className="p-1.5 rounded-lg border border-[var(--border-subtle)] bg-white disabled:opacity-40"
-                            >
-                                <ChevronRight size={14} />
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <Pagination page={page} pageSize={PER_PAGE} totalItems={displayed.length}
+                    onPageChange={setPage} itemLabel="penawaran" />
             </div>
 
             {/* Modal Section Approval (TTD Bukti Approval Non-Downloadable & Penghapusan Kode DRF) */}

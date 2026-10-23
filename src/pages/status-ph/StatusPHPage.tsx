@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { Pagination } from '@/shared/ui/Pagination';
 import {
     Send, CheckCircle2, XCircle, Clock, RefreshCw,
     ChevronDown, Search, FileText,
@@ -202,6 +204,8 @@ function QuotationCard({
     );
 }
 
+const STATUS_PAGE_SIZE = 10;
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export function StatusPHPage() {
@@ -209,6 +213,8 @@ export function StatusPHPage() {
     const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(search, 300);
     const [filterStatus, setFilterStatus] = useState<QuotationStatus | "active" | "all">("active");
     const [actionTarget, setActionTarget] = useState<{ q: Quotation; next: QuotationStatus } | null>(null);
     const [acting, setActing] = useState(false);
@@ -221,6 +227,8 @@ export function StatusPHPage() {
                 collection(db, "quotations"),
                 where("companyId", "==", user.companyId),
                 where("status", "in", ["approved", "sent_to_client", "deal", "cancelled"]),
+                // Marketing hanya melihat dan menindaklanjuti penawaran miliknya sendiri.
+                ...(user.role === "MARKETING" ? [where("marketingUid", "==", user.uid)] : []),
             ));
             const rows = snap.docs.map(d => {
                 const x = d.data() as Record<string, unknown>;
@@ -254,8 +262,8 @@ export function StatusPHPage() {
         let rows = [...quotations];
         if (filterStatus === "active") rows = rows.filter(q => q.status === "approved" || q.status === "sent_to_client");
         else if (filterStatus !== "all") rows = rows.filter(q => q.status === filterStatus);
-        if (search) {
-            const s = search.toLowerCase();
+        if (debouncedSearch.trim()) {
+            const s = debouncedSearch.trim().toLowerCase();
             rows = rows.filter(q =>
                 q.noSurat.toLowerCase().includes(s) ||
                 q.kepadaNama.toLowerCase().includes(s) ||
@@ -263,7 +271,10 @@ export function StatusPHPage() {
             );
         }
         return rows;
-    }, [quotations, filterStatus, search]);
+    }, [quotations, filterStatus, debouncedSearch]);
+    const pagedDisplayed = useMemo(() => displayed.slice((page - 1) * STATUS_PAGE_SIZE, page * STATUS_PAGE_SIZE), [displayed, page]);
+    const totalPages = Math.max(1, Math.ceil(displayed.length / STATUS_PAGE_SIZE));
+    useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
     const handleAction = async () => {
         if (!actionTarget) return;
@@ -358,7 +369,7 @@ export function StatusPHPage() {
             <div className="bg-white border border-slate-200 rounded-xl p-3 flex gap-2 flex-wrap items-center">
                 <div className="relative flex-1 min-w-48">
                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={search} onChange={e => setSearch(e.target.value)}
+                    <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                         placeholder="Cari nomor, klien, marketing..."
                         className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" />
                 </div>
@@ -371,7 +382,7 @@ export function StatusPHPage() {
                     { val: "cancelled",     label: "Batal" },
                     { val: "all",           label: "Semua" },
                 ] as const).map(f => (
-                    <button key={f.val} onClick={() => setFilterStatus(f.val as typeof filterStatus)}
+                    <button key={f.val} onClick={() => { setFilterStatus(f.val as typeof filterStatus); setPage(1); }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
                             ${filterStatus === f.val ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                         {f.label}
@@ -395,7 +406,7 @@ export function StatusPHPage() {
                     </p>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 result-enter" key={page}>
                     {/* Banner: ada yang perlu dikirim */}
                     {filterStatus === "active" && stats.approved > 0 && (
                         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -405,13 +416,14 @@ export function StatusPHPage() {
                             </p>
                         </div>
                     )}
-                    {displayed.map(q => (
+                    {pagedDisplayed.map(q => (
                         <QuotationCard key={q.id} q={q}
                             onAction={(q, next) => setActionTarget({ q, next })}
                             acting={acting}
                         />
                     ))}
-                    <p className="text-xs text-slate-400 text-center py-1">{displayed.length} penawaran ditampilkan</p>
+                    <Pagination page={page} pageSize={STATUS_PAGE_SIZE} totalItems={displayed.length}
+                        onPageChange={setPage} itemLabel="penawaran" />
                 </div>
             )}
 

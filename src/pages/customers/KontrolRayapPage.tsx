@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { Pagination } from '@/shared/ui/Pagination';
 import {
     Users, ShieldCheck, RefreshCw, Search, MessageCircle,
     CalendarClock, AlertTriangle, CheckCircle2, BellRing, CalendarCheck, X, Wrench,
@@ -11,6 +13,7 @@ import { PageHeader } from '@/shared/ui/PageHeader';
 import type { Quotation } from '@/entities/types';
 
 export type WarrantyAlertLevel = "overdue" | "expiring" | "safe";
+const KONTROL_PAGE_SIZE = 10;
 
 interface KontrolRow {
     id: string;
@@ -106,6 +109,8 @@ export function KontrolRayapPage() {
     const [rows, setRows] = useState<KontrolRow[]>(FALLBACK_KONTROL);
     const [loading, setLoading] = useState(false);
     const [searchQ, setSearchQ] = useState("");
+    const [page, setPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(searchQ, 300);
     const [statusFilter, setStatusFilter] = useState<"all" | "overdue" | "expiring" | "safe">("all");
     const [handlerTarget, setHandlerTarget] = useState<KontrolRow | null>(null);
     const [nextDateInput, setNextDateInput] = useState("");
@@ -181,24 +186,25 @@ export function KontrolRayapPage() {
         load();
     }, [companyId]);
 
-    const statsOverdue = rows.filter(r => r.alertLevel === "overdue").length;
-    const statsExpiring = rows.filter(r => r.alertLevel === "expiring").length;
-    const statsSafe = rows.filter(r => r.alertLevel === "safe").length;
+    const { statsOverdue, statsExpiring, statsSafe } = useMemo(() => ({
+        statsOverdue: rows.filter(r => r.alertLevel === "overdue").length,
+        statsExpiring: rows.filter(r => r.alertLevel === "expiring").length,
+        statsSafe: rows.filter(r => r.alertLevel === "safe").length,
+    }), [rows]);
 
     const filtered = useMemo(() => {
+        const q = debouncedSearch.trim().toLowerCase();
         return rows.filter(r => {
             if (statusFilter !== "all" && r.alertLevel !== statusFilter) return false;
-            if (searchQ.trim()) {
-                const q = searchQ.toLowerCase();
-                return (
-                    r.nama.toLowerCase().includes(q) ||
-                    r.noSurat.toLowerCase().includes(q) ||
-                    r.alamat.toLowerCase().includes(q)
-                );
-            }
-            return true;
+            if (!q) return true;
+            return r.nama.toLowerCase().includes(q) ||
+                r.noSurat.toLowerCase().includes(q) ||
+                r.alamat.toLowerCase().includes(q);
         });
-    }, [rows, statusFilter, searchQ]);
+    }, [rows, statusFilter, debouncedSearch]);
+    const pagedRows = useMemo(() => filtered.slice((page - 1) * KONTROL_PAGE_SIZE, page * KONTROL_PAGE_SIZE), [filtered, page]);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / KONTROL_PAGE_SIZE));
+    useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
     const openHandlerModal = (row: KontrolRow) => {
         const next6Mo = new Date();
@@ -286,7 +292,7 @@ export function KontrolRayapPage() {
                     <div className="flex items-center gap-2 shrink-0">
                         {statsOverdue > 0 && (
                             <button
-                                onClick={() => setStatusFilter("overdue")}
+                                onClick={() => { setStatusFilter("overdue"); setPage(1); }}
                                 className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold"
                             >
                                 Lihat {statsOverdue} Terlewat (Merah)
@@ -294,7 +300,7 @@ export function KontrolRayapPage() {
                         )}
                         {statsExpiring > 0 && (
                             <button
-                                onClick={() => setStatusFilter("expiring")}
+                                onClick={() => { setStatusFilter("expiring"); setPage(1); }}
                                 className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
                             >
                                 Lihat {statsExpiring} Akan Habis (Kuning)
@@ -308,7 +314,7 @@ export function KontrolRayapPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <button
                     type="button"
-                    onClick={() => setStatusFilter("all")}
+                    onClick={() => { setStatusFilter("all"); setPage(1); }}
                     className={`clean-card p-3.5 text-left transition-all cursor-pointer ${statusFilter === "all" ? "ring-2 ring-[var(--accent)]" : "hover:border-slate-300"}`}
                 >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Semua Kontrak</span>
@@ -318,7 +324,7 @@ export function KontrolRayapPage() {
 
                 <button
                     type="button"
-                    onClick={() => setStatusFilter("overdue")}
+                    onClick={() => { setStatusFilter("overdue"); setPage(1); }}
                     className={`clean-card p-3.5 text-left border-l-4 border-l-red-600 border-red-200 bg-red-50/40 transition-all cursor-pointer ${statusFilter === "overdue" ? "ring-2 ring-red-600" : "hover:border-red-300"}`}
                 >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-red-800 flex items-center gap-1">
@@ -330,7 +336,7 @@ export function KontrolRayapPage() {
 
                 <button
                     type="button"
-                    onClick={() => setStatusFilter("expiring")}
+                    onClick={() => { setStatusFilter("expiring"); setPage(1); }}
                     className={`clean-card p-3.5 text-left border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/40 transition-all cursor-pointer ${statusFilter === "expiring" ? "ring-2 ring-amber-500" : "hover:border-amber-300"}`}
                 >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1">
@@ -342,7 +348,7 @@ export function KontrolRayapPage() {
 
                 <button
                     type="button"
-                    onClick={() => setStatusFilter("safe")}
+                    onClick={() => { setStatusFilter("safe"); setPage(1); }}
                     className={`clean-card p-3.5 text-left border-l-4 border-l-emerald-600 border-emerald-200 bg-emerald-50/35 transition-all cursor-pointer ${statusFilter === "safe" ? "ring-2 ring-emerald-600" : "hover:border-emerald-300"}`}
                 >
                     <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
@@ -359,7 +365,7 @@ export function KontrolRayapPage() {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                         value={searchQ}
-                        onChange={e => setSearchQ(e.target.value)}
+                        onChange={e => { setSearchQ(e.target.value); setPage(1); }}
                         placeholder="Cari nama pelanggan, nomor surat resmi, atau alamat lokasi..."
                         className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] focus:bg-white focus:outline-none focus:border-[var(--accent)]"
                     />
@@ -374,7 +380,7 @@ export function KontrolRayapPage() {
                         <button
                             key={f.id}
                             type="button"
-                            onClick={() => setStatusFilter(f.id)}
+                            onClick={() => { setStatusFilter(f.id); setPage(1); }}
                             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                                 statusFilter === f.id
                                     ? "bg-[var(--accent)] text-white"
@@ -401,8 +407,11 @@ export function KontrolRayapPage() {
                                 <th className="py-2.5 px-3.5 text-right">Handler &amp; Tindak Lanjut</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[var(--border-subtle)]">
-                            {filtered.map(row => {
+                        <tbody key={page} className="divide-y divide-[var(--border-subtle)] result-enter">
+                            {filtered.length === 0 && (
+                                <tr><td colSpan={7} className="p-8 text-center text-[var(--text-muted)]">Tidak ada data pelanggan yang sesuai dengan pencarian atau filter.</td></tr>
+                            )}
+                            {pagedRows.map(row => {
                                 const waNumber = row.telp.replace(/^0/, "62").replace(/\D/g, "");
                                 const waText = encodeURIComponent(
                                     row.alertLevel === "overdue"
@@ -500,6 +509,8 @@ export function KontrolRayapPage() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination page={page} pageSize={KONTROL_PAGE_SIZE} totalItems={filtered.length}
+                    onPageChange={setPage} itemLabel="pelanggan" />
             </div>
 
             {/* Modal Handler Tindak Lanjut Kontrol / Garansi */}

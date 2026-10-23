@@ -1,5 +1,7 @@
 import { getQuotationById } from "@/shared/api/quotationService";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { Pagination } from '@/shared/ui/Pagination';
 import { useNavigate } from "react-router-dom";
 import {
     Hash, Plus, Download, Loader2, AlertCircle,
@@ -10,6 +12,8 @@ import { useAuthStore } from '@/app/store/authStore';
 import { getNomorSuratLog, addManualNomorSurat, deleteNomorSurat } from '@/shared/api/nomorSuratService';
 import { fmtDateID, TIPE_LABELS } from '@/shared/lib/quotationConfig';
 import type { NomorSuratLog, KategoriSurat, TipeKontrak, QuotationStatus, JenisLayanan } from '@/entities/types';
+
+const LOG_PAGE_SIZE = 10;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -41,17 +45,6 @@ function KategoriBadge({ kategori, isManual }: { kategori: string; isManual?: bo
     if (kategori === "AR")  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">AR</span>;
     if (kategori === "PCO") return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">PCO</span>;
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Lainnya</span>;
-}
-
-// ─── DEBOUNCE HOOK ────────────────────────────────────────────────────────────
-
-function useDebounce<T>(value: T, delay = 350): T {
-    const [debounced, setDebounced] = useState(value);
-    useEffect(() => {
-        const t = setTimeout(() => setDebounced(value), delay);
-        return () => clearTimeout(t);
-    }, [value, delay]);
-    return debounced;
 }
 
 // ─── DELETE CONFIRM MODAL ─────────────────────────────────────────────────────
@@ -233,9 +226,10 @@ export function NomorSuratLogPage() {
     const [fKategori, setFKategori] = useState<"" | KategoriSurat | "LAINNYA">("");
     const [fTipe, setFTipe]         = useState<"" | TipeKontrak>("");
     const [fStatus, setFStatus]     = useState<"" | QuotationStatus>("");
+    const [page, setPage] = useState(1);
 
-    // Debounce 350ms — filter di client, tidak trigger Firestore read
-    const debouncedSearch = useDebounce(searchQ, 350);
+    // Debounce 300ms — filter di client, tidak memicu pembacaan ulang database
+    const debouncedSearch = useDebouncedValue(searchQ, 300);
 
     const isAdmin   = user?.role === "ADMIN";
     const canManage = user?.role === "ADMIN";
@@ -255,26 +249,27 @@ export function NomorSuratLogPage() {
 
     useEffect(() => { fetchLogs(); }, [user?.companyId]);
 
-    // Client-side filter (debounced search)
-    const filtered = logs.filter(log => {
-        if (debouncedSearch) {
-            const q = debouncedSearch.toLowerCase();
-            if (!log.noSurat.toLowerCase().includes(q) &&
-                !log.kepada.toLowerCase().includes(q) &&
-                !log.byName.toLowerCase().includes(q)) return false;
-        }
+    // Memoized client-side filtering; only runs after the debounce window or a filter change.
+    const filtered = useMemo(() => logs.filter(log => {
+        const q = debouncedSearch.trim().toLowerCase();
+        if (q && !log.noSurat.toLowerCase().includes(q) &&
+            !log.kepada.toLowerCase().includes(q) &&
+            !log.byName.toLowerCase().includes(q)) return false;
         if (fKategori && log.kategori !== fKategori) return false;
-        if (fTipe     && log.tipe     !== fTipe)     return false;
-        if (fStatus   && log.status   !== fStatus)   return false;
+        if (fTipe && log.tipe !== fTipe) return false;
+        if (fStatus && log.status !== fStatus) return false;
         return true;
-    });
+    }), [logs, debouncedSearch, fKategori, fTipe, fStatus]);
+    const pagedLogs = useMemo(() => filtered.slice((page - 1) * LOG_PAGE_SIZE, page * LOG_PAGE_SIZE), [filtered, page]);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / LOG_PAGE_SIZE));
+    useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
-    const stats = {
+    const stats = useMemo(() => ({
         total:    logs.length,
         approved: logs.filter(l => l.status === "approved").length,
         pending:  logs.filter(l => l.status === "pending").length,
         manual:   logs.filter(l => l.isManual).length,
-    };
+    }), [logs]);
 
     const hasFilter = fKategori || fTipe || fStatus || debouncedSearch;
 
@@ -334,10 +329,10 @@ export function NomorSuratLogPage() {
                         className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400 min-w-0"
                         placeholder="Cari nomor, klien, pembuat..."
                         value={searchQ}
-                        onChange={e => setSearchQ(e.target.value)}
+                        onChange={e => { setSearchQ(e.target.value); setPage(1); }}
                     />
                     {searchQ && (
-                        <button onClick={() => setSearchQ("")} className="text-slate-400 hover:text-slate-600 shrink-0">
+                        <button onClick={() => { setSearchQ(""); setPage(1); }} className="text-slate-400 hover:text-slate-600 shrink-0">
                             <X size={13} />
                         </button>
                     )}
@@ -362,7 +357,7 @@ export function NomorSuratLogPage() {
                     <div className="space-y-1 min-w-28 flex-1">
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Kategori</label>
                         <select className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
-                            value={fKategori} onChange={e => setFKategori(e.target.value as any)}>
+                            value={fKategori} onChange={e => { setFKategori(e.target.value as any); setPage(1); }}>
                             <option value="">Semua</option>
                             <option value="AR">Anti Rayap</option>
                             <option value="PCO">Pest Control</option>
@@ -371,7 +366,7 @@ export function NomorSuratLogPage() {
                     <div className="space-y-1 min-w-24 flex-1">
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Tipe</label>
                         <select className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
-                            value={fTipe} onChange={e => setFTipe(e.target.value as any)}>
+                            value={fTipe} onChange={e => { setFTipe(e.target.value as any); setPage(1); }}>
                             <option value="">Semua</option>
                             <option value="U">Umum</option>
                             <option value="K">Kontrak</option>
@@ -380,7 +375,7 @@ export function NomorSuratLogPage() {
                     <div className="space-y-1 min-w-28 flex-1">
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-400">Status</label>
                         <select className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
-                            value={fStatus} onChange={e => setFStatus(e.target.value as any)}>
+                            value={fStatus} onChange={e => { setFStatus(e.target.value as any); setPage(1); }}>
                             <option value="">Semua</option>
                             <option value="approved">Disetujui</option>
                             <option value="pending">Pending</option>
@@ -388,7 +383,7 @@ export function NomorSuratLogPage() {
                             <option value="draft">Draft</option>
                         </select>
                     </div>
-                    <button onClick={() => { setFKategori(""); setFTipe(""); setFStatus(""); setSearchQ(""); }}
+                    <button onClick={() => { setFKategori(""); setFTipe(""); setFStatus(""); setSearchQ(""); setPage(1); }}
                         className="self-end px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
                         Reset
                     </button>
@@ -429,8 +424,8 @@ export function NomorSuratLogPage() {
                                         <th className="px-4 py-3 text-center">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {filtered.map(log => (
+                                <tbody key={page} className="divide-y divide-slate-50 result-enter">
+                                    {pagedLogs.map(log => (
                                         <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -474,8 +469,8 @@ export function NomorSuratLogPage() {
                         </div>
 
                         {/* Mobile cards */}
-                        <div className="md:hidden divide-y divide-slate-100">
-                            {filtered.map(log => (
+                        <div className="md:hidden divide-y divide-slate-100 result-enter" key={`mobile-${page}`}>
+                            {pagedLogs.map(log => (
                                 <div key={log.id} className="p-4 space-y-2">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
@@ -515,10 +510,8 @@ export function NomorSuratLogPage() {
                             ))}
                         </div>
 
-                        {/* Footer count */}
-                        <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-400 text-right">
-                            {filtered.length} dari {logs.length} nomor surat
-                        </div>
+                        <Pagination page={page} pageSize={LOG_PAGE_SIZE} totalItems={filtered.length}
+                            onPageChange={setPage} itemLabel="nomor surat" />
                     </>
                 )}
             </div>

@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { Pagination } from '@/shared/ui/Pagination';
 import {
     Users, Search, X, RefreshCw, Loader2, FileText,
     ChevronDown, ChevronUp, CheckCircle2, MessageCircle,
@@ -65,12 +67,6 @@ interface DerivedCustomer {
     lastServiceDate: Date | null; jasaDigunakan: string[];
     warranties: WarrantyInfo[]; activeWarranty: WarrantyInfo | null;
     checklists: ControlChecklist[];
-}
-
-function useDebounce<T>(value: T, delay = 350): T {
-    const [d, setD] = useState(value);
-    useEffect(() => { const t = setTimeout(() => setD(value), delay); return () => clearTimeout(t); }, [value, delay]);
-    return d;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -410,12 +406,15 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
     );
 }
 
+const CUSTOMER_PAGE_SIZE = 10;
+
 export function CustomersPage() {
     const { user } = useAuthStore();
     const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [checklists, setChecklists] = useState<(ControlChecklist & { customerId: string })[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQ, setSearchQ] = useState("");
+    const [page, setPage] = useState(1);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<"date" | "name" | "deal" | "area">("date");
     const [filterWarranty, setFilterWarranty] = useState(false);
@@ -480,7 +479,7 @@ export function CustomersPage() {
         reader.readAsBinaryString(file);
     };
 
-    const debouncedSearch = useDebounce(searchQ, 350);
+    const debouncedSearch = useDebouncedValue(searchQ, 300);
     const canSeeAll = user?.role !== "MARKETING";
 
     const load = async () => {
@@ -594,30 +593,42 @@ export function CustomersPage() {
         return map;
     }, [quotations, checklists]);
 
-    let customers = Array.from(customerMap.values());
-    if (filterWarranty) customers = customers.filter(c => c.activeWarranty?.isActive);
-    if (debouncedSearch) {
-        const s = debouncedSearch.toLowerCase();
-        customers = customers.filter(c =>
+    const customers = useMemo(() => {
+        let result = Array.from(customerMap.values());
+        if (filterWarranty) result = result.filter(c => c.activeWarranty?.isActive);
+        const s = debouncedSearch.trim().toLowerCase();
+        if (s) result = result.filter(c =>
             c.name.toLowerCase().includes(s) ||
             c.address.toLowerCase().includes(s) ||
             c.wilayah.toLowerCase().includes(s) ||
             c.jasaDigunakan.some(j => j.toLowerCase().includes(s))
         );
-    }
-    customers.sort((a, b) =>
-        sortBy === "name"    ? a.name.localeCompare(b.name)
-        : sortBy === "deal"  ? b.totalDeal - a.totalDeal
-        : sortBy === "area"  ? a.wilayah.localeCompare(b.wilayah)
-        : b.services[0]?.tanggal?.getTime() - a.services[0]?.tanggal?.getTime()
+        result.sort((a, b) =>
+            sortBy === "name" ? a.name.localeCompare(b.name)
+            : sortBy === "deal" ? b.totalDeal - a.totalDeal
+            : sortBy === "area" ? a.wilayah.localeCompare(b.wilayah)
+            : (b.services[0]?.tanggal?.getTime() ?? 0) - (a.services[0]?.tanggal?.getTime() ?? 0)
+        );
+        return result;
+    }, [customerMap, filterWarranty, debouncedSearch, sortBy]);
+    const pagedCustomers = useMemo(
+        () => customers.slice((page - 1) * CUSTOMER_PAGE_SIZE, page * CUSTOMER_PAGE_SIZE),
+        [customers, page],
     );
+    const customerTotalPages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE_SIZE));
+    useEffect(() => {
+        if (page > customerTotalPages) setPage(customerTotalPages);
+    }, [page, customerTotalPages]);
 
-    const totalCustomers = customerMap.size;
-    const withDeal = Array.from(customerMap.values()).filter(c => c.totalDeal > 0).length;
-    const activeWarranties = Array.from(customerMap.values()).filter(c => c.activeWarranty?.isActive).length;
-    const expiringWarranties = Array.from(customerMap.values()).filter(c =>
-        c.activeWarranty?.isActive && c.activeWarranty.daysRemaining <= 90
-    ).length;
+    const { totalCustomers, withDeal, activeWarranties, expiringWarranties } = useMemo(() => {
+        const allCustomers = Array.from(customerMap.values());
+        return {
+            totalCustomers: customerMap.size,
+            withDeal: allCustomers.filter(c => c.totalDeal > 0).length,
+            activeWarranties: allCustomers.filter(c => c.activeWarranty?.isActive).length,
+            expiringWarranties: allCustomers.filter(c => c.activeWarranty?.isActive && c.activeWarranty.daysRemaining <= 90).length,
+        };
+    }, [customerMap]);
 
     return (
         <div className="p-4 md:p-6 max-w-screen-lg mx-auto space-y-5">
@@ -677,11 +688,11 @@ export function CustomersPage() {
                     className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
                     placeholder="Cari nama klien, alamat, wilayah, atau jenis jasa..."
                     value={searchQ}
-                    onChange={e => setSearchQ(e.target.value)}
+                    onChange={e => { setSearchQ(e.target.value); setPage(1); }}
                     autoComplete="off"
                 />
                 {searchQ && (
-                    <button onClick={() => setSearchQ("")} className="text-slate-400 hover:text-slate-600 shrink-0 p-0.5 rounded">
+                    <button onClick={() => { setSearchQ(""); setPage(1); }} className="text-slate-400 hover:text-slate-600 shrink-0 p-0.5 rounded">
                         <X size={14} />
                     </button>
                 )}
@@ -690,7 +701,7 @@ export function CustomersPage() {
             {/* ── Filter chips row ── */}
             <div className="flex items-center gap-2 flex-wrap">
                 <button
-                    onClick={() => setFilterWarranty(v => !v)}
+                    onClick={() => { setFilterWarranty(v => !v); setPage(1); }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
                         filterWarranty
                             ? "bg-purple-600 text-white border-purple-600"
@@ -702,7 +713,7 @@ export function CustomersPage() {
 
                 <select
                     value={sortBy}
-                    onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                    onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
                     className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-100">
                     <option value="date">Terbaru</option>
                     <option value="deal">Terbanyak Deal</option>
@@ -720,7 +731,7 @@ export function CustomersPage() {
 
                 {(searchQ || filterWarranty) && (
                     <button
-                        onClick={() => { setSearchQ(""); setFilterWarranty(false); }}
+                        onClick={() => { setSearchQ(""); setFilterWarranty(false); setPage(1); }}
                         className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors">
                         <X size={11} /> Reset
                     </button>
@@ -747,16 +758,18 @@ export function CustomersPage() {
                     </p>
                 </div>
             ) : (
-                <div className="space-y-3">
-                    {customers.map(c => (
+                <div className="space-y-3 result-enter" key={page}>
+                    {pagedCustomers.map(c => (
                         <CustomerCard key={c.id} customer={c}
                             expanded={expandedId === c.id}
                             onToggle={() => setExpandedId(prev => prev === c.id ? null : c.id)}
                             onAddChecklist={() => setChecklistTarget(c)} />
                     ))}
                     <p className="text-xs text-slate-400 text-center pt-1">
-                        {customers.length} dari {totalCustomers} klien
+                        {customers.length} hasil filter dari {totalCustomers} klien
                     </p>
+                    <Pagination page={page} pageSize={CUSTOMER_PAGE_SIZE} totalItems={customers.length}
+                        onPageChange={setPage} itemLabel="klien" />
                 </div>
             )}
 

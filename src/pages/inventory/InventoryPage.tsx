@@ -14,9 +14,12 @@ import { supabase } from '@/shared/lib/supabase';
 import { getQuotations } from '@/shared/api/quotationService';
 import { formatRupiah } from '@/shared/lib/utils';
 import { TabContainer } from '@/shared/ui/TabContainer';
+import { Pagination } from '@/shared/ui/Pagination';
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+const INVENTORY_PAGE_SIZE = 10;
 const fmt = (n: number) => n.toLocaleString("id-ID", { maximumFractionDigits: 3 });
 const monthStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
@@ -46,6 +49,10 @@ export function InventoryPage() {
 
     const [tab, setTab] = useState<InvTab>(isWarehouseRole ? "stok" : "proyek");
     const [searchQ, setSearchQ] = useState("");
+    const [itemsPage, setItemsPage] = useState(1);
+    const [projectPage, setProjectPage] = useState(1);
+    const [logsPage, setLogsPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(searchQ, 300);
     const [kategoriFilter, setKategoriFilter] = useState("ALL");
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [logs, setLogs] = useState<InventoryLog[]>([]);
@@ -248,10 +255,6 @@ export function InventoryPage() {
         reader.readAsBinaryString(file);
     };
 
-    if (!companyId) {
-        return <div className="p-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl m-4">Pilih perusahaan pada menu di sidebar untuk melihat gudang.</div>;
-    }
-
     const categories = useMemo(() => {
         const set = new Set<string>();
         items.forEach(i => { if (i.kategori) set.add(i.kategori); });
@@ -263,9 +266,22 @@ export function InventoryPage() {
     const filtered = useMemo(() => {
         let base = tab === "alert" ? lowStockItems : items;
         if (kategoriFilter !== "ALL") base = base.filter(s => s.kategori === kategoriFilter);
-        if (searchQ.trim()) base = base.filter(s => s.nama.toLowerCase().includes(searchQ.toLowerCase()));
+        const search = debouncedSearch.trim().toLowerCase();
+        if (search) base = base.filter(s => s.nama.toLowerCase().includes(search));
         return base;
-    }, [items, lowStockItems, tab, kategoriFilter, searchQ]);
+    }, [items, lowStockItems, tab, kategoriFilter, debouncedSearch]);
+    const pagedItems = useMemo(
+        () => filtered.slice((itemsPage - 1) * INVENTORY_PAGE_SIZE, itemsPage * INVENTORY_PAGE_SIZE),
+        [filtered, itemsPage],
+    );
+    const pagedLogs = useMemo(
+        () => logs.slice((logsPage - 1) * INVENTORY_PAGE_SIZE, logsPage * INVENTORY_PAGE_SIZE),
+        [logs, logsPage],
+    );
+    const itemTotalPages = Math.max(1, Math.ceil(filtered.length / INVENTORY_PAGE_SIZE));
+    const logTotalPages = Math.max(1, Math.ceil(logs.length / INVENTORY_PAGE_SIZE));
+    useEffect(() => { if (itemsPage > itemTotalPages) setItemsPage(itemTotalPages); }, [itemsPage, itemTotalPages]);
+    useEffect(() => { if (logsPage > logTotalPages) setLogsPage(logTotalPages); }, [logsPage, logTotalPages]);
 
     // Hitung Estimasi Chemical & Analisis Untung Rugi per ID Proyek (Untuk Gudang, Admin, Marketing, & Superadmin)
     const projectProfitability = useMemo(() => {
@@ -314,6 +330,12 @@ export function InventoryPage() {
             };
         });
     }, [projects, logs, itemName]);
+    const pagedProjectProfitability = useMemo(
+        () => projectProfitability.slice((projectPage - 1) * INVENTORY_PAGE_SIZE, projectPage * INVENTORY_PAGE_SIZE),
+        [projectProfitability, projectPage],
+    );
+    const projectTotalPages = Math.max(1, Math.ceil(projectProfitability.length / INVENTORY_PAGE_SIZE));
+    useEffect(() => { if (projectPage > projectTotalPages) setProjectPage(projectTotalPages); }, [projectPage, projectTotalPages]);
 
     const invTabs = [
         { id: "stok",   label: "Daftar Stok Obat & Alat",           shortLabel: "Semua Stok",  icon: <ClipboardList size={15} />, badge: items.length },
@@ -322,6 +344,10 @@ export function InventoryPage() {
         { id: "log",    label: "Riwayat Masuk / Keluar",            shortLabel: "Riwayat",     icon: <Trash2 size={15} />,        badge: logs.length },
         { id: "alert",  label: "Stok Hampir Habis",                 shortLabel: "Stok Minim",  icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ];
+
+    if (!companyId) {
+        return <div className="p-6 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl m-4">Pilih perusahaan pada menu di sidebar untuk melihat gudang.</div>;
+    }
 
     return (
         <div className="space-y-4">
@@ -461,8 +487,8 @@ export function InventoryPage() {
                                         {canWrite && <th className="py-3 px-4 text-right">Aksi Gudang</th>}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-[var(--border-subtle)]">
-                                    {projectProfitability.map(p => {
+                                <tbody key={projectPage} className="divide-y divide-[var(--border-subtle)] result-enter">
+                                    {pagedProjectProfitability.map(p => {
                                         const isHealthy = p.marginPct >= 45;
                                         const isWarning = p.marginPct >= 20 && p.marginPct < 45;
                                         return (
@@ -542,6 +568,8 @@ export function InventoryPage() {
                                 </tbody>
                             </table>
                         </div>
+                        <Pagination page={projectPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={projectProfitability.length}
+                            onPageChange={setProjectPage} itemLabel="proyek" />
                     </div>
                 </div>
             )}
@@ -561,7 +589,7 @@ export function InventoryPage() {
                                 <span className="text-xs font-bold text-slate-700">Kategori:</span>
                                 <select
                                     value={kategoriFilter}
-                                    onChange={e => setKategoriFilter(e.target.value)}
+                                    onChange={e => { setKategoriFilter(e.target.value); setItemsPage(1); }}
                                     className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700"
                                 >
                                     <option value="ALL">Semua Lokasi / Kategori</option>
@@ -589,7 +617,7 @@ export function InventoryPage() {
                             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 value={searchQ}
-                                onChange={e => setSearchQ(e.target.value)}
+                                onChange={e => { setSearchQ(e.target.value); setItemsPage(1); }}
                                 placeholder="Cari nama chemical, kode barang, atau material..."
                                 className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[var(--accent)]"
                             />
@@ -611,7 +639,7 @@ export function InventoryPage() {
                                     {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-50/60">Catat Masuk / Estimasi Proyek</th>}
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody key={itemsPage} className="result-enter">
                                 {filtered.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="p-8 text-center text-slate-400">
@@ -619,7 +647,7 @@ export function InventoryPage() {
                                         </td>
                                     </tr>
                                 )}
-                                {filtered.map(s => {
+                                {pagedItems.map(s => {
                                     const low = s.stok <= s.minAlert;
                                     return (
                                         <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors">
@@ -678,18 +706,21 @@ export function InventoryPage() {
                             </tbody>
                         </table>
                     </div>
+                    <Pagination page={itemsPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={filtered.length}
+                        onPageChange={setItemsPage} itemLabel="material" />
                 </div>
             )}
 
             {!loading && tab === "log" && (
-                <div className="bg-white border border-[#e8e5e0] rounded-2xl overflow-x-auto p-4 shadow-xs">
+                <div className="bg-white border border-[#e8e5e0] rounded-2xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto p-4">
                     <table className="w-full text-left border-collapse text-sm">
                         <thead><tr className="bg-[#f5f3ef] text-slate-600 text-xs uppercase font-bold">
                             <th className="p-3 rounded-l-xl">Tanggal</th><th className="p-3">Tipe</th><th className="p-3">Item</th><th className="p-3 text-right">Masuk (IN)</th><th className="p-3 text-right">Keluar / Estimasi</th><th className="p-3 text-right">Sisa Stok</th><th className="p-3">ID Proyek</th><th className="p-3 rounded-r-xl">Keterangan</th>
                         </tr></thead>
-                        <tbody>
+                        <tbody key={logsPage} className="result-enter">
                             {logs.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">Belum ada mutasi stok.</td></tr>}
-                            {logs.map(l => (
+                            {pagedLogs.map(l => (
                                 <tr key={l.id} className="border-t border-slate-100">
                                     <td className="p-3 text-slate-500 whitespace-nowrap">{l.tanggal}</td>
                                     <td className="p-3">
@@ -707,6 +738,9 @@ export function InventoryPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
+                    <Pagination page={logsPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={logs.length}
+                        onPageChange={setLogsPage} itemLabel="mutasi stok" />
                 </div>
             )}
 

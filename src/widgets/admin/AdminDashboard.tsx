@@ -83,7 +83,6 @@ import { Header } from '../common/Header';
 
 const MotionDiv = motion.div as any;
 import { AppLayout } from '../common/AppLayout';
-import { TabContainer } from '@/shared/ui/TabContainer';
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
@@ -144,7 +143,7 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'projects') {
-      const t = setTimeout(loadProjects, 250);
+      const t = setTimeout(loadProjects, 300);
       return () => clearTimeout(t);
     }
   }, [loadProjects, activeTab]);
@@ -210,7 +209,7 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
-    const t = setTimeout(loadReports, 250); // debounce search/filter changes
+    const t = setTimeout(loadReports, 300); // debounce search/filter changes
     return () => clearTimeout(t);
   }, [loadReports, isAdmin]);
 
@@ -429,21 +428,6 @@ export const AdminDashboard: React.FC = () => {
   const sidebarItems = ALL_ITEMS.filter(i => user && i.roles.includes(user.role));
   const currentTabMeta = sidebarItems.find(i => i.id === activeTab) ?? sidebarItems[0];
 
-  // Sub-Menu atas & Floating Bottom Pill (Mobile/Tablet) selalu konsisten menampilkan menu pada Grup Sidebar yang sedang aktif
-  const currentGroupTabs = useMemo(() => {
-    if (!currentTabMeta) return [];
-    return sidebarItems
-      .filter(i => i.group === currentTabMeta.group)
-      .map(i => ({
-        id: i.id,
-        label: i.label,
-        shortLabel: i.shortLabel,
-        icon: i.icon,
-        badge: i.badge,
-        badgeTone: i.danger ? ('danger' as const) : ('default' as const),
-      }));
-  }, [sidebarItems, currentTabMeta]);
-
   const handleHeaderRefresh = useCallback(() => {
     if (activeTab === 'projects') { void loadProjects(); return; }
     if (activeTab === 'reports' || activeTab === 'anomalies' || activeTab === 'dashboard') { void loadReports(); return; }
@@ -485,14 +469,6 @@ export const AdminDashboard: React.FC = () => {
         }
     >
       <div className="p-3 sm:p-4 space-y-3.5 max-w-7xl w-full mx-auto">
-          {currentGroupTabs.length > 1 && (
-            <TabContainer
-              tabs={currentGroupTabs}
-              activeTab={activeTab}
-              onChange={(id) => setActiveTab(id as Tab)}
-              showFloatingBottom={true}
-            />
-          )}
           {isSuper && !activeCompanyId && (
             <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
               Pilih perusahaan yang akan dikelola pada menu di sidebar untuk mulai melihat data dan mengatur template.

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { Pagination } from "@/shared/ui/Pagination";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/app/providers/AuthContext";
 import { getSPKList } from "@/shared/api/spkService";
@@ -8,12 +10,16 @@ import {
     Search, RefreshCw, PenTool, Plus, ExternalLink, Phone
 } from "lucide-react";
 
+const SPK_PAGE_SIZE = 8;
+
 export function FieldJobsPage() {
     const { user } = useAuth();
     const [spks, setSpks] = useState<SPK[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<"all" | "assigned" | "in_progress" | "done">("all");
     const [searchQuery, setSearchQuery] = useState("");
+    const [page, setPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(searchQuery, 300);
     const [signingSPK, setSigningSPK] = useState<SPK | null>(null);
 
     const loadData = async () => {
@@ -34,19 +40,20 @@ export function FieldJobsPage() {
         loadData();
     }, [user]);
 
-    const filtered = spks.filter(s => {
-        if (filterStatus !== "all" && s.status !== filterStatus) return false;
-        if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            return (
-                s.customerName.toLowerCase().includes(q) ||
+    const filtered = useMemo(() => {
+        const q = debouncedSearch.trim().toLowerCase();
+        return spks.filter(s => {
+            if (filterStatus !== "all" && s.status !== filterStatus) return false;
+            if (!q) return true;
+            return s.customerName.toLowerCase().includes(q) ||
                 s.lokasi.toLowerCase().includes(q) ||
                 (s.quotationNoSurat || "").toLowerCase().includes(q) ||
-                s.perihal.toLowerCase().includes(q)
-            );
-        }
-        return true;
-    });
+                s.perihal.toLowerCase().includes(q);
+        });
+    }, [spks, filterStatus, debouncedSearch]);
+    const pagedSpks = useMemo(() => filtered.slice((page - 1) * SPK_PAGE_SIZE, page * SPK_PAGE_SIZE), [filtered, page]);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / SPK_PAGE_SIZE));
+    useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
     return (
         <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
@@ -84,7 +91,7 @@ export function FieldJobsPage() {
                         type="text"
                         placeholder="Cari nama klien, lokasi, nomor surat..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                         className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-slate-800"
                     />
                 </div>
@@ -93,7 +100,7 @@ export function FieldJobsPage() {
                     {(["all", "assigned", "in_progress", "done"] as const).map((st) => (
                         <button
                             key={st}
-                            onClick={() => setFilterStatus(st)}
+                            onClick={() => { setFilterStatus(st); setPage(1); }}
                             className={`px-3 py-1 rounded-md whitespace-nowrap transition-colors ${
                                 filterStatus === st ? "bg-white text-slate-900 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
                             }`}
@@ -105,7 +112,7 @@ export function FieldJobsPage() {
             </div>
 
             {/* Work Orders List */}
-            <div className="space-y-3">
+            <div className="space-y-3 result-enter" key={page}>
                 {loading ? (
                     <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
                         <RefreshCw size={20} className="animate-spin mx-auto text-slate-400 mb-2" />
@@ -116,7 +123,7 @@ export function FieldJobsPage() {
                         <p className="text-xs text-slate-500">Tidak ada penugasan yang sesuai kriteria.</p>
                     </div>
                 ) : (
-                    filtered.map((spk) => (
+                    pagedSpks.map((spk) => (
                         <div
                             key={spk.id}
                             className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
@@ -198,6 +205,10 @@ export function FieldJobsPage() {
                             </div>
                         </div>
                     ))
+                )}
+                {!loading && filtered.length > 0 && (
+                    <Pagination page={page} pageSize={SPK_PAGE_SIZE} totalItems={filtered.length}
+                        onPageChange={setPage} itemLabel="penugasan" />
                 )}
             </div>
 
