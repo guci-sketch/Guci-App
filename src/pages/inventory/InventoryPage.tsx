@@ -39,9 +39,10 @@ export function InventoryPage() {
     const companyId = (user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN")
         ? (activeCompanyId || user?.companyId || null)
         : (user?.companyId ?? null);
-    const canWrite = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN" || user?.role === "INVENTORY";
+    // Direktur (SUPERADMIN) dan Marketing hanya memantau Analisis Untung Rugi Proyek & Stok secara read-only
+    const canWrite = user?.role === "ADMIN" || user?.role === "INVENTORY";
 
-    const [tab, setTab] = useState<InvTab>("stok");
+    const [tab, setTab] = useState<InvTab>(user?.role === "SUPERADMIN" ? "proyek" : "stok");
     const [searchQ, setSearchQ] = useState("");
     const [kategoriFilter, setKategoriFilter] = useState("ALL");
     const [items, setItems] = useState<InventoryItem[]>([]);

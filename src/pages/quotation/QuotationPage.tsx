@@ -86,10 +86,12 @@ export function QuotationPage() {
     const [rejectNotes, setRejectNotes] = useState("");
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+    const isDirector = user?.role === "SUPERADMIN";
     const canSeeAll = user?.role !== "MARKETING";
-    const canApprove = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
-    const canCreate = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN" || user?.role === "MARKETING";
-    const canDelete = user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+    const canApprove = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+    // Direktur (SUPERADMIN) fokus memantau dan melakukan Approval/Adjust penawaran, bukan menginput draf survei baru
+    const canCreate = user?.role === "ADMIN" || user?.role === "MARKETING";
+    const canDelete = user?.role === "ADMIN";
 
     const load = async () => {
         if (!user) return;
@@ -390,8 +392,10 @@ export function QuotationPage() {
             <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} />
 
             <PageHeader
-                title="Surat Penawaran Harga — PT Guci Emas Pratama"
-                subtitle="Buat draf penawaran dari hasil survei lapangan, sesuaikan harga atau garansi saat negosiasi, lalu setujui untuk cetak PDF resmi."
+                title={isDirector ? "Approval & Pemantauan Penawaran Harga (Direktur)" : "Surat Penawaran Harga — PT Guci Emas Pratama"}
+                subtitle={isDirector
+                    ? "Pantau seluruh draf penawaran yang diajukan tim, tinjau penyesuaian harga/garansi, dan berikan tanda tangan bukti Approval."
+                    : "Buat draf penawaran dari hasil survei lapangan, sesuaikan harga atau garansi saat negosiasi, lalu setujui untuk cetak PDF resmi."}
                 icon={<FileText size={20} />}
                 actions={
                     <>

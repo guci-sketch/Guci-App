@@ -29,7 +29,7 @@ const Shell = () => {
     return <AdminDashboard />;
 };
 
-const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
+const ProtectedPage = ({ children, disallowRoles = [] }: { children: React.ReactNode; disallowRoles?: string[] }) => {
     const { user, status } = useAuth();
     if (status === 'checking') {
         return (
@@ -42,7 +42,7 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
         return <LoginForm />;
     }
     // MASTER_SUPER_ADMIN hanya dapat mengakses konsol manajemen Perusahaan & Token Undangan Superadmin
-    if (user.role === 'MASTER_SUPER_ADMIN') {
+    if (user.role === 'MASTER_SUPER_ADMIN' || disallowRoles.includes(user.role)) {
         return <Navigate to="/" replace />;
     }
     return <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6">{children}</div>;
@@ -70,7 +70,7 @@ export default function App() {
                 <Routes>
                     <Route path="/login" element={<AuthRoute component={LoginForm} />} />
                     <Route path="/signup" element={<AuthRoute component={SignupPage} />} />
-                    <Route path="/quotations/new" element={<ProtectedPage><QuotationFormPage /></ProtectedPage>} />
+                    <Route path="/quotations/new" element={<ProtectedPage disallowRoles={['SUPERADMIN']}><QuotationFormPage /></ProtectedPage>} />
                     <Route path="/quotations/:id/edit" element={<ProtectedPage><QuotationEditPage /></ProtectedPage>} />
                     <Route path="/*" element={<Shell />} />
                 </Routes>
