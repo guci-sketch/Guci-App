@@ -12,28 +12,29 @@ export interface LatLng {
  * using the Haversine formula.
  */
 export function calculateDistanceMeters(
-  point1: LatLng,
-  point2: LatLng
+  a: LatLng | number,
+  b: LatLng | number,
+  c?: number,
+  d?: number
 ): number {
-  const R = 6371e3; // Earth radius in meters
-  const φ1 = (point1.latitude * Math.PI) / 180;
-  const φ2 = (point2.latitude * Math.PI) / 180;
-  const Δφ = ((point2.latitude - point1.latitude) * Math.PI) / 180;
-  const Δλ = ((point2.longitude - point1.longitude) * Math.PI) / 180;
+  const lat1 = typeof a === "number" ? a : a.latitude;
+  const lon1 = typeof a === "number" ? (b as number) : a.longitude;
+  const lat2 = typeof a === "number" ? (c ?? 0) : (b as LatLng).latitude;
+  const lon2 = typeof a === "number" ? (d ?? 0) : (b as LatLng).longitude;
 
-  const a =
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const x =
     Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
     Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const y = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 
-  const distance = R * c;
-  return Math.round(distance);
+  return Math.round(R * y);
 }
-
-/**
- * Checks if user location is within the defined project radius
- */
-export const isWithinRadius = isLocationWithinRadius;
 
 export function isLocationWithinRadius(
   userLocation: LatLng,
@@ -45,6 +46,26 @@ export function isLocationWithinRadius(
     isWithin: distance <= radiusMeters,
     distance,
   };
+}
+
+/**
+ * Checks if user location is within the defined project radius.
+ * Supports both (lat1, lon1, lat2, lon2, radiusMeters) -> boolean
+ * and (userLocation: LatLng, projectLocation: LatLng, radiusMeters: number) -> boolean
+ */
+export function isWithinRadius(
+  a: LatLng | number,
+  b: LatLng | number,
+  c: number,
+  d?: number,
+  radiusMeters?: number
+): boolean {
+  if (typeof a === "number") {
+    const dist = calculateDistanceMeters(a, b as number, c, d ?? 0);
+    return dist <= (radiusMeters ?? 100);
+  }
+  const dist = calculateDistanceMeters(a, b as LatLng);
+  return dist <= c;
 }
 
 /**

@@ -610,7 +610,7 @@ export function InventoryPage() {
                                 {filtered.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="p-8 text-center text-slate-400">
-                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat "Tambah Barang Baru" atau Import." : "Tidak ada hasil yang cocok."}
+                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat 'Tambah Barang Baru' atau Import." : "Tidak ada hasil yang cocok."}
                                         </td>
                                     </tr>
                                 )}

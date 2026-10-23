@@ -1,6 +1,6 @@
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
-import { calculateDistanceMeters } from '@/shared/utils/geo';
+import { calculateDistanceMeters, isWithinRadius } from '@/shared/utils/geo';
 import {
   ApplicationMethod,
   ContractType,
