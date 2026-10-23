@@ -14,16 +14,19 @@ export function isUserRole(value: unknown): value is UserRole {
     return typeof value === 'string' && (DB_ROLES as readonly string[]).includes(value);
 }
 
+/** Khusus pemilik platform SaaS (secret role, hanya kelola Perusahaan & Token Undangan Superadmin). */
 export function isMasterSuperAdmin(role?: UserRole | string | null): boolean {
     return role === 'MASTER_SUPER_ADMIN';
 }
 
+/** Direktur / Superadmin Perusahaan Tenant. */
 export function isSuperOrMaster(role?: UserRole | string | null): boolean {
-    return role === 'MASTER_SUPER_ADMIN' || role === 'SUPERADMIN';
+    return role === 'SUPERADMIN';
 }
 
+/** Direktur (SUPERADMIN) atau Staf Admin Perusahaan (ADMIN). */
 export function isAdminOrAbove(role?: UserRole | string | null): boolean {
-    return role === 'MASTER_SUPER_ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN';
+    return role === 'SUPERADMIN' || role === 'ADMIN';
 }
 
 export function mapDbRole(role: unknown): UserRole {

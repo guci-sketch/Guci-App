@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppUser, UserRole } from '@/entities/types';
+import { AppUser } from '@/entities/types';
 import {
-  Menu, X, BookOpen, RefreshCw, Bell, Repeat, KeyRound, LogOut,
+  Menu, X, BookOpen, RefreshCw, Bell, KeyRound, LogOut,
   CheckCircle2, FileText, ShieldCheck, Wrench, Search, ChevronRight, Command,
 } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
-import { supabase } from '@/shared/lib/supabase';
 
 export interface QuickJumpModuleItem {
   id: string;
@@ -33,14 +32,13 @@ interface HeaderProps {
   onSelectModule?: (id: string) => void;
 }
 
-const ROLE_OPTIONS: { value: UserRole; label: string; short: string }[] = [
-  { value: 'MASTER_SUPER_ADMIN', label: '1. Master Super Admin (SaaS Owner)', short: 'MASTER SAAS' },
-  { value: 'SUPERADMIN',         label: '2. Superadmin (Direktur Perusahaan)', short: 'DIREKTUR' },
-  { value: 'ADMIN',              label: '3. Admin (Staf Operasional)',         short: 'ADMIN' },
-  { value: 'TEKNISI_LAPANGAN',   label: '4. Teknisi Lapangan (Check-in/Tim)',  short: 'TEKNISI' },
-  { value: 'MARKETING',          label: '5. Marketing / Surveyor',             short: 'MARKETING' },
-  { value: 'INVENTORY',          label: '6. Gudang (Chemical & Estimasi)',     short: 'GUDANG' },
-];
+const ROLE_BADGE_LABELS: Record<string, string> = {
+  SUPERADMIN: 'DIREKTUR',
+  ADMIN: 'ADMIN',
+  TEKNISI_LAPANGAN: 'TEKNISI',
+  MARKETING: 'MARKETING',
+  INVENTORY: 'GUDANG',
+};
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
@@ -64,8 +62,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [showQuickJump, setShowQuickJump] = useState(false);
   const [jumpQuery, setJumpQuery] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [switchingRole, setSwitchingRole] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
+
+  const isMasterSuper = currentUser.role === 'MASTER_SUPER_ADMIN';
 
   // Global keyboard shortcut Ctrl+K / Cmd+K for Quick Jump
   useEffect(() => {
@@ -92,23 +91,6 @@ export const Header: React.FC<HeaderProps> = ({
         (m.group ?? '').toLowerCase().includes(q)
     );
   }, [modules, jumpQuery]);
-
-  const handleRoleSwitch = async (newRole: UserRole) => {
-    if (newRole === currentUser.role || switchingRole) return;
-    setSwitchingRole(true);
-    try {
-      const { error } = await supabase.rpc('switch_my_role', { p_new_role: newRole });
-      if (error) {
-        alert(`Gagal mengganti role: ${error.message}`);
-        setSwitchingRole(false);
-        return;
-      }
-      window.location.href = '/';
-    } catch (err) {
-      console.error('Failed to switch role:', err);
-      setSwitchingRole(false);
-    }
-  };
 
   const handleRefreshClick = () => {
     setRefreshSpin(true);
@@ -159,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right: Quick Jump Search (Ctrl+K) + Role Switcher + Guidebook + Refresh + Profile */}
+          {/* Right: Quick Jump Search (Ctrl+K) + Role Badge + Guidebook + Refresh + Profile */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {pendingCount > 0 && (
               <button
@@ -173,8 +155,8 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Quick Jump Command Palette Trigger */}
-            {modules.length > 0 && onSelectModule && (
+            {/* Quick Jump Command Palette Trigger (disembunyikan untuk Master Super Admin karena hanya punya 1 konsol SaaS) */}
+            {!isMasterSuper && modules.length > 1 && onSelectModule && (
               <button
                 type="button"
                 onClick={() => { setJumpQuery(''); setShowQuickJump(true); }}
@@ -189,40 +171,24 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Role Switcher Eksklusif untuk Akun Superadmin Utama (lieziragroup@gmail.com) */}
-            {currentUser.email?.toLowerCase() === 'lieziragroup@gmail.com' ? (
-              <div className="flex items-center gap-1 bg-emerald-50/90 border border-emerald-300 rounded-lg px-2 h-8 text-[11px]">
-                <Repeat size={12} className="text-[var(--accent)] shrink-0" />
-                <span className="text-[10px] font-bold text-emerald-900 hidden xl:inline">Mode Uji:</span>
-                <select
-                  value={currentUser.role}
-                  disabled={switchingRole}
-                  onChange={e => handleRoleSwitch(e.target.value as UserRole)}
-                  className="bg-transparent font-bold text-[11px] text-[var(--accent)] focus:outline-none cursor-pointer pr-0.5 max-w-[95px] sm:max-w-[140px] truncate"
-                  title="Eksklusif Superadmin (lieziragroup@gmail.com): Ganti tampilan role"
-                >
-                  {ROLE_OPTIONS.map(r => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
+            {/* Badge Peran Statis (Tanpa Mode Uji) */}
+            {!isMasterSuper && (
               <span className="hidden sm:inline-flex items-center px-2.5 h-8 rounded-lg bg-[#faf9f7] border border-[#e8e5e0] text-[10.5px] font-bold text-[#5a554f]">
-                {ROLE_OPTIONS.find(r => r.value === currentUser.role)?.short ?? currentUser.role}
+                {ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role}
               </span>
             )}
 
-            {/* Tombol Panduan QA (Ikon Buku Hijau ala Barventis) */}
-            <button
-              type="button"
-              onClick={() => setShowGuidebook(true)}
-              title="Panduan QA & Alur Sistem PT Guci Emas Pratama"
-              className="w-8 h-8 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            >
-              <BookOpen size={15} />
-            </button>
+            {/* Tombol Panduan QA (Hanya untuk pengguna perusahaan tenant) */}
+            {!isMasterSuper && (
+              <button
+                type="button"
+                onClick={() => setShowGuidebook(true)}
+                title="Panduan QA & Alur Sistem"
+                className="w-8 h-8 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <BookOpen size={15} />
+              </button>
+            )}
 
             {/* Tombol Refresh Data */}
             <button
@@ -256,9 +222,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="p-2.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0]">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-xs text-[#2d2a26] truncate">{currentUser.name}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800">
-                          {currentUser.role}
-                        </span>
+                        {!isMasterSuper && (
+                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800">
+                            {ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-[#8a8580] truncate mt-0.5">{currentUser.email}</p>
                     </div>
@@ -370,7 +338,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Modal Panduan QA & Alur Kerja Sistem (Ikon Buku Hijau) */}
+      {/* Modal Panduan QA & Alur Kerja Sistem */}
       {showGuidebook && (
         <div
           className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 modal-overlay-in"
@@ -387,10 +355,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div>
                   <h2 className="text-sm sm:text-base font-extrabold text-[#2d2a26]">
-                    Panduan QA &amp; Alur Sistem — PT Guci Emas Pratama
+                    Panduan QA &amp; Alur Sistem — FieldWork
                   </h2>
                   <p className="text-xs text-[#5a554f]">
-                    Ringkasan grup modul, alur penawaran 2 tahap (GP-DRF &rarr; GP-APR), dan tips navigasi cepat.
+                    Ringkasan grup modul, alur penawaran 2 tahap (GP-DRF &rarr; GP/AR/PH), dan tips navigasi cepat.
                   </p>
                 </div>
               </div>
@@ -409,7 +377,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <FileText size={14} /> 1. Grup Penawaran &amp; CRM
                 </div>
                 <p className="text-[#5a554f] leading-relaxed">
-                  Surveyor menginput ukuran/rumus volume lapangan &rarr; terbit nomor draft <b>GP-DRF</b>. Jika klien negosiasi, Admin menyesuaikan garansi (Bulan/Tahun) atau diskon upah di panel <b>Adjust</b>, lalu klik <b>Approve</b> untuk menerbitkan <b>GP-APR</b> &amp; PDF resmi.
+                  Surveyor menginput ukuran/rumus volume lapangan &rarr; terbit nomor draft <b>GP-DRF</b>. Jika klien negosiasi, Admin menyesuaikan garansi atau diskon di panel <b>Adjust</b>, lalu klik <b>Approve</b> untuk menerbitkan nomor resmi tanpa kode DRF.
                 </p>
               </div>
 
@@ -418,7 +386,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <ShieldCheck size={14} /> 2. Grup Operasional Lapangan
                 </div>
                 <p className="text-[#5a554f] leading-relaxed">
-                  Pantau KPI pengerjaan, lokasi proyek ber-geofence, laporan foto Check-In / Check-Out teknisi, deteksi anomali spasial, serta pelacakan GPS teknisi secara langsung.
+                  Pantau KPI pengerjaan, lokasi proyek ber-geofence, laporan foto Check-In / Check-Out teknisi beserta anggota tim, deteksi anomali spasial, serta pelacakan GPS teknisi secara langsung.
                 </p>
               </div>
 
@@ -427,7 +395,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <Wrench size={14} /> 3. Grup Gudang &amp; Finansial
                 </div>
                 <p className="text-[#5a554f] leading-relaxed">
-                  Kelola stok termitisida, insektisida PCO, dan pipa PVC di <b>Daily Inventory &amp; Waste</b>, pantau termin/cicilan kontrak, arus kas bulanan, dan pencapaian target marketing.
+                  Kelola stok termitisida, insektisida PCO, dan estimasi chemical per ID Proyek untuk analisis untung rugi internal, pantau termin/cicilan kontrak, serta persentase performa MoM.
                 </p>
               </div>
 
@@ -436,7 +404,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <CheckCircle2 size={14} /> 4. Tips Navigasi Cepat (UX)
                 </div>
                 <p className="text-[#5a554f] leading-relaxed">
-                  Gunakan kapsul melayang di bawah layar (<b>Dynamic Floating Bottom Pill</b>) untuk berpindah antar sub-fitur dalam grup yang sama, tekan <b>Ctrl+K</b> untuk mencari fitur, atau ganti role lewat dropdown <b>Role</b> di kanan atas.
+                  Gunakan kapsul melayang di bawah layar (<b>Dynamic Floating Bottom Pill</b>) untuk berpindah antar sub-fitur dalam grup yang sama, atau tekan <b>Ctrl+K</b> untuk mencari modul secara instan.
                 </p>
               </div>
             </div>

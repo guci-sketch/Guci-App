@@ -41,6 +41,10 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
     if (status === 'unauthenticated' || !user) {
         return <LoginForm />;
     }
+    // MASTER_SUPER_ADMIN hanya dapat mengakses konsol manajemen Perusahaan & Token Undangan Superadmin
+    if (user.role === 'MASTER_SUPER_ADMIN') {
+        return <Navigate to="/" replace />;
+    }
     return <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6">{children}</div>;
 };
 

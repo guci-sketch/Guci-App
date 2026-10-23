@@ -1,6 +1,5 @@
 /**
- * Invite Service — token-based user onboarding
- * Firestore collection: `invites`
+ * Invite Service — token-based user & Superadmin onboarding
  */
 
 import {
@@ -13,13 +12,16 @@ import { supabase } from '@/shared/lib/supabase';
 const COL = "invites";
 const EXPIRE_DAYS = 7;
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+export type InviteRole = Extract<
+    UserRole,
+    "SUPERADMIN" | "ADMIN" | "MARKETING" | "INVENTORY" | "TEKNISI_LAPANGAN"
+>;
 
 export interface Invite {
     id: string;
     companyId: string;
     companyName: string;
-    role: Extract<UserRole, "ADMIN" | "MARKETING" | "INVENTORY" | "TEKNISI_LAPANGAN">;
+    role: InviteRole;
     createdBy: string;
     createdAt: Date;
     expiresAt: Date;
@@ -27,17 +29,16 @@ export interface Invite {
     usedBy: string | null;
 }
 
-// ─── CREATE ───────────────────────────────────────────────────────────────────
-
 export interface CreateInviteParams {
     companyId: string;
     companyName: string;
-    role: Invite["role"];
+    role: InviteRole;
     createdBy: string;
 }
 
 /**
- * Buat invite baru. Return token (= document ID Firestore).
+ * Buat invite baru (mendukung undangan SUPERADMIN oleh Master Super Admin maupun staf oleh Admin perusahaan).
+ * Return token (= ID baris tabel `invites`).
  */
 export async function createInvite(params: CreateInviteParams): Promise<string> {
     const now = new Date();
@@ -54,32 +55,72 @@ export async function createInvite(params: CreateInviteParams): Promise<string> 
         usedBy: null,
     });
 
-    return ref.id; // token = document ID
+    return ref.id;
 }
 
-// ─── READ ─────────────────────────────────────────────────────────────────────
+/**
+ * Mengambil daftar token undangan untuk suatu perusahaan (opsional difilter berdasarkan role, mis. 'SUPERADMIN').
+ */
+export async function getInvitesByCompany(companyId: string, roleFilter?: InviteRole): Promise<Invite[]> {
+    const { data, error } = await supabase
+        .from('invites')
+        .select('id, company_id, payload, created_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+
+    const list: Invite[] = data.map((row: any) => {
+        const p = row.payload || {};
+        return {
+            id: row.id,
+            companyId: row.company_id,
+            companyName: p.companyName || '',
+            role: (p.role || 'SUPERADMIN') as InviteRole,
+            createdBy: p.createdBy || '',
+            createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+            expiresAt: p.expiresAt ? new Date(p.expiresAt) : new Date(Date.now() + 7 * 86400000),
+            used: Boolean(p.used),
+            usedBy: p.usedBy || null,
+        };
+    });
+
+    return roleFilter ? list.filter(i => i.role === roleFilter) : list;
+}
 
 /**
- * Memvalidasi token undangan (boleh dipanggil TANPA login — dipakai halaman daftar).
- * Lewat RPC `get_invite_public`: anon hanya bisa memeriksa satu token yang ia ketahui, tidak bisa membaca/
- * menelusuri tabel `invites`. Return null bila tidak ada, sudah dipakai, atau kedaluwarsa.
+ * Menghapus / mencabut token undangan.
+ */
+export async function revokeInvite(token: string): Promise<void> {
+    const { error } = await supabase.from('invites').delete().eq('id', token);
+    if (error) throw new Error(error.message);
+}
+
+/**
+ * Memvalidasi token undangan (boleh dipanggil TANPA login — dipakai halaman daftar `/signup`).
  */
 export async function getInviteByToken(token: string): Promise<Invite | null> {
-    const { data, error } = await supabase.rpc('get_invite_public', { p_token: token });
+    const cleanToken = token.trim();
+    if (!cleanToken) return null;
+    const { data, error } = await supabase.rpc('get_invite_public', { p_token: cleanToken });
     if (error) throw new Error(error.message);
     if (!data) return null;
-    const d = data as { token: string; companyId: string; companyName: string; role: Invite['role']; expiresAt: string };
+    const d = data as { token: string; companyId: string; companyName: string; role: InviteRole; expiresAt: string };
     return {
-        id: d.token, companyId: d.companyId, companyName: d.companyName, role: d.role,
-        createdBy: '', createdAt: new Date(), expiresAt: new Date(d.expiresAt), used: false, usedBy: null,
+        id: d.token,
+        companyId: d.companyId,
+        companyName: d.companyName,
+        role: d.role,
+        createdBy: '',
+        createdAt: new Date(),
+        expiresAt: new Date(d.expiresAt),
+        used: false,
+        usedBy: null,
     };
 }
 
-// ─── ACCEPT ───────────────────────────────────────────────────────────────────
-
 const PENDING_KEY = 'fw_pending_invite_v1';
 
-/** Simpan undangan yang belum bisa diterima (mis. menunggu konfirmasi email) agar diselesaikan saat login pertama. */
 export function rememberPendingInvite(token: string, name: string, phone?: string) {
     try { localStorage.setItem(PENDING_KEY, JSON.stringify({ token, name, phone })); } catch { /* abaikan */ }
 }
@@ -91,11 +132,10 @@ export function clearPendingInvite() {
 }
 
 /**
- * Menerima undangan untuk pengguna yang SEDANG login: server (RPC `accept_invite`) membuat baris `users` dengan
- * perusahaan & role DARI UNDANGAN — bukan dari klien — lalu menandai undangan terpakai secara atomik.
+ * Menerima undangan untuk pengguna yang sedang mendaftar/login via RPC `accept_invite`.
  */
 export async function acceptInvite(token: string, name: string, phone?: string): Promise<void> {
-    const { error } = await supabase.rpc('accept_invite', { p_token: token, p_name: name, p_phone: phone ?? null });
+    const { error } = await supabase.rpc('accept_invite', { p_token: token.trim(), p_name: name, p_phone: phone ?? null });
     if (error) throw new Error(error.message);
     clearPendingInvite();
 }

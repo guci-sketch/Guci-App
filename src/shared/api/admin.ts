@@ -462,17 +462,17 @@ export async function createUser(input: NewUserInput): Promise<AdminUser> {
 }
 
 export async function suspendUser(id: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_set_user_active', { p_target_uid: id, p_active: false });
+  const { error } = await supabase.rpc('admin_set_user_active', { p_user_id: id, p_active: false });
   if (error) throw new Error(error.message);
 }
 
 export async function activateUser(id: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_set_user_active', { p_target_uid: id, p_active: true });
+  const { error } = await supabase.rpc('admin_set_user_active', { p_user_id: id, p_active: true });
   if (error) throw new Error(error.message);
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  const { error } = await supabase.rpc('admin_delete_company_user', { p_target_uid: id });
+  const { error } = await supabase.rpc('admin_delete_company_user', { p_user_id: id });
   if (error) throw new Error(error.message);
 }
 

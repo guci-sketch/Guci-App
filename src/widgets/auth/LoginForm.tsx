@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
-import { AlertCircle, Loader2, Lock, Mail, Eye, EyeOff, ShieldCheck, Sparkles, ArrowRight, UserCheck } from "lucide-react";
+import { AlertCircle, Loader2, Lock, Mail, Eye, EyeOff, ShieldCheck, Sparkles, ArrowRight, UserCheck, KeyRound } from "lucide-react";
 import type { AppUser } from '@/entities/types';
 import { fetchAppUser } from '@/shared/api/authProfile';
 
-// Akun demo staf standar (Akun Superadmin lieziragroup@gmail.com bersifat privat dan hanya diakses via input manual oleh pemilik)
 const QUICK_DEMO_ACCOUNTS = [
     {
         label: "Direktur (Superadmin)",
@@ -42,12 +41,21 @@ const QUICK_DEMO_ACCOUNTS = [
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { setUser } = useAuthStore();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // Jika URL memiliki ?invite=..., arahkan otomatis ke halaman aktivasi token /signup
+    useEffect(() => {
+        const inv = searchParams.get("invite") || searchParams.get("token");
+        if (inv) {
+            navigate(`/signup?invite=${encodeURIComponent(inv)}`, { replace: true });
+        }
+    }, [searchParams, navigate]);
 
     const performSignIn = async (loginEmail: string, loginPassword: string) => {
         setError("");
@@ -174,13 +182,24 @@ export function LoginPage() {
                         </button>
                     </form>
 
-                    {/* 1-Click Demo Staff Accounts (Tanpa menampilkan akun Superadmin privat) */}
-                    <div className="pt-3.5 border-t border-[#e8e5e0] space-y-2">
+                    {/* Tautan Registrasi via Token Undangan */}
+                    <div className="pt-2 border-t border-[#e8e5e0] flex items-center justify-between text-xs">
+                        <span className="text-[#5a554f]">Punya Token Undangan?</span>
+                        <Link
+                            to="/signup"
+                            className="inline-flex items-center gap-1 font-bold text-[var(--accent)] hover:underline"
+                        >
+                            <KeyRound size={12} /> Aktivasi via Token
+                        </Link>
+                    </div>
+
+                    {/* 1-Click Demo Staff Accounts */}
+                    <div className="pt-3 border-t border-[#e8e5e0] space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-[#5a554f] flex items-center gap-1">
-                                <Sparkles size={12} className="text-amber-600" /> Akun Demo Staf (1-Klik Masuk)
+                                <Sparkles size={12} className="text-amber-600" /> Akun Demo Perusahaan (1-Klik)
                             </span>
-                            <span className="text-[10px] text-[#8a8580]">Uji Coba Peran</span>
+                            <span className="text-[10px] text-[#8a8580]">5 Peran Perusahaan</span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-1.5">

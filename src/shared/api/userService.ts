@@ -11,13 +11,18 @@ function mapRoleToAppUser(role: string): UserRole {
     return mapDbRole(role);
 }
 
-export async function getUsersByCompany(companyId: string): Promise<AppUser[]> {
-    const { data, error } = await supabase
+export async function getUsersByCompany(companyId: string, roleFilter?: UserRole): Promise<AppUser[]> {
+    let q = supabase
         .from("users")
         .select(USER_PROFILE_COLUMNS)
         .eq("company_id", companyId)
         .order("created_at", { ascending: true });
 
+    if (roleFilter) {
+        q = q.eq("role", roleFilter);
+    }
+
+    const { data, error } = await q;
     if (error) throw error;
 
     return (data || []).map((d: any) => ({

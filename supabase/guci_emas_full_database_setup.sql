@@ -618,7 +618,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.is_superadmin() RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT coalesce((SELECT u.role::text IN ('MASTER_SUPER_ADMIN', 'SUPERADMIN') FROM public.users u WHERE u.id = auth.uid() AND u.is_active), false)
+  SELECT coalesce((SELECT u.role::text = 'SUPERADMIN' FROM public.users u WHERE u.id = auth.uid() AND u.is_active), false)
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_company_admin(p_company uuid) RETURNS boolean
@@ -626,10 +626,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.is_active
-      AND (
-        u.role::text = 'MASTER_SUPER_ADMIN'
-        OR (u.role::text IN ('SUPERADMIN', 'ADMIN') AND u.company_id = p_company)
-      )
+      AND u.role::text IN ('SUPERADMIN', 'ADMIN')
+      AND u.company_id = p_company
   )
 $$;
 
@@ -638,10 +636,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.is_active
-      AND (
-        u.role::text = 'MASTER_SUPER_ADMIN'
-        OR (u.company_id = p_company AND (u.role::text = 'SUPERADMIN' OR u.role::text = ANY (p_roles)))
-      )
+      AND u.company_id = p_company
+      AND (u.role::text = 'SUPERADMIN' OR u.role::text = ANY (p_roles))
   )
 $$;
 
@@ -935,16 +931,20 @@ BEGIN
   END IF;
 
   v_role := v_inv.payload ->> 'role';
-  IF v_role NOT IN ('ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN') THEN
+  IF v_role NOT IN ('SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN') THEN
     RAISE EXCEPTION 'Role undangan tidak diizinkan';
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.users WHERE id = v_uid) THEN
-    RAISE EXCEPTION 'Akun sudah terdaftar';
   END IF;
 
   SELECT email INTO v_email FROM auth.users WHERE id = v_uid;
   INSERT INTO public.users (id, company_id, name, email, password_hash, role, phone, is_active)
-  VALUES (v_uid, v_inv.company_id, btrim(p_name), v_email, 'managed-by-supabase-auth', v_role::public.user_role, nullif(btrim(p_phone), ''), true);
+  VALUES (v_uid, v_inv.company_id, btrim(p_name), lower(btrim(v_email)), 'managed-by-supabase-auth', v_role::public.user_role, nullif(btrim(p_phone), ''), true)
+  ON CONFLICT (id) DO UPDATE
+    SET company_id = EXCLUDED.company_id,
+        name       = EXCLUDED.name,
+        role       = EXCLUDED.role,
+        phone      = coalesce(EXCLUDED.phone, public.users.phone),
+        is_active  = true,
+        updated_at = now();
 
   UPDATE public.invites SET payload = payload || jsonb_build_object('used', true, 'usedBy', v_uid) WHERE id = p_token;
   RETURN jsonb_build_object('companyId', v_inv.company_id, 'role', v_role);
@@ -988,15 +988,15 @@ BEGIN
   END LOOP;
 END $$;
 
--- 9.1. companies
+-- 9.1. companies (MASTER_SUPER_ADMIN mengelola seluruh perusahaan tenant; user biasa hanya melihat perusahaannya sendiri)
 CREATE POLICY companies_select ON public.companies FOR SELECT TO authenticated
-  USING (id = public.current_company_id() OR public.is_superadmin());
+  USING (id = public.current_company_id() OR public.is_master_superadmin());
 CREATE POLICY companies_write ON public.companies FOR ALL TO authenticated
-  USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
+  USING (public.is_master_superadmin()) WITH CHECK (public.is_master_superadmin());
 
--- 9.2. users (kolom password_hash disembunyikan dari client browser)
+-- 9.2. users (MASTER_SUPER_ADMIN hanya melihat akun SUPERADMIN perusahaan terkait & dirinya sendiri)
 CREATE POLICY users_select ON public.users FOR SELECT TO authenticated
-  USING (company_id = public.current_company_id() OR public.is_superadmin() OR id = auth.uid());
+  USING (id = auth.uid() OR company_id = public.current_company_id() OR (public.is_master_superadmin() AND role = 'SUPERADMIN'));
 CREATE POLICY users_update_self ON public.users FOR UPDATE TO authenticated
   USING (id = auth.uid()) WITH CHECK (id = auth.uid());
 
@@ -1082,14 +1082,17 @@ CREATE POLICY checklist_write ON public.customer_checklists FOR ALL TO authentic
   WITH CHECK (public.has_company_role(company_id, 'ADMIN', 'MARKETING'));
 
 CREATE POLICY invites_select ON public.invites FOR SELECT TO authenticated
-  USING (public.is_company_admin(company_id));
+  USING (public.is_master_superadmin() OR public.is_company_admin(company_id));
 CREATE POLICY invites_insert ON public.invites FOR INSERT TO authenticated
-  WITH CHECK (public.is_company_admin(company_id)
-              AND (payload ->> 'role') IN ('ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN'));
+  WITH CHECK (
+    (public.is_master_superadmin() AND (payload ->> 'role') = 'SUPERADMIN')
+    OR (public.is_company_admin(company_id) AND (payload ->> 'role') IN ('ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN'))
+  );
 CREATE POLICY invites_update ON public.invites FOR UPDATE TO authenticated
-  USING (public.is_company_admin(company_id)) WITH CHECK (public.is_company_admin(company_id));
+  USING (public.is_master_superadmin() OR public.is_company_admin(company_id))
+  WITH CHECK (public.is_master_superadmin() OR public.is_company_admin(company_id));
 CREATE POLICY invites_delete ON public.invites FOR DELETE TO authenticated
-  USING (public.is_company_admin(company_id));
+  USING (public.is_master_superadmin() OR public.is_company_admin(company_id));
 
 -- 9.9. RLS Policies untuk Modul Fieldwork & Admin (projects, work_reports, treatment_records, documentation_photos, risk_events, risk_config, audit_logs, user_locations)
 -- Mendukung akses langsung via Supabase PostgREST (@supabase/supabase-js) tanpa bergantung pada koneksi TCP backend.
@@ -1201,14 +1204,15 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_tem
 DECLARE
   v_co_id uuid;
   v_email text;
+  v_target_role public.user_role;
 BEGIN
-  SELECT company_id, lower(email) INTO v_co_id, v_email FROM public.users WHERE id = p_user_id;
+  SELECT company_id, lower(email), role INTO v_co_id, v_email, v_target_role FROM public.users WHERE id = p_user_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
-  IF v_email = 'lieziragroup@gmail.com' THEN
-    RAISE EXCEPTION 'Akun Superadmin Utama (lieziragroup@gmail.com) dilindungi dan tidak dapat dinonaktifkan' USING ERRCODE = '42501';
+  IF v_email = 'lieziragroup@gmail.com' OR v_target_role = 'MASTER_SUPER_ADMIN' THEN
+    RAISE EXCEPTION 'Akun ini dilindungi dan tidak dapat dinonaktifkan' USING ERRCODE = '42501';
   END IF;
-  IF NOT public.is_company_admin(v_co_id) THEN
-    RAISE EXCEPTION 'Tidak berwenang mengubah status user' USING ERRCODE = '42501';
+  IF NOT (public.is_company_admin(v_co_id) OR (public.is_master_superadmin() AND v_target_role = 'SUPERADMIN')) THEN
+    RAISE EXCEPTION 'Tidak berwenang mengubah status user ini' USING ERRCODE = '42501';
   END IF;
   UPDATE public.users SET is_active = p_active, updated_at = now() WHERE id = p_user_id;
   RETURN jsonb_build_object('id', p_user_id, 'is_active', p_active);
@@ -1219,14 +1223,15 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_tem
 DECLARE
   v_co_id uuid;
   v_email text;
+  v_target_role public.user_role;
 BEGIN
-  SELECT company_id, lower(email) INTO v_co_id, v_email FROM public.users WHERE id = p_user_id;
+  SELECT company_id, lower(email), role INTO v_co_id, v_email, v_target_role FROM public.users WHERE id = p_user_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'User tidak ditemukan'; END IF;
-  IF v_email = 'lieziragroup@gmail.com' THEN
-    RAISE EXCEPTION 'Akun Superadmin Utama (lieziragroup@gmail.com) dilindungi dan tidak dapat dihapus' USING ERRCODE = '42501';
+  IF v_email = 'lieziragroup@gmail.com' OR v_target_role = 'MASTER_SUPER_ADMIN' THEN
+    RAISE EXCEPTION 'Akun ini dilindungi dan tidak dapat dihapus' USING ERRCODE = '42501';
   END IF;
-  IF NOT public.is_company_admin(v_co_id) THEN
-    RAISE EXCEPTION 'Tidak berwenang menghapus user' USING ERRCODE = '42501';
+  IF NOT (public.is_company_admin(v_co_id) OR (public.is_master_superadmin() AND v_target_role = 'SUPERADMIN')) THEN
+    RAISE EXCEPTION 'Tidak berwenang menghapus user ini' USING ERRCODE = '42501';
   END IF;
   DELETE FROM public.users WHERE id = p_user_id;
   RETURN jsonb_build_object('deleted', true, 'id', p_user_id);
@@ -1703,54 +1708,7 @@ END $$;
 
 REVOKE EXECUTE ON FUNCTION public.upsert_demo_account_guci_emas(uuid, text, text, text, public.user_role, text, text) FROM public, anon, authenticated;
 
--- RPC Ganti Role Eksklusif Pemilik Sistem (HANYA diizinkan untuk akun Superadmin Utama: lieziragroup@gmail.com)
-CREATE OR REPLACE FUNCTION public.switch_my_role(p_new_role text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$
-DECLARE
-  v_uid uuid := auth.uid();
-  v_email text;
-  v_role public.user_role;
-  v_co_id uuid;
-BEGIN
-  IF v_uid IS NULL THEN
-    RAISE EXCEPTION 'Belum login' USING ERRCODE = '28000';
-  END IF;
-
-  SELECT lower(email) INTO v_email FROM public.users WHERE id = v_uid;
-  IF coalesce(v_email, '') <> 'lieziragroup@gmail.com' THEN
-    RAISE EXCEPTION 'Akses ditolak: Hanya Superadmin utama (lieziragroup@gmail.com) yang diizinkan mengganti role' USING ERRCODE = '42501';
-  END IF;
-
-  BEGIN
-    v_role := upper(btrim(p_new_role))::public.user_role;
-  EXCEPTION WHEN invalid_text_representation THEN
-    RAISE EXCEPTION 'Role tidak valid: %', p_new_role;
-  END;
-
-  UPDATE public.users
-     SET role = v_role,
-         updated_at = now()
-   WHERE id = v_uid
-  RETURNING company_id INTO v_co_id;
-
-  IF v_role = 'TEKNISI_LAPANGAN' AND v_co_id IS NOT NULL THEN
-    UPDATE public.work_reports
-       SET executor_id = v_uid
-     WHERE company_id = v_co_id
-       AND id IN ('00000000-0000-4000-e000-000000000001'::uuid, '00000000-0000-4000-e000-000000000002'::uuid);
-
-    UPDATE public.spk
-       SET technician_id = v_uid,
-           payload = payload || jsonb_build_object('technicianId', v_uid::text)
-     WHERE company_id = v_co_id
-       AND id = '00000000-0000-4000-f000-000000000001'::uuid;
-  END IF;
-
-  RETURN jsonb_build_object('uid', v_uid, 'role', v_role);
-END $$;
-
-REVOKE EXECUTE ON FUNCTION public.switch_my_role(text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.switch_my_role(text) TO authenticated;
+DROP FUNCTION IF EXISTS public.switch_my_role(text);
 
 -- 11.0. AKUN MASTER SUPER ADMIN EKSKLUSIF PEMILIK SAAS: lieziragroup@gmail.com (Password: Rafi0502!)
 SELECT public.upsert_demo_account_guci_emas(
