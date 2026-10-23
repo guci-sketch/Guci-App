@@ -114,9 +114,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onMenuToggle}
-                aria-label="Buka Navigasi Sidebar"
-                title="Buka / Tutup Detail Menu Sidebar (Mobile, Tablet, & Desktop)"
-                className="h-8 px-2.5 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer"
+                aria-label={mobileMenuOpen ? 'Tutup Navigasi Sidebar' : 'Buka Navigasi Sidebar'}
+                aria-expanded={Boolean(mobileMenuOpen)}
+                title="Buka / Tutup Menu Navigasi"
+                className="xl:hidden h-9 px-2.5 sm:px-3 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {mobileMenuOpen ? <X size={15} /> : <Menu size={15} />}
                 <span className="text-[11px] font-bold hidden sm:inline xl:hidden">Menu</span>
@@ -125,16 +126,16 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="min-w-0">
               {pageGroup && (
-                <div className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-[var(--accent)] leading-none mb-0.5 truncate">
+                <div className="flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-[var(--accent)] leading-none mb-0.5 truncate">
                   <span>{pageGroup}</span>
                   <ChevronRight size={10} className="text-[#8a8580]" />
                 </div>
               )}
-              <h1 className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-[#2d2a26] truncate leading-tight">
+              <h1 className="font-bold text-sm sm:text-base tracking-tight text-[#2d2a26] truncate leading-tight">
                 {pageTitle}
               </h1>
               {pageSubtitle && !pageGroup && (
-                <p className="text-[10px] text-[#8a8580] truncate hidden sm:block">
+                <p className="text-[11px] text-[#8a8580] truncate hidden sm:block">
                   {pageSubtitle}
                 </p>
               )}
@@ -161,7 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => { setJumpQuery(''); setShowQuickJump(true); }}
                 title="Pencarian Cepat Fitur & Modul (Ctrl+K)"
-                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-[#e8e5e0] bg-[#faf9f7] hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] text-[11px] font-medium transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-[#e8e5e0] bg-[#faf9f7] hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] text-[11px] font-medium transition-colors cursor-pointer"
               >
                 <Search size={13} className="text-[#8a8580]" />
                 <span className="hidden md:inline">Cari Fitur...</span>
@@ -184,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => setShowGuidebook(true)}
                 title="Panduan QA & Alur Sistem"
-                className="w-8 h-8 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="hidden sm:flex w-9 h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <BookOpen size={15} />
               </button>
@@ -195,7 +196,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={handleRefreshClick}
               title="Muat Ulang Data Halaman Ini"
-              className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-9 h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
               <RefreshCw size={14} className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''} />
             </button>
@@ -206,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => setProfileMenuOpen(v => !v)}
                 title="Profil Akun & Pengaturan"
-                className="w-8 h-8 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
+                className="w-9 h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
               >
                 <Bell size={15} />
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-500 ring-1 ring-white" />

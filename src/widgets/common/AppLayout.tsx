@@ -28,12 +28,9 @@ export interface AppLayoutProps {
 
 /**
  * AppLayout FieldWork — Responsive Multi-Device (Desktop, Tablet, & Mobile):
- * - Desktop (Mouse Hover): Rail kiri 56px melebar halus ke 252px saat hover (`cubic-bezier(0.16, 1, 0.3, 1)`, 200ms)
- *   atau dapat dikunci tetap terbuka (Stay Open).
- * - Tablet View (Touch Screen 768px - 1180px): Karena perangkat Tablet tidak memiliki hover kursor, tersedia tombol
- *   Hamburger ("Menu") di Header dan tombol Toggle di atas rail yang membuka Sidebar secara penuh (252px) dan
- *   tetap terbuka (Stay / Absolute Overlay) sampai pengguna memilih menu atau menutupnya.
- * - Mobile View (< 768px): Slide-over drawer 260px + Floating Bottom Navigation Pill.
+ * - Desktop (>= 1280px): Rail 56px melebar ke 252px saat hover atau dapat dikunci terbuka.
+ * - Tablet & mobile (< 1280px): Sidebar menggunakan drawer dengan tombol hamburger; tidak bergantung pada hover.
+ * - Semua ukuran: transisi singkat, backdrop yang jelas, dan navigasi dapat ditutup setelah menu dipilih.
  */
 export function AppLayout({
     sidebarItems,
@@ -49,11 +46,12 @@ export function AppLayout({
     const [internalOpen, setInternalOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
+    const [isDesktopLayout, setIsDesktopLayout] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1280);
     const [isPinnedDesktop, setIsPinnedDesktop] = useState<boolean>(() => {
         try {
             const saved = localStorage.getItem('gep_sidebar_pinned');
             if (saved !== null) return saved === 'true';
-            // Pada perangkat Tablet layar sentuh (>= 768px & <= 1180px), default stay open jika dibuka
+            // Preferensi pin hanya berpengaruh pada layout desktop; tablet tetap menggunakan drawer
             return false;
         } catch {
             return false;
@@ -62,10 +60,15 @@ export function AppLayout({
     const hoverTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.matchMedia) {
-            const touchMatch = window.matchMedia('(hover: none), (pointer: coarse)').matches;
-            setIsTouchDevice(touchMatch);
-        }
+        const updateDeviceHints = () => {
+            if (typeof window.matchMedia === 'function') {
+                setIsTouchDevice(window.matchMedia('(hover: none), (pointer: coarse)').matches);
+            }
+            setIsDesktopLayout(window.innerWidth >= 1280);
+        };
+        updateDeviceHints();
+        window.addEventListener('resize', updateDeviceHints);
+        return () => window.removeEventListener('resize', updateDeviceHints);
     }, []);
 
     const isSidebarOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -76,6 +79,18 @@ export function AppLayout({
         setInternalOpen(val);
         onSidebarOpenChange?.(val);
     };
+
+    useEffect(() => {
+        if (!isSidebarOpen) return;
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setInternalOpen(false);
+                onSidebarOpenChange?.(false);
+            }
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isSidebarOpen, onSidebarOpenChange]);
 
     const togglePinDesktop = () => {
         const next = !isPinnedDesktop;
@@ -88,7 +103,7 @@ export function AppLayout({
     };
 
     const handleMouseEnter = () => {
-        if (typeof window !== 'undefined' && (window.innerWidth < 1024 || isTouchDevice)) return;
+        if (typeof window !== 'undefined' && (window.innerWidth < 1280 || isTouchDevice)) return;
         if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
         hoverTimeoutRef.current = window.setTimeout(() => {
             setIsHovered(true);
@@ -109,7 +124,7 @@ export function AppLayout({
         };
     }, []);
 
-    // Edge Swipe Gesture for Mobile & Tablet (< 1024px)
+    // Edge swipe tetap tersedia untuk mobile dan tablet (< 1280px). Hamburger tetap menjadi kontrol utama.
     useEffect(() => {
         let touchStartX = 0;
         let touchStartY = 0;
@@ -117,7 +132,7 @@ export function AppLayout({
         let isTracking = false;
 
         const handleTouchStart = (e: TouchEvent) => {
-            if (window.innerWidth >= 1024 || isSidebarOpen) return;
+            if (window.innerWidth >= 1280 || isSidebarOpen) return;
             const touch = e.touches[0];
             if (!touch) return;
             if (touch.clientX < 28) {
@@ -164,8 +179,8 @@ export function AppLayout({
     }, [isSidebarOpen]);
 
     const handleTabClick = (id: string) => {
-        // Pada Tablet landscape (layar sentuh >= 1024px), jika sidebar masih tertutup (56px), tap pertama membuka sidebar
-        if (isTouchDevice && !isExpanded && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        // Pada desktop sentuh, tap pertama dapat memperluas rail sebelum memilih item.
+        if (isTouchDevice && !isExpanded && typeof window !== 'undefined' && window.innerWidth >= 1280) {
             setSidebarOpen(true);
             return;
         }
@@ -188,12 +203,12 @@ export function AppLayout({
     }, [sidebarItems]);
 
     return (
-        <div className="flex flex-col h-screen bg-[var(--bg-primary)] font-sans overflow-hidden">
-            {/* Header offset pada layar >= 1024px agar tombol Hamburger tidak pernah tertutup oleh rail sidebar */}
+        <div className="flex flex-col h-screen h-dvh min-h-[100dvh] bg-[var(--bg-primary)] font-sans overflow-hidden">
+            {/* Ruang di kiri header hanya disediakan pada desktop; tablet selalu memakai drawer hamburger. */}
             <div
                 className={cn(
                     ' transition-[padding] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0',
-                    isPinnedDesktop ? 'lg:pl-[252px]' : 'lg:pl-14'
+                    isPinnedDesktop ? 'xl:pl-[252px]' : 'xl:pl-[56px]'
                 )}
             >
                 {header}
@@ -209,6 +224,7 @@ export function AppLayout({
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.18, ease: 'easeOut' }}
                             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1.5px]"
+                            aria-hidden="true"
                             onClick={() => setSidebarOpen(false)}
                         />
                     )}
@@ -230,24 +246,20 @@ export function AppLayout({
                     className={cn(
                         'fixed inset-y-0 left-0 z-50 bg-white border-r border-[#e8e5e0] flex flex-col select-none overflow-hidden',
                         'transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
-                        isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+                        isSidebarOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0',
                         isExpanded && !isPinnedDesktop
                             ? 'shadow-[8px_0_30px_rgba(45,42,38,0.12)]'
                             : 'shadow-none'
                     )}
                 >
-                    {/* Top Brand Rail Header — Klik pada logo FW di Tablet/Desktop dapat membuka/mengunci Sidebar */}
+                    {/* Tombol brand untuk membuka atau menutup navigasi sidebar */}
                     <div className="h-12 px-2.5 border-b border-[#e8e5e0] flex items-center justify-between shrink-0">
                         <div className="flex items-center min-w-0">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                                        setSidebarOpen(!isSidebarOpen);
-                                    } else {
-                                        setSidebarOpen(!isSidebarOpen);
-                                    }
-                                }}
+                                onClick={() => setSidebarOpen(!isSidebarOpen)}
+                                aria-label={isSidebarOpen ? 'Tutup navigasi sidebar' : 'Buka navigasi sidebar'}
+                                aria-expanded={isSidebarOpen}
                                 title="Buka / Tutup Detail Menu Sidebar"
                                 className="w-9 h-9 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs tracking-tighter cursor-pointer"
                             >
@@ -272,7 +284,7 @@ export function AppLayout({
                                     setSidebarOpen(false);
                                     setIsHovered(false);
                                 }}
-                                className="lg:hidden w-7 h-7 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef] shrink-0"
+                                className="xl:hidden w-8 h-8 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef] shrink-0"
                                 aria-label="Tutup Menu"
                             >
                                 <X size={14} />
@@ -286,7 +298,7 @@ export function AppLayout({
                             <div key={group.name} className="space-y-0.5">
                                 <div className="h-5 flex items-center px-1.5 overflow-hidden">
                                     {isExpanded ? (
-                                        <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] whitespace-nowrap">
+                                        <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#8a8580] whitespace-nowrap">
                                             {group.name}
                                         </span>
                                     ) : groupIdx > 0 ? (
@@ -304,9 +316,10 @@ export function AppLayout({
                                             key={item.id}
                                             type="button"
                                             onClick={() => handleTabClick(item.id)}
+                                            aria-current={active ? 'page' : undefined}
                                             title={!isExpanded ? item.label : undefined}
                                             className={cn(
-                                                'w-full h-9 flex items-center rounded-lg text-xs transition-colors duration-150 relative group/item cursor-pointer overflow-hidden',
+                                                'w-full h-9 flex items-center rounded-lg text-[12px] transition-colors duration-150 relative group/item cursor-pointer overflow-hidden',
                                                 active
                                                     ? danger
                                                         ? 'bg-rose-50 text-rose-700 font-semibold'
@@ -351,7 +364,7 @@ export function AppLayout({
                                                 {item.badge !== undefined && item.badge !== 0 && item.badge !== '0' && (
                                                     <span
                                                         className={cn(
-                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 leading-none',
+                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 leading-none',
                                                             active
                                                                 ? danger
                                                                     ? 'bg-rose-200 text-rose-800'
@@ -370,18 +383,18 @@ export function AppLayout({
                         ))}
                     </div>
 
-                    {/* Footer Pengatur Sidebar (Bisa dikunci Stay Open di Tablet maupun Desktop) */}
+                    {/* Footer: tutup drawer pada mobile/tablet, atau pin sidebar pada desktop */}
                     <div className="flex h-10 px-2 border-t border-[#e8e5e0] items-center bg-[#faf9f7] shrink-0">
                         <button
                             type="button"
                             onClick={() => {
-                                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                                if (typeof window !== 'undefined' && window.innerWidth < 1280) {
                                     setSidebarOpen(!isSidebarOpen);
                                 } else {
                                     togglePinDesktop();
                                 }
                             }}
-                            title={isPinnedDesktop ? 'Ubah ke Mode Ringkas / Hover' : 'Kunci Sidebar Agar Tetap Terbuka (Stay Open)'}
+                            title={!isDesktopLayout ? 'Tutup menu navigasi' : isPinnedDesktop ? 'Ubah ke Mode Ringkas / Hover' : 'Kunci Sidebar Agar Tetap Terbuka (Stay Open)'}
                             className="w-full h-7 flex items-center rounded-md text-[11px] text-[#5a554f] hover:text-[#2d2a26] hover:bg-[#f5f3ef] transition-colors cursor-pointer overflow-hidden"
                         >
                             <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[#8a8580]">
@@ -393,7 +406,7 @@ export function AppLayout({
                                     isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-1.5 pointer-events-none'
                                 )}
                             >
-                                {isPinnedDesktop ? 'Sidebar: Terkunci (Stay)' : 'Kunci Sidebar (Stay Open)'}
+                                {!isDesktopLayout ? 'Tutup Menu' : isPinnedDesktop ? 'Sidebar: Terkunci (Stay)' : 'Kunci Sidebar (Stay Open)'}
                             </span>
                         </button>
                     </div>
@@ -403,7 +416,7 @@ export function AppLayout({
                 <main
                     className={cn(
                         'flex-1 min-w-0 overflow-y-auto overflow-x-hidden relative bg-[var(--bg-primary)] page-fade-in w-full pb-24 transition-[margin] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
-                        isPinnedDesktop ? 'lg:ml-[252px]' : 'lg:ml-14'
+                        isPinnedDesktop ? 'xl:ml-[252px]' : 'xl:ml-[56px]'
                     )}
                 >
                     {children}
