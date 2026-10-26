@@ -4,21 +4,32 @@ Dokumen ini memuat panduan fungsional fitur utama dalam sistem yang dapat diguna
 
 ---
 
-## 1. Peta Peran Pengguna (User Roles)
+## 1. Peta Peran Pengguna (6-Role SaaS Hierarchy)
 
-Sistem membagi aksesibilitas modul dalam dua peran spesifik (*strict RBAC*), dikonfigurasi langsung dari ENUM Database:
+Sistem menerapkan kontrol akses berbasis peran yang ketat (*Strict RBAC*) terverifikasi pada level API dan UI:
 
-1. **ADMIN**
-   - Mengelola Dasbor Pusat (*KPI & Monitoring*), Pemetaan (*Maps*).
-   - Mengatur dan menugaskan Pekerjaan Baru (*SPK / Projects*).
-   - Meninjau *Work Reports* yang telah dikirimkan dari aplikasi _mobile_ teknisi lapangan.
-   - Mengakses pengaturan sistem (Retensi Foto Otomatis), ekspor data (PDF, Excel), dan pemantauan Laporan Anomali yang ditandai oleh *Risk Engine*.
+1. **MASTER_SUPER_ADMIN (Owner SaaS Platform)**
+   - Mengelola entitas multi-perusahaan/tenant dan token aktivasi admin.
 
-2. **EXECUTOR (Teknisi Lapangan)**
-   - Akses antarmuka _mobile-first_ yang ringan.
-   - Melakukan eksekusi pekerjaan, GPS Check-in, dan GPS Check-out.
-   - Melampirkan Bukti Foto (*Before / After / Progress*), dan input *Treatment Record* (misalnya: kalkulasi bahan kimia yang diaplikasikan, data aerasi gas fumigasi, titik injeksi).
-   - Menggunakan alat ukur digital (AR & Fallback Photo-Measurement).
+2. **SUPERADMIN (Direktur Utama / Eksekutif)**
+   - Memiliki wewenang eksklusif melihat **Analisis Untung Rugi Proyek & Margin Keuntungan Chemical** per ID Proyek.
+   - Approval penawaran resmi, pemantauan seluruh surveyor marketing, dan konfigurasi legal/Kop Surat/TTD.
+
+3. **ADMIN (Admin Operasional Perusahaan)**
+   - Mengelola penugasan SPK, audit kehadiran teknisi, verifikasi anomali geofence, dan template operasional.
+   - Meninjau alokasi chemical gudang tanpa akses ke margin laba/rugi sensitif direktur.
+
+4. **MARKETING (Surveyor & Sales Specialist)**
+   - Membuat draft penawaran (*Quotation Dual-Stage* `GP-DRF` ke `GP-APR`).
+   - Akses **Visual Performa Bulanan (MoM) Terisolasi**: Staf marketing hanya dapat memantau rasio closing deal dan volume quotation miliknya sendiri (data staf lain tersembunyi), lengkap dengan breakdown kategori **Anti Rayap (Termite Control)** dan **Pest Control (PCO)**.
+
+5. **INVENTORY (Staf Gudang & Logistik Chemical)**
+   - Mengelola stok bahan kimia, alat, dan perangkap.
+   - Mencatat alokasi kuantitas fisik chemical (Botol/Liter) ke masing-masing ID Proyek. Seluruh nominal nilai kontrak, biaya HPP, dan margin keuntungan diproteksi khusus Direktur.
+
+6. **TEKNISI_LAPANGAN (Executor Lapangan)**
+   - Antarmuka mobile-first PWA dengan navigasi *Dynamic Island Floating Pill*.
+   - Melakukan GPS Check-in/out, melampirkan foto bukti WebP, pencatatan dosis chemical (SNI 2404), dan kalibrator kamera AR.
 
 ---
 
@@ -45,22 +56,32 @@ Laporan komersial didukung secara *native*.
 
 ---
 
-## 3. Modul Pekerjaan Lapangan (EXECUTOR)
+## 4. Modul Visual Performa Bulanan (Marketing MoM Analytics)
 
-### A. Geo-Tracking & Mode PWA Offline (Antrean Sinyal)
-Aplikasi didesain memiliki resiliensi tinggi bagi lingkungan lapangan keras.
-- Saat pekerjaan dibuka, aplikasi menangkap sinyal presisi *latitude* & *longitude* untuk pembuktian *timestamp*.
-- Jika `EXECUTOR` memasuki *blank spot* (Basemen / Area Pabrik Terisolasi), aplikasi **tidak akan mati/gagal**. Input disimpan di dalam *Service Worker / IndexedDB cache*. Ketika sinyal 4G/Wi-Fi kembali ditemukan, transaksi *Check-out* & *Upload* Foto akan disinkronisasi ke server secara aman di latar belakang.
-
-### B. Alat Ukur Kamera (Augmented Reality & Visual Calibrator)
-Sebuah utilitas inovatif guna mempermudah kalkulasi jumlah injeksi anti rayap (SNI 2404). Memiliki dua arsitektur yang beroperasi *seamless*:
-
-1. **Mode 3D WebXR (AR Camera):**
-   *Smartphone* modern akan membuka kamera belakang, mendeteksi permukaan lantai dan dinding, dan memproyeksikan Cincin (Reticle). Jarak dikalkulasi dan garis virtual dirender tepat di layar ponsel.
-   
-2. **Mode Cadangan Anotasi Foto (Smart Fallback):**
-   Sistem penopang bagi perangkat yang tidak mendukung AR (tanpa sensor *LiDAR/ToF*). 
-   `EXECUTOR` memotret dinding secara datar, menggambar 1 garis sebagai kalibrasi (misal, menginput secara manual bahwa panjang dinding dari pintu ke sudut pilar adalah "4 Meter"). Segala garis tambahan yang ditarik teknisi selanjutnya akan diproporsikan secara matematis sesuai *pixel density* rasio tersebut. Kalkulator HUD (*Head-Up Display*) akan mengekstrak **Total Meter Lari (m')**, **Perkiraan Titik Bor**, dan **Total Kebutuhan Cairan Kimia**.
+Modul analitik performa berbasis *Month-over-Month* (MoM) yang dirancang khusus menjaga privasi antar-staf:
+- **Data Isolation per Marketing:** Akun login dengan role `MARKETING` hanya dapat melihat quotation dan rasio closing yang dibuat oleh dirinya sendiri.
+- **Breakdown Kategori Spesifik:**
+  - **Anti Rayap (Termite Control):** Menampilkan total quotation AR, jumlah deal, persentase konversi deal (`deal %`), total nilai deal (Rp), dan selisih MoM dibanding bulan sebelumnya.
+  - **Pest Control (PCO):** Menampilkan total quotation pest control, jumlah deal, persentase konversi deal (`deal %`), total nilai deal (Rp), dan selisih MoM.
+  - **Total Deal:** Akumulasi rasio closing deal keseluruhan dan perbandingan terhadap target benchmark bulanan.
+- **Kartu Tim Surveyor:** Hanya menampilkan kartu pencapaian pribadi untuk marketing; sedangkan Direktur dan Admin dapat memantau seluruh anggota tim dan mengatur target bulanan.
 
 ---
-*Dokumentasi Sistem — Diperbarui pada fase implementasi final FieldWork V2.*
+
+## 5. Keamanan & Proteksi Keuntungan Chemical (Director-Only)
+
+- **Akses Terbatas:** Kolom finansial Nilai Kontrak, Biaya HPP Chemical & Operasional, Estimasi Untung/Rugi (Rp), dan Margin (%) per ID Proyek di `InventoryPage` dilindungi secara eksklusif untuk Direktur (`SUPERADMIN`, `MASTER_SUPER_ADMIN`, dan tim direksi Izumi & Ayling).
+- **Pemisahan Tugas Gudang:** Staf gudang (`INVENTORY`) dan Admin operasional tetap dapat mencatat alokasi pemakaian fisik bahan kimia ke ID Proyek, namun nilai finansial dilindungi oleh badge `🔒 Khusus Direktur`.
+- **Isolasi Role:** Role `MARKETING` dibatasi dan tidak memiliki akses ke modul stok gudang internal.
+
+---
+
+## 6. Optimasi Responsivitas Mobile & Tablet (Keyboard Shield)
+
+- **Virtual Keyboard Shield:** Terintegrasi hook `useVirtualKeyboard` berbasis `window.visualViewport`. Navigasi melayang otomatis disembunyikan saat keyboard virtual terbuka.
+- **Global Auto-Scroll Centering:** Setiap elemen formulir (`input`, `textarea`, `select`) yang menerima fokus otomatis bergeser ke tengah layar (`block: 'center'`) sehingga tidak pernah tertutup keyboard di Android dan iOS.
+- **Anti-Zoom Safari:** Standardisasi ukuran font input minimal 16px dan clearance scroll bawah `scroll-padding-bottom: 20rem`.
+- **Dynamic Island Navigation:** Menggunakan kapsul melayang tengah bawah (`fixed bottom-5 left-1/2 -translate-x-1/2`) dengan spring physics Framer Motion.
+
+---
+*Dokumentasi Sistem — Diperbarui pada rilis Phase 5 FieldWork V2.*

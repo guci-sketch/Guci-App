@@ -24,16 +24,16 @@ FieldWork V2 dibangun menggunakan **React 19 + Vite 6** dengan antarmuka modern 
 - **Database & Auth:** PostgreSQL + Supabase Auth (+ Storage untuk foto bukti)
 - **Multi-tenant:** setiap perusahaan hanya melihat datanya sendiri (RLS di Supabase + filter `company_id` di backend)
 
-## 👥 Role
+## 👥 Role (6-Role SaaS Hierarchy)
 
-| Role | Akses |
+| Role | Deskripsi & Hak Akses |
 |---|---|
-| `SUPERADMIN` | Semua perusahaan (memilih perusahaan di sidebar) |
-| `ADMIN` | Admin perusahaan: dashboard, laporan, user, aturan risiko, **template dokumen**, log |
-| `MARKETING` | Penawaran harga, garansi rayap |
-| `INVENTORY` | Gudang & stok |
-| `TEKNISI_LAPANGAN` | Aplikasi lapangan (check-in/out, foto, treatment) |
-
+| `MASTER_SUPER_ADMIN` | Pemilik platform SaaS: kelola entitas tenant & aktivasi token |
+| `SUPERADMIN` | Direktur Utama: approval penawaran, **analisis untung rugi & keuntungan chemical** |
+| `ADMIN` | Admin operasional: penugasan SPK, pantau laporan, aturan risiko, log audit |
+| `MARKETING` | Surveyor & sales: draft penawaran, **visual performa MoM terisolasi (Pest vs Anti Rayap)** |
+| `INVENTORY` | Staf gudang: manajemen stok, **alokasi fisik chemical ke ID proyek** |
+| `TEKNISI_LAPANGAN` | Pelaksana lapangan: PWA mobile, presensi GPS, foto WebP, treatment dosis SNI 2404 |
 ## 📦 Setup Development
 
 Butuh **Node.js 20+**, **PostgreSQL 15+** (atau proyek Supabase).
@@ -50,16 +50,17 @@ npm run dev              # http://localhost:3000
 > pelacakan, migrasi `00`/`01` otomatis dianggap sudah diterapkan dan hanya `02`+ yang dijalankan. Baca
 > [docs/PANDUAN_DEPLOY.md](docs/PANDUAN_DEPLOY.md) sebelum menerapkannya di produksi.
 
-## ✅ Pengujian
+## ✅ Pengujian (Sprint Test Suites)
 
 ```bash
+npm run test:whitebox             # 30 skenario: boundary, AST, dosis SNI 2404, risk engine, keyboard, isolasi role
+npm run test:blackbox             # 21 skenario: RBAC matrix, transisi SPK, SUS calculator, idempotensi antrean
 npm run lint                      # tsc --noEmit
-npm run test:integration          # 50 skenario Express + Postgres (butuh DB hasil migrate+seed)
+npm run test:integration          # skenario Express + Postgres (butuh DB hasil migrate+seed)
 npm run test:templates            # sistem template: sanitasi, markup, dua perusahaan
 psql -d <db> -f supabase/tests/rls_test.sql   # 48 skenario RLS/RPC lintas perusahaan & role
 npm run pdf:samples               # render contoh PDF ke ./out/pdf-samples
 ```
-
 ## 🏗 Build & Deploy
 
 ```bash
