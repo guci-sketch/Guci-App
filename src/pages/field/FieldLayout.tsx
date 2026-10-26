@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/app/providers/AuthContext";
 import { useVirtualKeyboard } from "@/shared/hooks/useVirtualKeyboard";
-import { Home, ClipboardList, Clock, LogOut } from "lucide-react";
+import { Home, ClipboardList, Clock, LogOut, BookOpen } from "lucide-react";
 import { OfflineStatusBar } from "../../components/common/OfflineStatusBar";
+import { RoleGuidebookModal } from "@/widgets/common/RoleGuidebookModal";
 
 const FIELD_TABS = [
     { id: "dashboard", path: "/field/dashboard", label: "Beranda", icon: Home },
@@ -16,9 +18,9 @@ export function FieldLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const isKeyboardOpen = useVirtualKeyboard();
+    const [showGuide, setShowGuide] = useState(false);
 
     const activeTabObj = FIELD_TABS.find(tab => location.pathname.startsWith(tab.path)) || FIELD_TABS[0];
-
     return (
         <div className="min-h-screen min-h-[100dvh] bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col font-sans select-none overflow-x-hidden">
             {/* Header bergaya Barventis Glassmorphism */}
@@ -41,6 +43,15 @@ export function FieldLayout() {
                     <span className="text-xs font-semibold text-[var(--text-secondary)] hidden sm:inline-block max-w-[120px] truncate">
                         {user?.name || "Teknisi"}
                     </span>
+                    <button
+                        type="button"
+                        onClick={() => setShowGuide(true)}
+                        title="Panduan Tugas Teknisi"
+                        className="p-1.5 rounded-lg text-[var(--accent)] hover:bg-emerald-50 transition-colors"
+                        aria-label="Panduan Tugas"
+                    >
+                        <BookOpen size={16} />
+                    </button>
                     <button
                         type="button"
                         onClick={logout}
@@ -135,6 +146,13 @@ export function FieldLayout() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Modal Panduan Alur Kerja Teknisi Lapangan */}
+            <RoleGuidebookModal
+                isOpen={showGuide}
+                onClose={() => setShowGuide(false)}
+                initialRole="TEKNISI_LAPANGAN"
+            />
         </div>
     );
 }

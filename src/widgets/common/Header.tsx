@@ -5,7 +5,7 @@ import {
   CheckCircle2, FileText, ShieldCheck, Wrench, Search, ChevronRight, Command,
 } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
-
+import { RoleGuidebookModal } from './RoleGuidebookModal';
 export interface QuickJumpModuleItem {
   id: string;
   label: string;
@@ -184,8 +184,8 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setShowGuidebook(true)}
-                title="Panduan QA & Alur Sistem"
-                className="hidden sm:flex w-9 h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Buku Panduan & Alur Sistem"
+                className="flex w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <BookOpen size={15} />
               </button>
@@ -339,89 +339,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Modal Panduan QA & Alur Kerja Sistem */}
-      {showGuidebook && (
-        <div
-          className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4 modal-overlay-in"
-          onClick={() => setShowGuidebook(false)}
-        >
-          <div
-            className="bg-white rounded-2xl border border-[#e8e5e0] max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 modal-card-in"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-[#e8e5e0] pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[var(--accent)] flex items-center justify-center shrink-0">
-                  <BookOpen size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm sm:text-base font-extrabold text-[#2d2a26]">
-                    Panduan QA &amp; Alur Sistem — FieldWork
-                  </h2>
-                  <p className="text-xs text-[#5a554f]">
-                    Ringkasan grup modul, alur penawaran 2 tahap (GP-DRF &rarr; GP/AR/PH), dan tips navigasi cepat.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGuidebook(false)}
-                className="w-8 h-8 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef]"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0] space-y-1.5">
-                <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <FileText size={14} /> 1. Grup Penawaran &amp; CRM
-                </div>
-                <p className="text-[#5a554f] leading-relaxed">
-                  Surveyor menginput ukuran/rumus volume lapangan &rarr; terbit nomor draft <b>GP-DRF</b>. Jika klien negosiasi, Admin menyesuaikan garansi atau diskon di panel <b>Adjust</b>, lalu klik <b>Approve</b> untuk menerbitkan nomor resmi tanpa kode DRF.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0] space-y-1.5">
-                <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <ShieldCheck size={14} /> 2. Grup Operasional Lapangan
-                </div>
-                <p className="text-[#5a554f] leading-relaxed">
-                  Pantau KPI pengerjaan, lokasi proyek ber-geofence, laporan foto Check-In / Check-Out teknisi beserta anggota tim, deteksi anomali spasial, serta pelacakan GPS teknisi secara langsung.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0] space-y-1.5">
-                <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <Wrench size={14} /> 3. Grup Gudang &amp; Finansial
-                </div>
-                <p className="text-[#5a554f] leading-relaxed">
-                  Kelola stok termitisida, insektisida PCO, dan estimasi chemical per ID Proyek untuk analisis untung rugi internal, pantau termin/cicilan kontrak, serta persentase performa MoM.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0] space-y-1.5">
-                <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                  <CheckCircle2 size={14} /> 4. Tips Navigasi Cepat (UX)
-                </div>
-                <p className="text-[#5a554f] leading-relaxed">
-                  Gunakan kapsul melayang di bawah layar (<b>Dynamic Floating Bottom Pill</b>) untuk berpindah antar sub-fitur dalam grup yang sama, atau tekan <b>Ctrl+K</b> untuk mencari modul secara instan.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-[#e8e5e0]">
-              <button
-                type="button"
-                onClick={() => setShowGuidebook(false)}
-                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-hover)] cursor-pointer"
-              >
-                Mengerti, Tutup Panduan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Interaktif Panduan Sistem & Alur Role */}
+      <RoleGuidebookModal
+        isOpen={showGuidebook}
+        onClose={() => setShowGuidebook(false)}
+      />
 
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
