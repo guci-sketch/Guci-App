@@ -6,6 +6,17 @@ export interface LatLng {
   latitude: number;
   longitude: number;
 }
+export type Coordinates = LatLng;
+export const calculateHaversineDistance = calculateDistanceMeters;
+export function validateGeofence(userLocation: LatLng, projectLocation: LatLng, radiusMeters: number) {
+  const distanceMeters = calculateDistanceMeters(userLocation, projectLocation);
+  const isInside = distanceMeters <= radiusMeters;
+  return {
+    isInside,
+    distanceMeters,
+    differenceMeters: isInside ? 0 : Math.round((distanceMeters - radiusMeters) * 100) / 100,
+  };
+}
 
 /**
  * Calculates distance in meters between two geographic coordinates

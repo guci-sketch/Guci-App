@@ -15,7 +15,9 @@
     "pdf:samples": "bash scripts/build-run.sh scripts/render-samples.ts && bash scripts/build-run.sh scripts/render-visit-sample.ts",
     "test:integration": "tsx scripts/integration-test.mts",
     "test:templates": "bash scripts/build-run.sh scripts/template-test.ts",
-    "test:shim": "bash scripts/run-shim-test.sh"
+    "test:shim": "bash scripts/run-shim-test.sh",
+    "test:whitebox": "tsx tests/whitebox.test.ts",
+    "test:blackbox": "tsx tests/blackbox.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

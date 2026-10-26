@@ -23,3 +23,19 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 Styling-Reference/
+
+# Local AI agents, skills, and prompts (development & memory only)
+.agents/
+skills/
+AGENTS.md
+agent_lean_prompt_v2.md
+antislop.md
+
+# Obsidian Vault configuration & machine memory
+.obsidian/
+vault-guci/
+docs/_index.md
+docs/diagrams/
+docs/memory/
+docs/prd/
+docs/roadmap/

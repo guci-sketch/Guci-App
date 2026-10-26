@@ -319,21 +319,21 @@ export function AppLayout({
                                             aria-current={active ? 'page' : undefined}
                                             title={!isExpanded ? item.label : undefined}
                                             className={cn(
-                                                'w-full h-9 flex items-center rounded-lg text-[12px] transition-colors duration-150 relative group/item cursor-pointer overflow-hidden',
+                                                'w-full h-10 flex items-center rounded-xl text-[13px] transition-colors duration-200 relative group/item cursor-pointer select-none',
                                                 active
                                                     ? danger
-                                                        ? 'bg-rose-50 text-rose-700 font-semibold'
-                                                        : 'bg-[var(--accent-glow)] text-[var(--accent)] font-semibold'
+                                                        ? 'bg-rose-50 text-rose-700 font-semibold shadow-2xs'
+                                                        : 'bg-[var(--accent-glow)] text-[var(--accent)] font-semibold shadow-2xs'
                                                     : 'text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[#2d2a26] font-medium'
                                             )}
                                         >
                                             {active && (
                                                 <motion.div
-                                                    layoutId="supabase-sidebar-active-pill"
-                                                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                                    layoutId="active-nav-indicator"
+                                                    transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                                                     className={cn(
-                                                        'absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full',
-                                                        danger ? 'bg-rose-500' : 'bg-[var(--accent)]'
+                                                        'absolute inset-0 rounded-xl pointer-events-none -z-10',
+                                                        danger ? 'bg-rose-50' : 'bg-[var(--accent-glow)]'
                                                     )}
                                                 />
                                             )}

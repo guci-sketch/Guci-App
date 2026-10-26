@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
+import { useVirtualKeyboard } from '@/shared/hooks/useVirtualKeyboard';
 
 export interface NavItem {
     id: string;
@@ -32,15 +33,7 @@ function renderNavIcon(icon: React.ElementType | React.ReactNode, size = 14) {
  *   lengkap dengan Ikon + Label Singkat (contoh: `[📋 Semua]`).
  */
 export function DynamicIslandNav({ items, activeTab, onTabChange }: DynamicIslandNavProps) {
-    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsKeyboardOpen(window.innerHeight < 440);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const isKeyboardOpen = useVirtualKeyboard();
 
     if (!items || items.length === 0 || isKeyboardOpen) return null;
 
