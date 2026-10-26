@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppUser } from '@/entities/types';
 import {
-  Menu, X, BookOpen, RefreshCw, Bell, KeyRound, LogOut,
+  Menu, X, BookOpen, RefreshCw, KeyRound, LogOut,
   CheckCircle2, FileText, ShieldCheck, Wrench, Search, ChevronRight, Command,
+  User, ChevronDown,
 } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { RoleGuidebookModal } from './RoleGuidebookModal';
@@ -179,15 +180,16 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             )}
 
-            {/* Tombol Panduan QA (Hanya untuk pengguna perusahaan tenant) */}
+            {/* Tombol Panduan Alur Role */}
             {!isMasterSuper && (
               <button
                 type="button"
                 onClick={() => setShowGuidebook(true)}
-                title="Buku Panduan & Alur Sistem"
-                className="flex w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] items-center justify-center transition-colors cursor-pointer shrink-0"
+                title={`Buku Panduan & Alur Kerja (${ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role})`}
+                className="flex items-center gap-1.5 px-2.5 h-8 sm:h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] text-xs font-bold transition-colors cursor-pointer shrink-0"
               >
                 <BookOpen size={15} />
+                <span className="hidden lg:inline">Panduan</span>
               </button>
             )}
 
@@ -196,21 +198,26 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={handleRefreshClick}
               title="Muat Ulang Data Halaman Ini"
-              className="w-9 h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
               <RefreshCw size={14} className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''} />
             </button>
 
-            {/* Tombol Notifikasi & Menu Profil */}
+            {/* Menu Akun & Profil */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen(v => !v)}
                 title="Profil Akun & Pengaturan"
-                className="w-9 h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer relative shrink-0"
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 h-8 sm:h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] text-xs font-semibold transition-colors cursor-pointer shrink-0"
               >
-                <Bell size={15} />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-500 ring-1 ring-white" />
+                <div className="w-5 h-5 rounded-full bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-black shrink-0">
+                  <User size={12} />
+                </div>
+                <span className="max-w-[70px] sm:max-w-[100px] truncate hidden md:inline-block">
+                  {currentUser.name}
+                </span>
+                <ChevronDown size={12} className="text-[#8a8580]" />
               </button>
 
               {profileMenuOpen && (
@@ -219,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
                     className="fixed inset-0 z-40"
                     onClick={() => setProfileMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-68 rounded-2xl bg-white border border-[#e8e5e0] shadow-xl z-50 p-3 space-y-2">
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-[#e8e5e0] shadow-xl z-50 p-3 space-y-2">
                     <div className="p-2.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0]">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-xs text-[#2d2a26] truncate">{currentUser.name}</span>
@@ -249,7 +256,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setProfileMenuOpen(false);
                         onLogout();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
                     >
                       <LogOut size={14} className="text-rose-600" /> Keluar dari Sesi (Logout)
                     </button>
@@ -257,6 +264,18 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               )}
             </div>
+
+            {/* Tombol Logout Jelas & Langsung (Dedicated Logout Button) */}
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Keluar dari Akun (Logout)"
+              className="flex items-center gap-1.5 px-2.5 h-8 sm:h-9 rounded-lg border border-rose-200 bg-rose-50/80 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition-colors cursor-pointer shrink-0"
+              aria-label="Tombol Keluar"
+            >
+              <LogOut size={14} className="text-rose-600" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
           </div>
         </div>
       </header>

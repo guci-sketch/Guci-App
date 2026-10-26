@@ -224,8 +224,8 @@ export function RoleGuidebookModal({ isOpen, onClose, initialRole }: RoleGuidebo
     const user = useAuthStore(s => s.user);
     const isDirector = isDirectorUser(user);
 
-    // Tentukan role bawaan berdasarkan pengguna yang sedang aktif
-    const defaultRole: GuideRole = initialRole || (
+    // Kunci panduan secara ketat hanya untuk role pengguna yang sedang login
+    const userRole: GuideRole = initialRole || (
         isDirector
             ? 'SUPERADMIN'
             : (user?.role === 'ADMIN' ? 'ADMIN'
@@ -234,20 +234,9 @@ export function RoleGuidebookModal({ isOpen, onClose, initialRole }: RoleGuidebo
                         : 'TEKNISI_LAPANGAN')
     );
 
-    const [activeRole, setActiveRole] = useState<GuideRole>(defaultRole);
-
     if (!isOpen) return null;
 
-    const currentGuide = ROLE_GUIDES[activeRole] || ROLE_GUIDES.ADMIN;
-
-    const roleTabList: { id: GuideRole; label: string; icon: React.ReactNode }[] = [
-        { id: 'SUPERADMIN', label: 'Direktur', icon: <Crown size={14} /> },
-        { id: 'ADMIN', label: 'Admin', icon: <ShieldCheck size={14} /> },
-        { id: 'MARKETING', label: 'Marketing', icon: <Target size={14} /> },
-        { id: 'INVENTORY', label: 'Gudang', icon: <Package size={14} /> },
-        { id: 'TEKNISI_LAPANGAN', label: 'Teknisi', icon: <Smartphone size={14} /> },
-    ];
-
+    const currentGuide = ROLE_GUIDES[userRole] || ROLE_GUIDES.ADMIN;
     return (
         <div
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 modal-overlay-in"
@@ -260,18 +249,23 @@ export function RoleGuidebookModal({ isOpen, onClose, initialRole }: RoleGuidebo
                 className="bg-[var(--bg-primary)] w-full max-w-3xl max-h-[90vh] rounded-3xl border border-[var(--border)] shadow-2xl flex flex-col overflow-hidden modal-card-in select-none"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Header Modal */}
+                {/* Header Modal - Khusus Role Pengguna */}
                 <div className="p-4 sm:p-5 border-b border-[var(--border)] bg-white flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center font-bold shrink-0 shadow-2xs">
                             <BookOpen size={20} />
                         </div>
                         <div>
-                            <h2 id="guidebook-title" className="text-base sm:text-lg font-extrabold text-[var(--text-primary)] tracking-tight">
-                                Panduan Alur Sistem &amp; Peran
-                            </h2>
-                            <p className="text-xs text-[var(--text-secondary)]">
-                                Pelajari peran, batasan akses, dan 3 langkah kerja praktis untuk setiap peran.
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h2 id="guidebook-title" className="text-base sm:text-lg font-extrabold text-[var(--text-primary)] tracking-tight">
+                                    Panduan Alur: {currentGuide.title}
+                                </h2>
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                    Role Aktif Anda
+                                </span>
+                            </div>
+                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                Instruksi langkah operasional harian dan batasan wewenang resmi akun Anda.
                             </p>
                         </div>
                     </div>
@@ -284,32 +278,6 @@ export function RoleGuidebookModal({ isOpen, onClose, initialRole }: RoleGuidebo
                         <X size={16} />
                     </button>
                 </div>
-
-                {/* Role Switcher Tabs (Responsive Scrollable) */}
-                <div className="px-3 sm:px-5 py-2.5 bg-[#f5f3ef] border-b border-[var(--border)] flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-                    {roleTabList.map(tab => {
-                        const isActive = activeRole === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveRole(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                                    isActive
-                                        ? 'bg-[var(--accent)] text-white shadow-xs'
-                                        : 'bg-white text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-emerald-50/50 border border-[#e8e5e0]'
-                                }`}
-                            >
-                                {tab.icon}
-                                {tab.label}
-                                {user?.role === tab.id && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ml-0.5" title="Role Anda Saat Ini" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-
                 {/* Content Area */}
                 <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs text-[var(--text-primary)]">
                     {/* Role Header Banner */}
@@ -402,7 +370,7 @@ export function RoleGuidebookModal({ isOpen, onClose, initialRole }: RoleGuidebo
                 {/* Footer Modal */}
                 <div className="p-3.5 sm:p-4 border-t border-[var(--border)] bg-white flex items-center justify-between gap-3 shrink-0">
                     <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline-block">
-                        Tips: Tekan tombol role di atas untuk melihat alur kerja divisi lainnya.
+                        Akun aktif: <strong>{user?.name || 'Pengguna'}</strong> ({currentGuide.badge})
                     </span>
                     <button
                         type="button"
