@@ -6,7 +6,7 @@ import { formatRupiah } from '@/shared/lib/utils';
 import {
     TrendingUp, Award, ChevronDown, RefreshCw, Loader2,
     SlidersHorizontal, Check, X, Percent, ArrowUpRight,
-    ArrowDownRight, Minus, BarChart3, Target, Users,
+    ArrowDownRight, Minus, BarChart3, Target, Users, ShieldCheck, Bug,
 } from "lucide-react";
 import type { Quotation } from '@/entities/types';
 
@@ -147,19 +147,48 @@ export function PerformaPage() {
         load();
     }, [load]);
 
+    const currentMarketingUid = user?.uid;
+    const currentMarketingName = (user?.name || "").toLowerCase().trim();
+
+    // Jika user role MARKETING, batasi hanya data penawaran miliknya sendiri
+    const scopedQuotations = useMemo(() => {
+        if (!isMarketing) return quotations;
+        return quotations.filter(q => {
+            const mUid = q.marketingUid || "";
+            const sName = (q.surveyor || q.marketingNama || "").toLowerCase().trim();
+            return (
+                mUid === currentMarketingUid ||
+                (currentMarketingName && sName.includes(currentMarketingName)) ||
+                (currentMarketingName && currentMarketingName.includes(sName))
+            );
+        });
+    }, [quotations, isMarketing, currentMarketingUid, currentMarketingName]);
+
+    const isARQuotation = useCallback((q: Quotation) => {
+        const kat = (q.kategori || "").toUpperCase();
+        const projKat = (q.kategoriProyek || "").toUpperCase();
+        const jns = (q.jenisLayanan || "").toUpperCase();
+        const no = (q.noSurat || q.draftNoSurat || "").toUpperCase();
+        return kat === "AR" || projKat === "ANTI_RAYAP" || jns.includes("RAYAP") || jns.includes("TERMITE") || no.includes("/AR/");
+    }, []);
+
+    const isDealOrApproved = useCallback((q: Quotation) => {
+        return q.status === "approved" || q.status === "sent_to_client" || q.status === "deal";
+    }, []);
+
     const monthlyBuckets = useMemo<MonthPerfBucket[]>(() => {
         const raw: Omit<MonthPerfBucket, "momGrowthPct">[] = [];
         for (let i = config.rangeMonths - 1; i >= 0; i--) {
             const d = new Date(filterYear, filterMonth - 1 - i, 1);
             const y = d.getFullYear();
             const m = d.getMonth() + 1;
-            const monthQuos = quotations.filter(q => {
+            const monthQuos = scopedQuotations.filter(q => {
                 const dt = q.tanggal instanceof Date ? q.tanggal : new Date(q.createdAt);
                 return dt.getFullYear() === y && dt.getMonth() + 1 === m;
             });
             const totalSurvey = monthQuos.length;
-            const approvedList = monthQuos.filter(q => q.status === "approved" || q.status === "sent_to_client" || q.status === "deal");
-            const dealList = monthQuos.filter(q => q.status === "deal" || q.status === "approved");
+            const approvedList = monthQuos.filter(isDealOrApproved);
+            const dealList = monthQuos.filter(isDealOrApproved);
             const approvedCount = approvedList.length;
             const dealCount = dealList.length;
             const approvalRatePct = totalSurvey > 0 ? Math.round((approvedCount / totalSurvey) * 100) : 0;
@@ -187,7 +216,7 @@ export function PerformaPage() {
             const momGrowthPct = b.approvalRatePct - prev.approvalRatePct;
             return { ...b, momGrowthPct };
         });
-    }, [quotations, filterYear, filterMonth, config.rangeMonths]);
+    }, [scopedQuotations, filterYear, filterMonth, config.rangeMonths, isDealOrApproved]);
 
     const currentBucket = monthlyBuckets[monthlyBuckets.length - 1] ?? {
         key: "", shortLabel: MONTHS_ID[filterMonth - 1], label: `${MONTHS_ID[filterMonth - 1]} ${filterYear}`,
@@ -203,6 +232,58 @@ export function PerformaPage() {
     const diffApprovalVsPrevMonth = currentBucket.approvalRatePct - prevBucket.approvalRatePct;
     const diffVsBenchmark = currentBucket.approvalRatePct - config.benchmarkPct;
 
+    // Analisis Kategori Spesifik: Anti Rayap (AR) vs Pest Control (PCO)
+    const categoryStats = useMemo(() => {
+        const currMonthQuos = scopedQuotations.filter(q => {
+            const dt = q.tanggal instanceof Date ? q.tanggal : new Date(q.createdAt);
+            return dt.getFullYear() === filterYear && dt.getMonth() + 1 === filterMonth;
+        });
+
+        const prevMonthQuos = scopedQuotations.filter(q => {
+            const dt = q.tanggal instanceof Date ? q.tanggal : new Date(q.createdAt);
+            return dt.getFullYear() === prevBucket.year && dt.getMonth() + 1 === prevBucket.month;
+        });
+
+        // Anti Rayap (AR)
+        const arCurr = currMonthQuos.filter(isARQuotation);
+        const arCurrDeals = arCurr.filter(isDealOrApproved);
+        const arDealPct = arCurr.length > 0 ? Math.round((arCurrDeals.length / arCurr.length) * 100) : 0;
+        const arRevenue = arCurrDeals.reduce((acc, q) => acc + (q.total || 0), 0);
+
+        const arPrev = prevMonthQuos.filter(isARQuotation);
+        const arPrevDeals = arPrev.filter(isDealOrApproved);
+        const arPrevDealPct = arPrev.length > 0 ? Math.round((arPrevDeals.length / arPrev.length) * 100) : 0;
+        const arDeltaMoM = arDealPct - arPrevDealPct;
+
+        // Pest Control (PCO)
+        const pestCurr = currMonthQuos.filter(q => !isARQuotation(q));
+        const pestCurrDeals = pestCurr.filter(isDealOrApproved);
+        const pestDealPct = pestCurr.length > 0 ? Math.round((pestCurrDeals.length / pestCurr.length) * 100) : 0;
+        const pestRevenue = pestCurrDeals.reduce((acc, q) => acc + (q.total || 0), 0);
+
+        const pestPrev = prevMonthQuos.filter(q => !isARQuotation(q));
+        const pestPrevDeals = pestPrev.filter(isDealOrApproved);
+        const pestPrevDealPct = pestPrev.length > 0 ? Math.round((pestPrevDeals.length / pestPrev.length) * 100) : 0;
+        const pestDeltaMoM = pestDealPct - pestPrevDealPct;
+
+        return {
+            ar: {
+                totalSurvey: arCurr.length,
+                dealCount: arCurrDeals.length,
+                dealPct: arDealPct,
+                revenue: arRevenue,
+                deltaMoM: arDeltaMoM,
+            },
+            pest: {
+                totalSurvey: pestCurr.length,
+                dealCount: pestCurrDeals.length,
+                dealPct: pestDealPct,
+                revenue: pestRevenue,
+                deltaMoM: pestDeltaMoM,
+            },
+        };
+    }, [scopedQuotations, filterYear, filterMonth, prevBucket.year, prevBucket.month, isARQuotation, isDealOrApproved]);
+
     const perMarketing = useMemo(() => {
         const map = new Map<string, {
             uid: string;
@@ -217,7 +298,7 @@ export function PerformaPage() {
             revenue: number;
         }>();
 
-        quotations.forEach(q => {
+        scopedQuotations.forEach(q => {
             const uid = q.marketingUid || "mkt";
             const nama = q.surveyor || q.marketingNama || "Surveyor / Marketing";
             if (isMasterSuperAdminEntry(uid, nama)) return;
@@ -232,7 +313,7 @@ export function PerformaPage() {
             const dt = q.tanggal instanceof Date ? q.tanggal : new Date(q.createdAt);
             const y = dt.getFullYear();
             const m = dt.getMonth() + 1;
-            const isApp = q.status === "approved" || q.status === "sent_to_client" || q.status === "deal";
+            const isApp = isDealOrApproved(q);
 
             if (y === currentBucket.year && m === currentBucket.month) {
                 entry.currTotal++;
@@ -256,8 +337,16 @@ export function PerformaPage() {
                 momDeltaPct: currPct - prevPct,
             };
         });
-    }, [quotations, currentBucket, prevBucket]);
+    }, [scopedQuotations, currentBucket, prevBucket, isDealOrApproved]);
 
+    const visibleMarketingList = useMemo(() => {
+        if (!isMarketing) return perMarketing;
+        return perMarketing.filter(m =>
+            m.uid === currentMarketingUid ||
+            (currentMarketingName && m.nama.toLowerCase().includes(currentMarketingName)) ||
+            (currentMarketingName && currentMarketingName.includes(m.nama.toLowerCase()))
+        );
+    }, [perMarketing, isMarketing, currentMarketingUid, currentMarketingName]);
     const handleSaveTarget = async (uid: string, nama: string) => {
         if (!isAdminOrSuper || !companyId) return;
         setSavingTarget(true);
@@ -472,72 +561,101 @@ export function PerformaPage() {
                 </div>
             ) : (
                 <>
-                    {/* 3 Kartu Visual Ringkas */}
+                    {/* Banner Personal Marketing View */}
+                    {isMarketing && (
+                        <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                                    MKT
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-emerald-950 text-sm">
+                                        Performa Penawaran Saya: {user?.name || "Marketing"}
+                                    </h3>
+                                    <p className="text-emerald-800 text-[11.5px] mt-0.5">
+                                        Hanya menampilkan quotation &amp; rasio deal milik Anda untuk kategori Pest Control dan Anti Rayap.
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="px-3 py-1 rounded-full bg-emerald-200/90 text-emerald-900 font-bold text-[10.5px] self-start sm:self-center shrink-0">
+                                🔒 Data Terisolasi Pribadi
+                            </span>
+                        </div>
+                    )}
+
+                    {/* 3 Kartu Visual MoM: Breakdown Kategori Pest & Anti Rayap */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                        <div className="clean-card p-4 flex items-center justify-between gap-3">
+                        {/* KARTU 1: ANTI RAYAP (TERMITE CONTROL) */}
+                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-purple-100 bg-gradient-to-br from-white to-purple-50/30">
                             <div className="space-y-1">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-                                    Approval ({currentBucket.shortLabel} {currentBucket.year})
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
+                                    <ShieldCheck size={14} className="text-purple-600" />
+                                    Anti Rayap (Termite)
                                 </span>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
-                                        {currentBucket.approvalRatePct}%
+                                        {categoryStats.ar.dealPct}%
+                                    </span>
+                                    {renderDeltaBadge(categoryStats.ar.deltaMoM, "%")}
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] block">
+                                    <strong>{categoryStats.ar.dealCount} Deal</strong> dari {categoryStats.ar.totalSurvey} quotation (Bln lalu: {categoryStats.ar.prevDealPct}%)
+                                </span>
+                                <span className="text-[11px] font-mono text-purple-900 font-semibold block pt-0.5">
+                                    Nilai Deal: {formatRupiah(categoryStats.ar.revenue)}
+                                </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0">
+                                <ShieldCheck size={22} />
+                            </div>
+                        </div>
+
+                        {/* KARTU 2: PEST CONTROL (PCO / GENERAL PEST) */}
+                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-emerald-100 bg-gradient-to-br from-white to-emerald-50/30">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                                    <Bug size={14} className="text-emerald-600" />
+                                    Pest Control (PCO)
+                                </span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
+                                        {categoryStats.pest.dealPct}%
+                                    </span>
+                                    {renderDeltaBadge(categoryStats.pest.deltaMoM, "%")}
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] block">
+                                    <strong>{categoryStats.pest.dealCount} Deal</strong> dari {categoryStats.pest.totalSurvey} quotation (Bln lalu: {categoryStats.pest.prevDealPct}%)
+                                </span>
+                                <span className="text-[11px] font-mono text-emerald-900 font-semibold block pt-0.5">
+                                    Nilai Deal: {formatRupiah(categoryStats.pest.revenue)}
+                                </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[var(--accent)] flex items-center justify-center shrink-0">
+                                <Bug size={22} />
+                            </div>
+                        </div>
+
+                        {/* KARTU 3: TOTAL DEAL SEMUA LAYANAN */}
+                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-amber-100 bg-gradient-to-br from-white to-amber-50/30">
+                            <div className="space-y-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+                                    <TrendingUp size={14} className="text-amber-600" />
+                                    Total Deal ({currentBucket.shortLabel})
+                                </span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
+                                        {currentBucket.dealRatePct}%
                                     </span>
                                     {renderDeltaBadge(diffApprovalVsPrevMonth, "%")}
                                 </div>
                                 <span className="text-[11px] text-[var(--text-muted)] block">
-                                    {currentBucket.approvedCount} disetujui dari {currentBucket.totalSurvey} survey (Bln lalu: {prevBucket.approvalRatePct}%)
+                                    <strong>{currentBucket.dealCount} Deal</strong> dari {currentBucket.totalSurvey} survey total
                                 </span>
-                            </div>
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[var(--accent)] flex items-center justify-center shrink-0">
-                                <Percent size={22} />
-                            </div>
-                        </div>
-
-                        <div className="clean-card p-4 flex items-center justify-between gap-3">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-                                    Pencapaian vs Target ({config.benchmarkPct}%)
-                                </span>
-                                <div className="flex items-baseline gap-2">
-                                    <span className={`text-2xl sm:text-3xl font-extrabold font-mono ${
-                                        diffVsBenchmark >= 0 ? "text-emerald-700" : "text-amber-600"
-                                    }`}>
-                                        {diffVsBenchmark >= 0 ? `+${diffVsBenchmark}%` : `${diffVsBenchmark}%`}
-                                    </span>
-                                    <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
-                                        diffVsBenchmark >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                                    }`}>
-                                        {diffVsBenchmark >= 0 ? "Capai Target" : "Di Bawah Target"}
-                                    </span>
-                                </div>
-                                <span className="text-[11px] text-[var(--text-muted)] block">
-                                    Benchmark: {config.benchmarkPct}% (Atur di Custom Setup)
+                                <span className="text-[11px] font-mono text-amber-900 font-semibold block pt-0.5">
+                                    Total Omset: {formatRupiah(currentBucket.revenue)}
                                 </span>
                             </div>
                             <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
-                                <Target size={22} />
-                            </div>
-                        </div>
-
-                        <div className="clean-card p-4 flex items-center justify-between gap-3">
-                            <div className="space-y-1">
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-                                    Pertumbuhan Aktivitas Survey
-                                </span>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-[var(--text-primary)]">
-                                        {currentBucket.totalSurvey}
-                                    </span>
-                                    <span className="text-xs font-semibold text-[var(--text-secondary)]">
-                                        survey (Bln lalu: {prevBucket.totalSurvey})
-                                    </span>
-                                </div>
-                                <span className="text-[11px] text-[var(--text-muted)] block">
-                                    Konversi Deal: <strong>{currentBucket.dealRatePct}%</strong>
-                                </span>
-                            </div>
-                            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
                                 <TrendingUp size={22} />
                             </div>
                         </div>
@@ -570,9 +688,9 @@ export function PerformaPage() {
                             </div>
                         </div>
 
-                        {/* Area Grafik Visual */}
-                        <div className="relative h-52 pt-6 pb-2 px-2 sm:px-4 bg-[#faf9f7] rounded-2xl border border-[#e8e5e0] flex items-end justify-between gap-2 sm:gap-4">
-                            {/* Garis Benchmark Horizontal (Untuk mode persentase) */}
+                        {/* Area Grafik Visual (Responsive Scrollable on Small Phones) */}
+                        <div className="overflow-x-auto no-scrollbar pb-1">
+                            <div className="relative h-52 pt-6 pb-2 px-2 sm:px-4 bg-[#faf9f7] rounded-2xl border border-[#e8e5e0] flex items-end justify-between gap-2 sm:gap-4 min-w-[340px] sm:min-w-full">
                             {config.metric !== "survey_count" && (
                                 <div
                                     className="absolute left-3 right-3 border-t-2 border-dashed border-emerald-600/50 pointer-events-none flex items-center justify-end"
@@ -626,6 +744,7 @@ export function PerformaPage() {
                                     </div>
                                 );
                             })}
+                            </div>
                         </div>
                     </div>
 
@@ -635,20 +754,21 @@ export function PerformaPage() {
                             <div className="flex items-center justify-between">
                                 <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
                                     <Users size={16} className="text-[var(--accent)]" />
-                                    Performa Surveyor / Marketing ({currentBucket.label})
+                                    {isMarketing ? "Rincian KPI & Capaian Saya" : `Performa Tim Surveyor / Marketing (${currentBucket.label})`}
                                 </h2>
                                 <span className="text-[11px] text-[var(--text-muted)]">
                                     Visual rasio keberhasilan &amp; selisih MoM
                                 </span>
                             </div>
 
-                            {perMarketing.length === 0 ? (
+                            {visibleMarketingList.length === 0 ? (
                                 <div className="py-8 text-center text-xs text-[var(--text-muted)]">
                                     Belum ada aktivitas survey pada periode ini.
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {perMarketing.map(m => {
+                                    {visibleMarketingList.map(m => {
+
                                         const tgt = targets.find(t => t.uid === m.uid && t.year === filterYear && t.month === filterMonth);
                                         const isEditing = editingUid === m.uid;
 

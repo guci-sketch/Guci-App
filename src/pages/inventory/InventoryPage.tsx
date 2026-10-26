@@ -3,6 +3,7 @@ import {
     Package, FileText, Search, Plus, Download, UploadCloud,
     ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle,
     ClipboardList, Trash2, Briefcase, Calculator, TrendingUp, CheckCircle2,
+    Lock, ShieldAlert,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuthStore } from '@/app/store/authStore';
@@ -16,7 +17,7 @@ import { formatRupiah } from '@/shared/lib/utils';
 import { TabContainer } from '@/shared/ui/TabContainer';
 import { Pagination } from '@/shared/ui/Pagination';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
-
+import { isDirectorUser } from '@/shared/lib/roles';
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 const INVENTORY_PAGE_SIZE = 10;
@@ -42,12 +43,11 @@ export function InventoryPage() {
     const companyId = (user?.role === "MASTER_SUPER_ADMIN" || user?.role === "SUPERADMIN")
         ? (activeCompanyId || user?.companyId || null)
         : (user?.companyId ?? null);
-    // Hanya pihak Gudang (INVENTORY) dan Admin Operasional (ADMIN) yang dapat melihat dan mengelola Stok Gudang.
-    // Direktur (SUPERADMIN) dan Marketing hanya memantau Analisis Untung Rugi Proyek secara read-only.
+    const isDirector = isDirectorUser(user);
     const isWarehouseRole = user?.role === "INVENTORY" || user?.role === "ADMIN";
     const canWrite = isWarehouseRole;
 
-    const [tab, setTab] = useState<InvTab>(isWarehouseRole ? "stok" : "proyek");
+    const [tab, setTab] = useState<InvTab>(isDirector ? "proyek" : "stok");
     const [searchQ, setSearchQ] = useState("");
     const [itemsPage, setItemsPage] = useState(1);
     const [projectPage, setProjectPage] = useState(1);
@@ -337,12 +337,18 @@ export function InventoryPage() {
     const projectTotalPages = Math.max(1, Math.ceil(projectProfitability.length / INVENTORY_PAGE_SIZE));
     useEffect(() => { if (projectPage > projectTotalPages) setProjectPage(projectTotalPages); }, [projectPage, projectTotalPages]);
 
-    const invTabs = [
-        { id: "stok",   label: "Daftar Stok Obat & Alat",           shortLabel: "Semua Stok",  icon: <ClipboardList size={15} />, badge: items.length },
-        { id: "proyek", label: "Proyek Baru & Estimasi Untung Rugi",shortLabel: "Proyek & P/L",icon: <Calculator size={15} />,    badge: projects.length },
-        { id: "rekap",  label: "Rekap Bulanan",                     shortLabel: "Rekap",       icon: <FileText size={15} /> },
-        { id: "log",    label: "Riwayat Masuk / Keluar",            shortLabel: "Riwayat",     icon: <Trash2 size={15} />,        badge: logs.length },
-        { id: "alert",  label: "Stok Hampir Habis",                 shortLabel: "Stok Minim",  icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+    const invTabs: { id: InvTab; label: string; shortLabel: string; icon: React.ReactNode; badge?: number; badgeTone?: "danger" }[] = isDirector ? [
+        { id: "proyek", label: "Analisis Untung Rugi & Keuntungan Chemical", shortLabel: "Untung Rugi", icon: <Calculator size={15} />, badge: projects.length },
+        { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "rekap",  label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileText size={15} /> },
+        { id: "log",    label: "Riwayat Masuk / Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+    ] : [
+        { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "proyek", label: "Alokasi Chemical ke Proyek", shortLabel: "Alokasi Chemical", icon: <Calculator size={15} />, badge: projects.length },
+        { id: "rekap",  label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileText size={15} /> },
+        { id: "log",    label: "Riwayat Masuk / Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ];
 
     if (!companyId) {
@@ -351,8 +357,8 @@ export function InventoryPage() {
 
     return (
         <div className="space-y-4">
-            {/* Sub-tab internal Gudang hanya untuk role Gudang & Admin Operasional, tanpa menimpa Floating Menu utama */}
-            {isWarehouseRole && (
+            {/* Sub-tab internal Gudang & Analisis Direktur */}
+            {(isWarehouseRole || isDirector) && (
                 <TabContainer
                     tabs={invTabs}
                     activeTab={tab}
@@ -365,12 +371,18 @@ export function InventoryPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                 <div>
                     <h2 className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] tracking-tight">
-                        {tab === "proyek" ? "Estimasi Chemical per ID Proyek & Analisis Untung Rugi" : "Stok Obat & Alat Gudang"}
+                        {tab === "proyek"
+                            ? isDirector
+                                ? "Estimasi Chemical per ID Proyek & Analisis Untung Rugi"
+                                : "Alokasi Bahan Chemical per ID Proyek"
+                            : "Stok Obat & Alat Gudang"}
                     </h2>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                         {tab === "proyek"
-                            ? "Gudang dapat menginput estimasi maupun pemakaian chemical langsung ke ID masing-masing proyek untuk analisis untung rugi internal (Gudang, Admin, Marketing, & Superadmin)."
-                            : "Catat obat masuk, estimasi/pemakaian per ID proyek, dan pantau barang yang hampir habis."}
+                            ? isDirector
+                                ? "Pantau nilai kontrak, biaya chemical, operasional teknisi, dan margin untung rugi per proyek."
+                                : "Catat alokasi chemical ke ID proyek untuk operasional. Estimasi keuntungan dan margin finansial dikunci khusus Direktur."
+                            : "Catat obat masuk, alokasi per ID proyek, dan pantau barang yang hampir habis."}
                     </p>
                 </div>
                 {canWrite && (
@@ -480,10 +492,16 @@ export function InventoryPage() {
                                     <tr>
                                         <th className="py-3 px-4">ID Proyek &amp; Klien</th>
                                         <th className="py-3 px-4">Layanan &amp; Tanggal</th>
-                                        <th className="py-3 px-4">Catatan Estimasi / Pemakaian Chemical Gudang</th>
-                                        <th className="py-3 px-4 text-right">Nilai Kontrak</th>
-                                        <th className="py-3 px-4 text-right">HPP Chemical &amp; Ops</th>
-                                        <th className="py-3 px-4 text-right">Estimasi Untung / Rugi</th>
+                                        <th className="py-3 px-4">Alokasi Chemical Gudang</th>
+                                        {isDirector ? (
+                                            <>
+                                                <th className="py-3 px-4 text-right">Nilai Kontrak</th>
+                                                <th className="py-3 px-4 text-right">HPP Chemical &amp; Ops</th>
+                                                <th className="py-3 px-4 text-right">Estimasi Untung / Rugi</th>
+                                            </>
+                                        ) : (
+                                            <th className="py-3 px-4 text-right">Analisis Margin &amp; Untung Rugi</th>
+                                        )}
                                         {canWrite && <th className="py-3 px-4 text-right">Aksi Gudang</th>}
                                     </tr>
                                 </thead>
@@ -517,37 +535,51 @@ export function InventoryPage() {
                                                                         </span>
                                                                         <strong>{ce.itemName}</strong> ({fmt(ce.qty)} {ce.satuan})
                                                                     </div>
-                                                                    <span className="font-mono font-semibold text-slate-700">{formatRupiah(ce.totalCost)}</span>
+                                                                    {isDirector && (
+                                                                        <span className="font-mono font-semibold text-slate-700">{formatRupiah(ce.totalCost)}</span>
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     ) : (
                                                         <div className="text-[11px] text-amber-800 bg-amber-50/70 border border-amber-200 rounded-lg px-2.5 py-1.5">
-                                                            Belum ada input spesifik Gudang (menggunakan baseline estimasi 14% = {formatRupiah(p.totalChemicalCost)})
+                                                            {isDirector
+                                                                ? `Belum ada input spesifik Gudang (baseline estimasi 14% = ${formatRupiah(p.totalChemicalCost)})`
+                                                                : "Belum ada alokasi chemical tercatat dari Gudang"}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="py-3.5 px-4 text-right font-mono font-bold text-[var(--text-primary)] whitespace-nowrap">
-                                                    {formatRupiah(p.contractValue)}
-                                                </td>
-                                                <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
-                                                    <div className="text-red-600 font-semibold">Chem: - {formatRupiah(p.totalChemicalCost)}</div>
-                                                    <div className="text-[10.5px] text-[var(--text-muted)]">Ops: - {formatRupiah(p.operationalCost)}</div>
-                                                </td>
-                                                <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                                                    <div className={`font-mono font-bold text-sm ${p.grossProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                                                        {formatRupiah(p.grossProfit)}
-                                                    </div>
-                                                    <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        isHealthy
-                                                            ? "bg-emerald-100 text-emerald-800"
-                                                            : isWarning
-                                                            ? "bg-amber-100 text-amber-800"
-                                                            : "bg-red-100 text-red-700"
-                                                    }`}>
-                                                        Margin {p.marginPct}% ({p.grossProfit >= 0 ? "UNTUNG" : "RUGI"})
-                                                    </span>
-                                                </td>
+                                                {isDirector ? (
+                                                    <>
+                                                        <td className="py-3.5 px-4 text-right font-mono font-bold text-[var(--text-primary)] whitespace-nowrap">
+                                                            {formatRupiah(p.contractValue)}
+                                                        </td>
+                                                        <td className="py-3.5 px-4 text-right font-mono whitespace-nowrap">
+                                                            <div className="text-red-600 font-semibold">Chem: - {formatRupiah(p.totalChemicalCost)}</div>
+                                                            <div className="text-[10.5px] text-[var(--text-muted)]">Ops: - {formatRupiah(p.operationalCost)}</div>
+                                                        </td>
+                                                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                                            <div className={`font-mono font-bold text-sm ${p.grossProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                                                {formatRupiah(p.grossProfit)}
+                                                            </div>
+                                                            <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                isHealthy
+                                                                    ? "bg-emerald-100 text-emerald-800"
+                                                                    : isWarning
+                                                                    ? "bg-amber-100 text-amber-800"
+                                                                    : "bg-red-100 text-red-700"
+                                                            }`}>
+                                                                Margin {p.marginPct}% ({p.grossProfit >= 0 ? "UNTUNG" : "RUGI"})
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-semibold">
+                                                            <Lock size={12} className="text-amber-600" /> Khusus Direktur
+                                                        </span>
+                                                    </td>
+                                                )}
                                                 {canWrite && (
                                                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                                                         <button

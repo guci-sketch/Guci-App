@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Hook untuk mendeteksi software keyboard di mobile (iOS/Android).
- * Menggunakan visualViewport API dengan fallback window.innerHeight.
+ * Hook untuk mendeteksi software keyboard di mobile (iOS/Android)
+ * dan mengamankan posisi input agar tidak terhalang keyboard.
  */
 export function useVirtualKeyboard() {
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
@@ -15,8 +15,17 @@ export function useVirtualKeyboard() {
                 // Keyboard terbuka jika visualViewport menyusut > 20% dari innerHeight
                 const isKb = window.visualViewport.height < window.innerHeight * 0.8;
                 setIsKeyboardOpen(isKb);
+
+                // Jika keyboard terbuka dan ada elemen aktif, pastikan berada di tengah pandangan
+                if (isKb && document.activeElement) {
+                    const el = document.activeElement as HTMLElement;
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                        setTimeout(() => {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 150);
+                    }
+                }
             } else {
-                // Fallback untuk browser lawas tanpa visualViewport
                 setIsKeyboardOpen(window.innerHeight < 520);
             }
         };

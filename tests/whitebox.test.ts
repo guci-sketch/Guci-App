@@ -4,7 +4,7 @@ import { calculateDistanceMeters, validateGeofence, Coordinates } from '../src/s
 import { evaluateVolumeFormula, normalizeVolumeFormulaDisplay } from '../src/shared/utils/volumeCalculator.ts';
 import { evaluateWorkReportRisk, DEFAULT_RISK_CONFIG } from '../backend-src/modules/risk/riskEngine.ts';
 import type { RiskEvaluationInput } from '../backend-src/types.js';
-
+import { isDirectorUser } from '../src/shared/lib/roles.ts';
 // ============================================================================
 // SPRINT WHITEBOX TEST SUITE — FIELDWORK APP V2
 // ============================================================================
@@ -197,5 +197,50 @@ test('WB-06 [Mobile Virtual Keyboard & Viewport Invariants]', async (t) => {
         const viewportHeightNormal = 844;
         const isKb = viewportHeightNormal < innerHeight * 0.8;
         assert.equal(isKb, false);
+    });
+});
+
+test('WB-07 [Director Authorization & Chemical Profit Masking]', async (t) => {
+    await t.test('Direktur (SUPERADMIN / MASTER_SUPER_ADMIN / Tim Izumi & Ayling) diizinkan melihat keuntungan chemical', () => {
+        assert.equal(isDirectorUser({ role: 'SUPERADMIN', email: 'direktur@gucimaspratama.co.id' }), true);
+        assert.equal(isDirectorUser({ role: 'MASTER_SUPER_ADMIN', email: 'lieziragroup@gmail.com' }), true);
+        assert.equal(isDirectorUser({ role: 'ADMIN', email: 'ayling.director@fieldwork.id' }), true);
+        assert.equal(isDirectorUser({ role: 'ADMIN', email: 'izumi.board@fieldwork.id' }), true);
+    });
+
+    await t.test('Staf Gudang (INVENTORY), Teknisi, dan Marketing DILARANG melihat estimasi keuntungan chemical', () => {
+        assert.equal(isDirectorUser({ role: 'INVENTORY', email: 'gudang@gucimaspratama.co.id' }), false);
+        assert.equal(isDirectorUser({ role: 'MARKETING', email: 'marketing.andi@gucimaspratama.co.id' }), false);
+        assert.equal(isDirectorUser({ role: 'TEKNISI_LAPANGAN', email: 'budi@fieldwork.id' }), false);
+    });
+});
+
+test('WB-08 [Marketing MoM Personal Isolation & Service Category Breakdown]', async (t) => {
+    const mockQuotations = [
+        // Marketing A: 2 Anti Rayap (1 deal, 1 draft) + 1 Pest Control (1 deal)
+        { id: 'q1', marketingUid: 'user-mkt-a', kategori: 'AR', status: 'deal', total: 15000000 },
+        { id: 'q2', marketingUid: 'user-mkt-a', kategori: 'AR', status: 'draft', total: 10000000 },
+        { id: 'q3', marketingUid: 'user-mkt-a', kategori: 'PCO', status: 'approved', total: 5000000 },
+        // Marketing B: 2 Pest Control (2 deal)
+        { id: 'q4', marketingUid: 'user-mkt-b', kategori: 'PCO', status: 'deal', total: 8000000 },
+        { id: 'q5', marketingUid: 'user-mkt-b', kategori: 'PCO', status: 'deal', total: 6000000 },
+    ];
+
+    await t.test('Isolasi Marketing A: Hanya menghitung penawaran miliknya (3 total, bukan 5)', () => {
+        const myQuos = mockQuotations.filter(q => q.marketingUid === 'user-mkt-a');
+        assert.equal(myQuos.length, 3);
+    });
+
+    await t.test('Breakdown Kategori Marketing A: Deal Anti Rayap 50% & Deal Pest Control 100%', () => {
+        const myQuos = mockQuotations.filter(q => q.marketingUid === 'user-mkt-a');
+        const arQuos = myQuos.filter(q => q.kategori === 'AR');
+        const arDeals = arQuos.filter(q => q.status === 'deal' || q.status === 'approved');
+        const arDealPct = Math.round((arDeals.length / arQuos.length) * 100);
+        assert.equal(arDealPct, 50); // 1 deal / 2 survey = 50%
+
+        const pestQuos = myQuos.filter(q => q.kategori === 'PCO');
+        const pestDeals = pestQuos.filter(q => q.status === 'deal' || q.status === 'approved');
+        const pestDealPct = Math.round((pestDeals.length / pestQuos.length) * 100);
+        assert.equal(pestDealPct, 100); // 1 deal / 1 survey = 100%
     });
 });

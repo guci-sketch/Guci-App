@@ -41,6 +41,7 @@ import { generateInvite } from '@/shared/api/auth';
 import { createUser, resetRiskConfig } from '@/shared/api/admin';
 import { TemplateSettingsPanel } from '@/widgets/admin/TemplateSettingsPanel';
 import { CompanyPicker } from '@/widgets/admin/CompanyPicker';
+import { isDirectorUser } from '@/shared/lib/roles';
 import { useAuthStore } from '@/app/store/authStore';
 import { InventoryPage } from '../../pages/inventory/InventoryPage';
 import { KontrolRayapPage } from '../../pages/customers/KontrolRayapPage';
@@ -393,7 +394,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Menu menggunakan Bahasa Indonesia sehari-hari yang mudah dipahami oleh Admin, Surveyor, Teknisi, maupun Gudang
   const isMarketingUser = user?.role === 'MARKETING';
-  const isDirector = user?.role === 'SUPERADMIN';
+  const isDirector = isDirectorUser(user);
   const ALL_ITEMS: { id: Tab; label: string; shortLabel: string; group: string; icon: React.ReactNode; danger?: boolean; badge?: number; roles: string[] }[] = [
     // KHUSUS MASTER SUPER ADMIN (Hanya Kelola Perusahaan & Token Undangan Superadmin)
     { id: 'saas-companies', label: 'Kelola Perusahaan & Token Superadmin', shortLabel: 'Perusahaan SaaS', group: 'KONSOL PLATFORM SAAS', icon: <ShieldCheck size={16} />, roles: ['MASTER_SUPER_ADMIN'] },
@@ -413,7 +414,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'tracking', label: 'Lacak Posisi Teknisi', shortLabel: 'Peta Teknisi', group: '2. PEKERJAAN LAPANGAN', icon: <MapPin size={16} />, roles: ['ADMIN'] },
 
     // GRUP 3: ANALISIS UNTUNG RUGI & PERFORMA (Direktur hanya memantau P/L Proyek, Cashflow, & Performa tanpa input cicilan/stok harian)
-    { id: 'inventory', label: isDirector ? 'Analisis Untung Rugi Proyek' : 'Stok Obat & Estimasi Proyek', shortLabel: isDirector ? 'Untung Rugi' : 'Stok & P/L', group: isDirector ? '2. PANTAU LAPORAN & P/L' : '3. STOK OBAT & KEUANGAN', icon: <Package size={16} />, roles: ['SUPERADMIN', 'ADMIN', 'INVENTORY', 'MARKETING'] },
+    { id: 'inventory', label: isDirector ? 'Analisis Untung Rugi Proyek' : 'Stok Obat & Alokasi Proyek', shortLabel: isDirector ? 'Untung Rugi' : 'Stok & Proyek', group: isDirector ? '2. PANTAU LAPORAN & P/L' : '3. STOK OBAT & KEUANGAN', icon: <Package size={16} />, roles: ['SUPERADMIN', 'ADMIN', 'INVENTORY'] },
     { id: 'order-tracking', label: 'Tagihan & Cicilan Klien', shortLabel: 'Tagihan', group: '3. STOK OBAT & KEUANGAN', icon: <Clock size={16} />, roles: ['ADMIN', 'MARKETING'] },
     { id: 'cashflow', label: 'Laporan Pemasukan & Cashflow', shortLabel: 'Pemasukan', group: isDirector ? '2. PANTAU LAPORAN & P/L' : '3. STOK OBAT & KEUANGAN', icon: <SlidersHorizontal size={16} />, roles: ['SUPERADMIN', 'ADMIN'] },
     { id: 'performa', label: isMarketingUser ? 'Persentase Performa (MoM)' : 'Performa MoM & Capaian', shortLabel: 'Performa %', group: isDirector ? '2. PANTAU LAPORAN & P/L' : '3. STOK OBAT & KEUANGAN', icon: <CheckCircle2 size={16} />, roles: ['SUPERADMIN', 'ADMIN', 'MARKETING'] },
