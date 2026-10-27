@@ -367,11 +367,12 @@ export const AdminDashboard: React.FC = () => {
     setStaleRefreshError(null);
     try {
       const targetCompany = (isSuper ? activeCompanyId : user?.companyId) ?? '';
-      const [summary, projectRes, executorList, quos] = await Promise.all([
+      const [summary, projectRes, executorList, quos, latestLocs] = await Promise.all([
         fetchAdminSummary(),
-        fetchAdminProjects({ limit: 8, page: 1 }),
+        fetchAdminProjects({ limit: 24, page: 1 }),
         fetchExecutors(),
         targetCompany ? getQuotations({ companyId: targetCompany }).catch(() => []) : Promise.resolve([]),
+        fetchLatestLocations().catch(() => []),
       ]);
       setSummaryData(summary);
       setProjects(projectRes.projects);
@@ -379,6 +380,7 @@ export const AdminDashboard: React.FC = () => {
       setProjectTotalCount(projectRes.totalCount || projectRes.projects.length);
       setExecutors(executorList);
       setQuotationsList(quos);
+      setUserLocations(latestLocs);
       await loadReports();
     } catch (err) {
       setLoadError(
@@ -1032,6 +1034,12 @@ export const AdminDashboard: React.FC = () => {
           <OperationsAnalyticsBento
             summary={summaryData}
             quotationSummary={quotationSummary}
+            reports={reports}
+            projects={projects}
+            executors={executors}
+            quotations={quotationsList}
+            userLocations={userLocations}
+            companyDisplayName={user?.name || 'Gucimas Pratama'}
             isLoading={isLoading}
             isRefreshing={isRefreshingSummary}
             error={loadError}
@@ -1049,6 +1057,22 @@ export const AdminDashboard: React.FC = () => {
             onOpenReportsTab={() => {
               setCameFromDashboard(true);
               setActiveTab('reports');
+            }}
+            onOpenExecutorsTab={() => {
+              setCameFromDashboard(true);
+              setActiveTab('executors');
+            }}
+            onOpenProjectsTab={() => {
+              setCameFromDashboard(true);
+              setActiveTab('projects');
+            }}
+            onOpenQuotationsTab={() => {
+              setCameFromDashboard(true);
+              setActiveTab('quotation');
+            }}
+            onOpenCustomersTab={() => {
+              setCameFromDashboard(true);
+              setActiveTab('customers');
             }}
             onOpenReportDetail={id => setSelectedReportId(id)}
           />

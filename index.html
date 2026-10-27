@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" class="dark" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -16,7 +16,7 @@
         try {
           var key = 'fw_theme_preference_v1';
           var stored = localStorage.getItem(key);
-          var pref = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system';
+          var pref = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'dark';
           var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           var isDark = pref === 'dark' || (pref === 'system' && sysDark);
           var root = document.documentElement;
@@ -35,7 +35,7 @@
       })();
     </script>
   </head>
-  <body class="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-emerald-600 selection:text-white">
+  <body class="bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>

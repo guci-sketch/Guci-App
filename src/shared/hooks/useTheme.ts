@@ -8,16 +8,16 @@ const THEME_CHANGE_EVENT = 'fw-theme-change';
 
 export const THEME_OPTIONS: { value: ThemePreference; label: string; shortLabel: string; description: string }[] = [
   {
-    value: 'light',
-    label: 'Terang',
-    shortLabel: 'Terang',
-    description: 'Latar hangat terang untuk penggunaan di ruangan bercahaya atau lapangan siang hari.',
-  },
-  {
     value: 'dark',
     label: 'Gelap',
     shortLabel: 'Gelap',
-    description: 'Latar gelap nyaman di mata untuk penggunaan malam hari atau ruang kendali redup.',
+    description: 'Latar gelap matte slate ala Jarivis yang nyaman di mata untuk pemantauan operasional.',
+  },
+  {
+    value: 'light',
+    label: 'Terang',
+    shortLabel: 'Terang',
+    description: 'Latar terang bersih untuk penggunaan di ruangan bercahaya atau lapangan siang hari.',
   },
   {
     value: 'system',
@@ -28,7 +28,7 @@ export const THEME_OPTIONS: { value: ThemePreference; label: string; shortLabel:
 ];
 
 export function readStoredThemePreference(): ThemePreference {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return 'dark';
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (raw === 'light' || raw === 'dark' || raw === 'system') {
@@ -37,7 +37,7 @@ export function readStoredThemePreference(): ThemePreference {
   } catch {
     // ignore localStorage read errors
   }
-  return 'system';
+  return 'dark';
 }
 
 export function resolveEffectiveTheme(preference: ThemePreference, systemPrefersDark?: boolean): ResolvedTheme {
@@ -90,7 +90,7 @@ export function useTheme() {
   }, []);
 
   const cycleTheme = useCallback(() => {
-    const order: ThemePreference[] = ['light', 'dark', 'system'];
+    const order: ThemePreference[] = ['dark', 'light', 'system'];
     const currentIdx = order.indexOf(theme);
     const next = order[(currentIdx + 1) % order.length];
     setTheme(next);

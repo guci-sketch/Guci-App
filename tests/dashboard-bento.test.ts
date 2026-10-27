@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   aggregateOperationalSummaryFromRows,
   buildDateWindowKeys,
+  computeJarivisDashboardMetrics,
   isPriorityReport,
   toLocalDateKey,
   RawOperationalReportRow,
@@ -189,4 +190,85 @@ test('BENTO-06 [Anti-Slop & Security Guardrails]: No generic analytics filler or
   assert.ok(adminRoutesSrc.includes('dailyTrend'));
   assert.ok(adminRoutesSrc.includes('statusBreakdown'));
   assert.ok(adminRoutesSrc.includes('priorityReports'));
+});
+
+test('BENTO-07 [Jarivis 4-Tab Aggregation Engine]: Computes Operation Center, Live Map, Performance Team, and Business Funnel accurately', () => {
+  const refDate = new Date('2026-10-27T05:00:00.000Z');
+  const summary = aggregateOperationalSummaryFromRows([], refDate, 30, 'Asia/Jakarta');
+  const computed = computeJarivisDashboardMetrics({
+    summary,
+    reports: [],
+    projects: [
+      {
+        id: 'proj-1',
+        projectName: 'Bank Victoria Fatmawati',
+        clientName: 'Bank Victoria',
+        address: 'Jl. RS Fatmawati',
+        latitude: -6.28,
+        longitude: 106.79,
+        radius: 100,
+        workDate: '2026-10-27',
+        workType: 'Injeksi Rayap',
+        serviceType: 'TERMITE_CONTROL',
+        targetFocus: [],
+        contractType: 'RECURRING',
+        warrantyMonths: 36,
+        scheduledStartTime: '09:00',
+        createdBy: 'u1',
+        createdAt: '2026-10-01T00:00:00.000Z',
+      },
+    ],
+    executors: [
+      {
+        id: 'exec-1',
+        name: 'Budi Santoso',
+        email: 'budi@gucimas.com',
+        nip: null,
+        phone: null,
+        isActive: true,
+        totalJobs: 0,
+        completedJobs: 0,
+        highRiskJobs: 0,
+        avgDurationMinutes: 0,
+      },
+    ],
+    quotations: [
+      {
+        id: 'quo-1',
+        noSurat: '001/GEP/X/2026',
+        kategoriProyek: 'Korporat',
+        kategori: 'AR',
+        tipeKontrak: 'K',
+        jenisLayanan: 'anti_rayap_injeksi',
+        perihal: 'Penawaran Anti Rayap',
+        kepadaNama: 'Bank Victoria',
+        kepadaAlamatLines: ['Jakarta'],
+        tanggal: new Date('2026-10-20T00:00:00.000Z'),
+        items: [],
+        biayaTambahan: [],
+        diskonPct: 0,
+        ppn: true,
+        subtotal: 20000000,
+        diskonRp: 0,
+        ppnRp: 2200000,
+        total: 22200000,
+        marketingUid: 'm1',
+        marketingNama: 'Siti',
+        status: 'approved',
+        companyId: 'c1',
+        createdAt: new Date('2026-10-20T00:00:00.000Z'),
+      },
+    ],
+    selectedDateKey: '2026-10-27',
+    selectedPeriod: 'month',
+    referenceDate: refDate,
+  });
+
+  assert.equal(computed.isToday, true);
+  assert.equal(computed.operationCenter.workforceToday.totalStaff, 1);
+  assert.equal(computed.operationCenter.idleStaffCount, 1);
+  assert.equal(computed.liveMap.customerLocations.length, 1);
+  assert.equal(computed.business.activeCustomersCount, 1);
+  assert.equal(computed.business.funnel.contactedOrApprovedCount, 1);
+  assert.equal(computed.business.funnel.totalEstimatedRevenueIdr, 22200000);
 });

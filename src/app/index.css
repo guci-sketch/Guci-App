@@ -13,8 +13,8 @@
   --color-tertiary: #825100;
   --color-tertiary-light: #ffddb8;
   --color-accent: #d97706;
-  --color-surface-dim: #191c1e;
-  --color-surface-text: #eff1f3;
+  --color-surface-dim: #0f1115;
+  --color-surface-text: #f3f4f6;
 }
 
 /* Tipografi responsif yang seimbang: nyaman dibaca tanpa membuat antarmuka terlalu padat. (compact baseline: font-size: 13px pada tabel padat, 15px root) */
@@ -58,7 +58,7 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
 }
 
@@ -101,26 +101,36 @@ input[type="number"] {
 :root {
   color-scheme: light;
 
-  /* Surfaces — Warm Editorial Off-White Canvas */
-  --bg-primary: #faf9f7;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f5f3ef;
+  /* Surfaces — Clean Enterprise Light Slate Canvas */
+  --bg-primary: #f4f6f9;
+  --bg-secondary: #edf0f5;
+  --bg-tertiary: #e5e9f0;
   --bg-card: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-skeleton: #ece9e2;
+  --bg-skeleton: #e2e8f0;
 
   /* Content & Typography */
-  --text-primary: #2d2a26;
-  --text-secondary: #5a554f;
-  --text-muted: #78736d;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
   --text-inverse: #ffffff;
 
-  /* Brand Interaction — PT Guci Emas Pratama (Emerald Forest + Warm Gold) */
+  /* Brand & Jarivis Interactive Accents */
   --accent: #1a5c38;
   --accent-hover: #13462a;
-  --accent-glow: rgba(26, 92, 56, 0.09);
-  --accent-muted: rgba(26, 92, 56, 0.08);
-  --accent-text: #1a5c38;
+  --accent-glow: rgba(37, 99, 235, 0.10);
+  --accent-muted: rgba(37, 99, 235, 0.08);
+  --accent-text: #1d4ed8;
+
+  --accent-blue: #2563eb;
+  --accent-blue-hover: #1d4ed8;
+  --accent-blue-soft: rgba(37, 99, 235, 0.12);
+
+  /* Jarivis "PERLU PERHATIAN!" Alert Card Tokens */
+  --alert-surface-bg: #7f1d1d;
+  --alert-surface-border: #991b1b;
+  --alert-surface-text: #ffffff;
+  --alert-surface-muted: #fecaca;
 
   --brand-gold: #b45309;
   --brand-gold-soft: #fef3c7;
@@ -156,36 +166,36 @@ input[type="number"] {
   --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;
-  --info: #0284c7;
+  --info: #2563eb;
 
   /* Operational Chart Tokens */
-  --chart-total: #1a5c38;
-  --chart-total-fill: rgba(26, 92, 56, 0.14);
-  --chart-completed: #059669;
-  --chart-flagged: #dc2626;
-  --chart-working: #2563eb;
+  --chart-total: #2563eb;
+  --chart-total-fill: rgba(37, 99, 235, 0.12);
+  --chart-completed: #10b981;
+  --chart-flagged: #ef4444;
+  --chart-working: #3b82f6;
   --chart-ready: #64748b;
-  --chart-draft: #d97706;
-  --chart-reviewed: #0d9488;
-  --chart-grid: #e8e5e0;
+  --chart-draft: #f59e0b;
+  --chart-reviewed: #14b8a6;
+  --chart-grid: #e2e8f0;
   --tooltip-bg: #ffffff;
-  --tooltip-border: #dcd8d0;
+  --tooltip-border: #cbd5e1;
 
   /* Borders, Radius, Shadows */
-  --border: #e8e5e0;
-  --border-subtle: #e8e5e0;
-  --border-light: #f5f3ef;
-  --border-focus: rgba(26, 92, 56, 0.30);
+  --border: #dde2eb;
+  --border-subtle: #dde2eb;
+  --border-light: #edf0f5;
+  --border-focus: rgba(37, 99, 235, 0.35);
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 
-  --shadow-sm: 0 1px 3px rgba(45, 42, 38, 0.04);
-  --shadow-md: 0 4px 14px -2px rgba(45, 42, 38, 0.05);
-  --shadow-lg: 0 10px 28px -4px rgba(45, 42, 38, 0.07);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 10px 28px -4px rgba(15, 23, 42, 0.10);
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -193,28 +203,38 @@ input[type="number"] {
   line-height: 1.5;
 }
 
-/* Dark Theme — Warm Editorial Operations Dark Palette (WCAG 2.2 AA verified) */
+/* Dark Theme — Jarivis Matte Slate Enterprise Dark Palette (WCAG 2.2 AA verified) */
 html.dark,
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --bg-primary: #141311;
-  --bg-secondary: #1c1b18;
-  --bg-tertiary: #25231f;
-  --bg-card: #1c1b18;
-  --bg-elevated: #24221e;
-  --bg-skeleton: #2c2924;
+  --bg-primary: #0f1115;
+  --bg-secondary: #16191f;
+  --bg-tertiary: #222731;
+  --bg-card: #1c2026;
+  --bg-elevated: #232830;
+  --bg-skeleton: #262b35;
 
-  --text-primary: #f4f2ee;
-  --text-secondary: #c2bdb4;
-  --text-muted: #969086;
-  --text-inverse: #141311;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --text-inverse: #0f1115;
 
-  --accent: #2d8a56;
-  --accent-hover: #36a165;
-  --accent-glow: rgba(52, 211, 153, 0.14);
-  --accent-muted: rgba(52, 211, 153, 0.12);
-  --accent-text: #4ade80;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-glow: rgba(59, 130, 246, 0.16);
+  --accent-muted: rgba(59, 130, 246, 0.12);
+  --accent-text: #60a5fa;
+
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #2563eb;
+  --accent-blue-soft: rgba(59, 130, 246, 0.16);
+
+  /* Jarivis "PERLU PERHATIAN!" Deep Crimson Alert Card */
+  --alert-surface-bg: #4c1d24;
+  --alert-surface-border: #7f1d1d;
+  --alert-surface-text: #ffffff;
+  --alert-surface-muted: #fecaca;
 
   --brand-gold: #f59e0b;
   --brand-gold-soft: rgba(245, 158, 11, 0.16);
@@ -246,31 +266,31 @@ html.dark,
   --status-approved-bg: rgba(16, 185, 129, 0.18);
   --status-approved-text: #6ee7b7;
 
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --info: #38bdf8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
 
-  --chart-total: #34d399;
-  --chart-total-fill: rgba(52, 211, 153, 0.16);
+  --chart-total: #3b82f6;
+  --chart-total-fill: rgba(59, 130, 246, 0.15);
   --chart-completed: #10b981;
-  --chart-flagged: #f87171;
+  --chart-flagged: #ef4444;
   --chart-working: #60a5fa;
   --chart-ready: #94a3b8;
   --chart-draft: #fbbf24;
   --chart-reviewed: #2dd4bf;
-  --chart-grid: #2e2c27;
-  --tooltip-bg: #24221e;
-  --tooltip-border: #3a3731;
+  --chart-grid: #262b35;
+  --tooltip-bg: #1c2026;
+  --tooltip-border: #2e3440;
 
-  --border: #2f2d28;
-  --border-subtle: #2f2d28;
-  --border-light: #25231f;
-  --border-focus: rgba(74, 222, 128, 0.42);
+  --border: #282d37;
+  --border-subtle: #282d37;
+  --border-light: #222731;
+  --border-focus: rgba(59, 130, 246, 0.45);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
-  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.40);
-  --shadow-lg: 0 10px 28px -4px rgba(0, 0, 0, 0.50);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 28px -4px rgba(0, 0, 0, 0.55);
 }
 
 @layer utilities {
@@ -312,7 +332,7 @@ html.dark,
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .clean-input:focus {
-    border-color: var(--accent);
+    border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px var(--accent-glow);
   }
 
@@ -337,7 +357,7 @@ html.dark .bg-white {
 }
 html.dark .bg-slate-50,
 html.dark .bg-zinc-50 {
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-secondary);
 }
 html.dark .text-slate-900,
 html.dark .text-slate-800,
