@@ -27,19 +27,24 @@ export function CompanyPicker() {
 
   return (
     <div className="mt-2">
-      <label className="block text-[9.5px] font-bold uppercase tracking-wider text-[#8a8580] mb-1">
+      <label
+        htmlFor="fw-company-picker"
+        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1"
+      >
         Tenant Perusahaan
       </label>
       <select
+        id="fw-company-picker"
+        aria-label="Pilih perusahaan aktif"
         value={activeCompanyId ?? ''}
         onChange={e => setActiveCompanyId(e.target.value || null)}
-        className="w-full px-2 py-1 text-[11px] font-semibold rounded-lg border border-[#e8e5e0] bg-[#faf9f7] text-[#2d2a26] focus:outline-none focus:border-[var(--accent)]"
+        className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
       >
         {companies.map(c => (
           <option key={c.id} value={c.id}>{c.company_name}</option>
         ))}
       </select>
-      {error && <p className="text-[10px] text-red-600 mt-1">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)] mt-1" role="alert">{error}</p>}
     </div>
   );
 }

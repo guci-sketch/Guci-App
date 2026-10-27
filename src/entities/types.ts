@@ -509,6 +509,35 @@ export interface AuditLogEntry {
   createdAt: string;
 }
 
+export interface DailyJobTrendPoint {
+  /** YYYY-MM-DD dalam zona waktu operasional (Asia/Jakarta). */
+  date: string;
+  total: number;
+  completed: number;
+  flagged: number;
+}
+
+export interface WorkStatusBreakdownItem {
+  status: WorkReportStatus;
+  count: number;
+}
+
+export interface PriorityVerificationReportItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  serviceType: ServiceType;
+  executorName: string;
+  status: WorkReportStatus;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  checkInValid: boolean | null;
+  checkInDistance: number | null;
+  durationSeconds: number | null;
+  createdAt: string;
+}
+
 export interface KPIStats {
   totalJobs: number;
   completedJobs: number;
@@ -517,7 +546,17 @@ export interface KPIStats {
   highRiskCount: number;
   avgDurationMinutes: number;
   avgRiskScore: number;
+  windowDays?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  generatedAt?: string;
+  priorityUniqueCount?: number;
+  dailyTrend?: DailyJobTrendPoint[];
+  statusBreakdown?: WorkStatusBreakdownItem[];
+  priorityReports?: PriorityVerificationReportItem[];
 }
+
+export type OperationalDashboardSummary = Required<KPIStats>;
 
 export interface ExecutorStats {
   id: string;
@@ -584,4 +623,5 @@ export interface UserLocation {
   latitude: number;
   longitude: number;
   trackedAt: string;
+  accuracy?: number;
 }

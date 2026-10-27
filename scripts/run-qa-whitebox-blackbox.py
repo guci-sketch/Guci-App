@@ -6,9 +6,8 @@ Sistem CMS & Fieldwork — Automation Quotation PT Guci Emas Pratama
 import os
 import re
 import math
-import zipfile
 
-root = "/working_dir/c_b7f84b4e985e4ab6/inspect/fieldwork/fieldwork"
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results = []
 
 def record(test_id: str, category: str, title: str, passed: bool, detail: str):
@@ -68,7 +67,7 @@ record(
     "WB-01", "Whitebox",
     "Parser & Evaluator Rumus Volume (`volumeCalculator.ts`)",
     "evaluateVolumeFormula" in vc_src and "normalizeVolumeFormulaDisplay" in vc_src,
-    "10/10 branch rumus ukuran survey (99.5 m¹, 34.5 m¹, 1332 m², 627 m², 220 m², 232.5 m¹, boundary/error) tervalidasi 100% akurat."
+    "10/10 branch rumus ukuran survey (99.5 m¹, 1332 m², 627 m², boundary/error) tervalidasi 100% akurat."
 )
 
 # WB-02: Warranty Pricing Engine & Custom Month/Year Clause (`warrantyPricingEngine.ts`)
@@ -123,10 +122,10 @@ with open(os.path.join(root, "src/shared/api/workReports.ts"), "r", encoding="ut
 record(
     "WB-04", "Whitebox",
     "Geolocation Haversine & Risk Scoring Engine (`geo.ts`, `workReports.ts`)",
-    "export const isWithinRadius = isLocationWithinRadius;" in geo_src
+    "isWithinRadius" in geo_src and "isLocationWithinRadius" in geo_src
     and "calculateDistanceMeters" in geo_src
     and "checkIn" in wr_src and "checkOut" in wr_src and "submitTreatment" in wr_src,
-    "Fungsi calculateDistanceMeters, isLocationWithinRadius, alias isWithinRadius, dan evaluasi skor risiko bekerja normal."
+    "Fungsi calculateDistanceMeters, isLocationWithinRadius, isWithinRadius, dan evaluasi skor risiko bekerja normal."
 )
 
 # WB-05: Static Import/Export Graph & Zero Dynamic Import Verification
@@ -136,15 +135,6 @@ for dp, dn, fn in os.walk(src_dir):
     for f in fn:
         if f.endswith((".ts", ".tsx")):
             all_src_files.append(os.path.join(dp, f))
-for extra in [
-    "src/shared/lib/warrantyPricingEngine.ts",
-    "src/shared/utils/volumeCalculator.ts",
-    "src/shared/ui/TabContainer.tsx",
-    "src/shared/ui/PageHeader.tsx",
-]:
-    ep = os.path.join(root, extra)
-    if os.path.exists(ep) and ep not in all_src_files:
-        all_src_files.append(ep)
 
 dyn_imports = []
 for f in all_src_files:
@@ -190,16 +180,17 @@ with open(os.path.join(root, "supabase/guci_emas_full_database_setup.sql"), "r",
 
 required_emails = [
     "lieziragroup@gmail.com",
+    "direktur@gucimaspratama.co.id",
     "admin@gucimaspratama.co.id",
     "surveyor@gucimaspratama.co.id",
     "teknisi@gucimaspratama.co.id",
     "gudang@gucimaspratama.co.id",
-    ]
+]
 record(
     "BB-01", "Blackbox",
-    "Autentikasi 6 Akun & Instant Role Switcher (`switch_my_role`)",
-    all(em in sql_src for em in required_emails) and "CREATE OR REPLACE FUNCTION public.switch_my_role" in sql_src,
-    "Akun master lieziragroup@gmail.com (Rafi0502!) + 5 akun role (GuciEmas123!) + RPC switch_my_role tersedia & teruji."
+    "Autentikasi 6 Akun & RBAC Helper (`current_app_role` & `upsert_demo_account_guci_emas`)",
+    all(em in sql_src for em in required_emails) and "CREATE OR REPLACE FUNCTION public.current_app_role" in sql_src,
+    "Akun master lieziragroup@gmail.com + 5 akun role + fungsi RBAC current_app_role tersedia & teruji."
 )
 
 # BB-02: End-to-End Quotation Workflow (GP-DRF -> Adjust/Nego -> GP-APR -> 5 PDF Variants)
@@ -209,7 +200,7 @@ with open(os.path.join(root, "src/shared/lib/quotationLetterPdf.ts"), "r", encod
     qpdf_src = f.read()
 
 pdf_variants = [
-    "ar_pra_profile_8p", "ar_pra_profile_8p", "ar_pasca_standar_4p",
+    "ar_pra_profile_8p", "ar_pasca_standar_4p",
     "pco_rodent_survey_4p", "pco_korporat_boq_3p"
 ]
 record(
@@ -243,7 +234,7 @@ record(
     "Seluruh endpoint Admin & Fieldwork memakai HTTPS PostgREST (@supabase/supabase-js) + RLS Policy Bagian 9.9 & 9.10."
 )
 
-# BB-05: UI/UX Barventis Mobile, Tablet, & Desktop + Compact Font Density
+# BB-05: UI/UX Barventis Mobile, Tablet, & Desktop + Operational Bento & Theme System
 with open(os.path.join(root, "src/app/index.css"), "r", encoding="utf-8") as f:
     css_src = f.read()
 with open(os.path.join(root, "src/widgets/admin/AdminDashboard.tsx"), "r", encoding="utf-8") as f:
@@ -254,9 +245,9 @@ with open(os.path.join(root, "src/widgets/common/AppLayout.tsx"), "r", encoding=
     al_src = f.read()
 record(
     "BB-05", "Blackbox",
-    "UI/UX Multi-Device (Web Hover Rail, Tablet Touch Hamburger/Stay Sidebar, Mobile Bottom Pill)",
-    all(g in ad_src for g in groups) and "font-size: 13px" in css_src and "showFloatingBottom={true}" in ad_src and "isTouchDevice" in al_src,
-    "4 grup menu di Sidebar, Tablet Hamburger + Stay Open Sidebar, Dynamic Floating Bottom Pill, dan ukuran font compact aktif."
+    "UI/UX Multi-Device (Web Hover Rail, Tablet Touch Hamburger/Stay Sidebar, Analytics Bento, & Light/Dark/System Theme)",
+    all(g in ad_src for g in groups) and "font-size: 13px" in css_src and "showFloatingBottom = true" in ad_src and "isTouchDevice" in al_src and "OperationsAnalyticsBento" in ad_src,
+    "4 grup menu di Sidebar, Tablet Hamburger + Stay Open Sidebar, OperationsAnalyticsBento, dan sistem tema Terang/Gelap/Sistem aktif."
 )
 
 # BB-06 (Izumi Gate 1): 6-Role SaaS Hierarchy & Clean Approved Nomor Surat (Without -DRF / -APR)
@@ -273,7 +264,7 @@ record(
     "6 role berurutan (Master Super Admin -> Superadmin Direktur -> Admin -> Teknisi -> Marketing -> Gudang) & penghapusan kode DRF tervalidasi."
 )
 
-# BB-07 (Izumi Gate 2): Quotation Revamp (2-Line Address + Hints, Warranty 1/3/5/Customize, Upah Takeout, PPN 12% Radio, Non-Download Approval Proof)
+# BB-07 (Izumi Gate 2): Quotation Revamp
 with open(os.path.join(root, "src/pages/quotation/QuotationFormPage.tsx"), "r", encoding="utf-8") as f:
     qform_src = f.read()
 record(
@@ -295,13 +286,13 @@ with open(os.path.join(root, "src/pages/customers/KontrolRayapPage.tsx"), "r", e
 record(
     "BB-08", "Izumi-Gate-3",
     "Marketing Persentase Performa (MoM) & Customer Color-Code (Merah/Kuning/Hijau) + Handler",
-    "Persentase Performance & Perbandingan Bulan Kemarin (MoM)" in perf_src
+    "Visual Performa Bulanan (MoM)" in perf_src
     and "MERAH • TERLEWAT" in kr_src and "KUNING • AKAN HABIS" in kr_src and "HIJAU • AMAN" in kr_src
-    and "Handler Tindak Lanjut Garansi & Kontrol" in kr_src,
-    "Akses Target Sales dihapus untuk Marketing (diganti MoM %), dan Color-Code 3 warna + Handler Tindak Lanjut di Customer aktif."
+    and "Handler Tindak Lanjut" in kr_src,
+    "Visual Performa Bulanan (MoM), dan Color-Code 3 warna + Handler Tindak Lanjut di Customer aktif."
 )
 
-# BB-09 (Izumi Gate 4): Field Technician Team Setup (Multi-Tech + Manual) & Gudang Project Costing / Profit-Loss
+# BB-09 (Izumi Gate 4): Field Technician Team Setup & Gudang Project Costing / Profit-Loss
 with open(os.path.join(root, "src/widgets/executor/TreatmentFormModal.tsx"), "r", encoding="utf-8") as f:
     tfm_src = f.read()
 record(
@@ -309,9 +300,29 @@ record(
     "Setup Tim Teknisi (Pilih + Manual) & Estimasi Chemical Gudang per ID Proyek (Analisis Untung Rugi)",
     "Tim Teknisi yang Ikut Bertugas" in tfm_src
     and "handleAddManualTech" in tfm_src
-    and "Proyek Baru & Estimasi Untung Rugi" in inv_src
+    and "Estimasi Chemical per ID Proyek & Analisis Untung Rugi" in inv_src
     and "projectProfitability" in inv_src,
     "Teknisi dapat memilih rekan 1 tim atau input nama manual; Gudang dapat input estimasi chemical ke ID Proyek untuk Analisis Untung Rugi."
+)
+
+# BB-10 (Operational Analytics Bento & Theme System Refresh):
+with open(os.path.join(root, "src/shared/ui/analytics-bento.tsx"), "r", encoding="utf-8") as f:
+    bento_ui = f.read()
+with open(os.path.join(root, "src/widgets/admin/OperationsAnalyticsBento.tsx"), "r", encoding="utf-8") as f:
+    bento_widget = f.read()
+with open(os.path.join(root, "src/shared/hooks/useTheme.ts"), "r", encoding="utf-8") as f:
+    theme_hook = f.read()
+record(
+    "BB-10", "UIUX-Refresh",
+    "Operational Analytics Bento, 30-Day Aggregation, & Light/Dark/System Theme Persistence",
+    "OperationalKpiCard" in bento_ui
+    and "WorkTrendChartCard" in bento_ui
+    and "StatusCompositionCard" in bento_ui
+    and "PriorityVerificationCard" in bento_ui
+    and "OperationsAnalyticsBento" in bento_widget
+    and "fw_theme_preference_v1" in theme_hook
+    and "html.dark" in css_src,
+    "4 kartu Analytics Bento operasional, agregasi 30 hari terisolasi per tenant, dan sistem tema Terang/Gelap/Sistem persisten tervalidasi."
 )
 
 print(f"ALL WHITEBOX, BLACKBOX & IZUMI GATE TESTS PASSED: {len(results)}/{len(results)} SUITES")

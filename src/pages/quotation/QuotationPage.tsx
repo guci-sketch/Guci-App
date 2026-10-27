@@ -3,11 +3,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { SignatureModal } from '@/widgets/common/SignatureModal';
 import { useCompanyTemplate } from '@/shared/hooks/useCompanyTemplate';
 import {
-    FileText, Plus, Search, RefreshCw,
-    CheckCircle2, XCircle, Clock, FileX2,
-    Eye, Download, Filter,
-    PenLine, MessageSquare, AlertCircle, Trash2, Send, MessageCircle, Pencil,
-    SlidersHorizontal, Hash, TrendingUp, Sparkles,
+    Plus, Search, RefreshCw,
+    CheckCircle2, XCircle,
 } from "lucide-react";
 import { useAuthStore } from '@/app/store/authStore';
 import {
@@ -29,14 +26,14 @@ import { StatusPHPage } from '../status-ph/StatusPHPage';
 import { NomorSuratLogPage } from '../nomor-surat/NomorSuratLogPage';
 import type { Quotation, QuotationStatus, KategoriSurat, TipeKontrak } from '@/entities/types';
 
-const STATUS_CFG: Record<QuotationStatus, { label: string; icon: React.ReactNode; bg: string; text: string; dot: string }> = {
-    draft:          { label: "Draft (GP-DRF)",        icon: <FileX2 size={12} />,       bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
-    pending:        { label: "Menunggu Verifikasi",   icon: <Clock size={12} />,        bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
-    approved:       { label: "Approved (Resmi)",      icon: <CheckCircle2 size={12} />, bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
-    rejected:       { label: "Perlu Revisi",          icon: <XCircle size={12} />,      bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
-    sent_to_client: { label: "Dikirim ke Klien",      icon: <Send size={12} />,         bg: "#dbeafe", text: "#1e40af", dot: "#3b82f6" },
-    deal:           { label: "Deal Kontrak ✓",        icon: <CheckCircle2 size={12} />, bg: "#d1fae5", text: "#065f46", dot: "#059669" },
-    cancelled:      { label: "Batal",                 icon: <XCircle size={12} />,      bg: "#f3f4f6", text: "#6b7280", dot: "#9ca3af" },
+const STATUS_CFG: Record<QuotationStatus, { label: string; bg: string; text: string; dot: string }> = {
+    draft:          { label: "Draft (GP-DRF)",        bg: "var(--status-draft-bg)",     text: "var(--status-draft-text)",     dot: "#f59e0b" },
+    pending:        { label: "Menunggu Verifikasi",   bg: "var(--status-draft-bg)",     text: "var(--status-draft-text)",     dot: "#f59e0b" },
+    approved:       { label: "Approved (Resmi)",      bg: "var(--status-completed-bg)", text: "var(--status-completed-text)", dot: "#16a34a" },
+    rejected:       { label: "Perlu Revisi",          bg: "var(--status-flagged-bg)",   text: "var(--status-flagged-text)",   dot: "#ef4444" },
+    sent_to_client: { label: "Dikirim ke Klien",      bg: "var(--status-working-bg)",   text: "var(--status-working-text)",   dot: "#3b82f6" },
+    deal:           { label: "Deal Kontrak",          bg: "var(--status-completed-bg)", text: "var(--status-completed-text)", dot: "#059669" },
+    cancelled:      { label: "Batal",                 bg: "var(--status-ready-bg)",     text: "var(--status-ready-text)",     dot: "#9ca3af" },
 };
 
 function StatusBadge({ status }: { status: QuotationStatus }) {
@@ -53,9 +50,9 @@ function StatusBadge({ status }: { status: QuotationStatus }) {
 function KategoriBadge({ kategori }: { kategori: KategoriSurat }) {
     const isAR = kategori === "AR";
     return (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold
-            ${isAR ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800"}`}>
-            {isAR ? "🛡 AR" : "🦟 PCO"}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold
+            ${isAR ? "bg-[var(--status-working-bg)] text-[var(--status-working-text)]" : "bg-[var(--status-completed-bg)] text-[var(--status-completed-text)]"}`}>
+            {isAR ? "AR" : "PCO"}
         </span>
     );
 }
@@ -92,7 +89,6 @@ export function QuotationPage() {
     const isDirector = user?.role === "SUPERADMIN";
     const canSeeAll = user?.role !== "MARKETING";
     const canApprove = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
-    // Direktur (SUPERADMIN) fokus memantau dan melakukan Approval/Adjust penawaran, bukan menginput draf survei baru
     const canCreate = user?.role === "ADMIN" || user?.role === "MARKETING";
     const canDelete = user?.role === "ADMIN";
 
@@ -112,7 +108,6 @@ export function QuotationPage() {
 
     useEffect(() => { load(); }, [user]);
 
-    // Preview / Download PDF (mendukung on-the-fly render bila masih berstatus GP-DRF)
     const handleOpenOrRenderPdf = async (q: Quotation, download = false) => {
         setActionLoading(q.id);
         try {
@@ -196,6 +191,7 @@ export function QuotationPage() {
     };
 
     // Approve: Hilangkan kode -DRF -> Nomor Resmi GP/... + Simpan Bukti Approval Non-Download + Auto-Sync Proyek
+    // adjustmentHistory tetap dipertahankan untuk audit
     const handleApprove = async () => {
         if (!approveTarget || !user) return;
         setActionLoading(approveTarget.id);
@@ -308,7 +304,6 @@ export function QuotationPage() {
         statsDeal: quotations.filter(q => q.status === "deal").length,
     }), [quotations]);
 
-    // Label navigasi mengikuti konteks pengguna; izin aksi tetap dikontrol melalui canCreate/canApprove/canDelete.
     const listTabLabel = isDirector
         ? { label: "Pantau & Approval", shortLabel: "Approval" }
         : user?.role === "MARKETING"
@@ -316,13 +311,12 @@ export function QuotationPage() {
             : { label: "Daftar Penawaran", shortLabel: "Daftar" };
 
     const hubTabs = [
-        { id: "list", label: listTabLabel.label, shortLabel: listTabLabel.shortLabel, icon: <FileText size={15} />, badge: statsDraftPending, badgeTone: "warning" as const },
-        ...(canCreate ? [{ id: "new", label: "+ Buat Penawaran Baru", shortLabel: "Buat Baru", icon: <Plus size={15} /> }] : []),
-        { id: "pipeline", label: user?.role === "MARKETING" ? "Status Deal Saya" : "Status Deal & Kontrak", shortLabel: user?.role === "MARKETING" ? "Deal Saya" : "Status Deal", icon: <TrendingUp size={15} />, badge: statsApproved, badgeTone: "success" as const },
-        { id: "nomor-log", label: "Buku Nomor Surat", shortLabel: "Nomor Surat", icon: <Hash size={15} /> },
+        { id: "list", label: listTabLabel.label, shortLabel: listTabLabel.shortLabel, badge: statsDraftPending, badgeTone: "warning" as const },
+        ...(canCreate ? [{ id: "new", label: "Buat Penawaran Baru", shortLabel: "Buat Baru" }] : []),
+        { id: "pipeline", label: user?.role === "MARKETING" ? "Status Deal Saya" : "Status Deal & Kontrak", shortLabel: user?.role === "MARKETING" ? "Deal Saya" : "Status Deal", badge: statsApproved, badgeTone: "success" as const },
+        { id: "nomor-log", label: "Buku Nomor Surat", shortLabel: "Nomor Surat" },
     ];
 
-    // Memoize filtered rows; debounce avoids recalculating the full list per keystroke.
     const displayed = useMemo(() => {
         let rows = quotations;
         const s = debouncedSearch.trim().toLowerCase();
@@ -409,24 +403,23 @@ export function QuotationPage() {
             <TabContainer tabs={hubTabs} activeTab={subTab} onChange={id => setSubTab(id as HubSubTab)} showFloatingBottom={false} />
 
             <PageHeader
-                title={isDirector ? "Approval & Pemantauan Penawaran Harga (Direktur)" : "Surat Penawaran Harga — PT Guci Emas Pratama"}
+                title={isDirector ? "Approval & Pemantauan Penawaran Harga" : "Surat Penawaran Harga — PT Guci Emas Pratama"}
                 subtitle={isDirector
-                    ? "Pantau seluruh draf penawaran yang diajukan tim, tinjau penyesuaian harga/garansi, dan berikan tanda tangan bukti Approval."
+                    ? "Tinjau draf penawaran yang diajukan tim, sesuaikan harga atau garansi, dan berikan persetujuan."
                     : "Buat draf penawaran dari hasil survei lapangan, sesuaikan harga atau garansi saat negosiasi, lalu setujui untuk cetak PDF resmi."}
-                icon={<FileText size={20} />}
                 actions={
                     <>
                         <button
                             onClick={load}
-                            className="p-2 rounded-xl border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                            title="Segarkan Data"
+                            className="p-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+                            title="Muat Ulang Data"
                         >
                             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
                         </button>
                         {canCreate && (
                             <button
                                 onClick={() => setSubTab("new")}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold shadow-xs btn-tactile"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold shadow-xs btn-tactile cursor-pointer"
                             >
                                 <Plus size={15} /> Buat Penawaran Baru
                             </button>
@@ -435,83 +428,82 @@ export function QuotationPage() {
                 }
             />
 
-            {/* Interactive 4-Step Workflow & KPI Cards (Klik untuk Filter Langsung) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {/* Interactive 4-Step Workflow & KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <button
                     type="button"
                     onClick={() => { setFilterStatus("all"); setPage(1); }}
-                    className={`clean-card p-3.5 text-left transition-all cursor-pointer ${filterStatus === "all" ? "ring-2 ring-[var(--accent)]" : "hover:border-slate-300"}`}
+                    className={`clean-card p-4 text-left transition-all cursor-pointer ${filterStatus === "all" ? "ring-2 ring-[var(--accent)]" : ""}`}
                 >
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">Semua Penawaran</span>
-                    <div className="text-xl font-bold font-mono text-[var(--text-primary)] mt-0.5 tabular-nums">{statsTotal}</div>
-                    <span className="text-[10.5px] text-[var(--text-secondary)]">Klik tampilkan semua &rarr;</span>
+                    <span className="text-xs font-semibold text-[var(--text-secondary)] block">Semua Penawaran</span>
+                    <div className="text-2xl font-bold font-mono text-[var(--text-primary)] mt-1 tabular-nums">{statsTotal}</div>
+                    <span className="text-xs text-[var(--text-muted)]">Tampilkan semua</span>
                 </button>
                 <button
                     type="button"
                     onClick={() => { setFilterStatus("pending"); setPage(1); }}
-                    className={`clean-card p-3.5 text-left border-amber-200 bg-amber-50/35 transition-all cursor-pointer ${filterStatus === "pending" ? "ring-2 ring-amber-600" : "hover:border-amber-300"}`}
+                    className={`clean-card p-4 text-left transition-all cursor-pointer ${filterStatus === "pending" ? "ring-2 ring-amber-600" : ""}`}
                 >
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-amber-800 block">1. Tahap Draft (GP-DRF)</span>
-                    <div className="text-xl font-bold font-mono text-amber-800 mt-0.5 tabular-nums">{statsDraftPending}</div>
-                    <span className="text-[10.5px] text-amber-700">Klik untuk Nego / Approve &rarr;</span>
+                    <span className="text-xs font-semibold text-[var(--status-draft-text)] block">Tahap Draft (GP-DRF)</span>
+                    <div className="text-2xl font-bold font-mono text-[var(--status-draft-text)] mt-1 tabular-nums">{statsDraftPending}</div>
+                    <span className="text-xs text-[var(--text-muted)]">Menunggu Nego / Approve</span>
                 </button>
                 <button
                     type="button"
                     onClick={() => { setFilterStatus("approved"); setPage(1); }}
-                    className={`clean-card p-3.5 text-left border-emerald-200 bg-emerald-50/35 transition-all cursor-pointer ${filterStatus === "approved" ? "ring-2 ring-emerald-600" : "hover:border-emerald-300"}`}
+                    className={`clean-card p-4 text-left transition-all cursor-pointer ${filterStatus === "approved" ? "ring-2 ring-emerald-600" : ""}`}
                 >
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-emerald-800 block">2. Approved (Resmi Tanpa DRF)</span>
-                    <div className="text-xl font-bold font-mono text-emerald-800 mt-0.5 tabular-nums">{statsApproved}</div>
-                    <span className="text-[10.5px] text-emerald-700">Klik untuk PDF &amp; Kirim WA &rarr;</span>
+                    <span className="text-xs font-semibold text-[var(--status-completed-text)] block">Sudah Disetujui (Resmi)</span>
+                    <div className="text-2xl font-bold font-mono text-[var(--status-completed-text)] mt-1 tabular-nums">{statsApproved}</div>
+                    <span className="text-xs text-[var(--text-muted)]">Siap PDF &amp; Kirim WA</span>
                 </button>
                 <button
                     type="button"
                     onClick={() => setSubTab("pipeline")}
-                    className="clean-card p-3.5 text-left hover:border-emerald-300 transition-all cursor-pointer"
+                    className="clean-card p-4 text-left transition-all cursor-pointer"
                 >
-                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--accent)] block">3. Deal &amp; Pipeline SPK</span>
-                    <div className="text-xl font-bold font-mono text-[var(--accent)] mt-0.5 tabular-nums">{statsDeal}</div>
-                    <span className="text-[10.5px] text-[var(--text-secondary)]">Buka Pipeline Deal &rarr;</span>
+                    <span className="text-xs font-semibold text-[var(--accent-text)] block">Deal &amp; Pipeline SPK</span>
+                    <div className="text-2xl font-bold font-mono text-[var(--accent-text)] mt-1 tabular-nums">{statsDeal}</div>
+                    <span className="text-xs text-[var(--text-muted)]">Buka Pipeline Deal</span>
                 </button>
             </div>
 
             {/* Filter & Search Bar */}
-            <div className="clean-card p-3.5 space-y-3">
-                <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between">
+            <div className="clean-card p-4 space-y-3">
+                <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
                     <div className="relative flex-1">
-                        <Search size={15} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
+                        <Search size={15} className="absolute left-3.5 top-3 text-[var(--text-muted)]" />
                         <input
                             value={search}
                             onChange={e => { setSearch(e.target.value); setPage(1); }}
-                            placeholder="Cari nomor GP-DRF / GP-APR, nama klien, objek survey, atau surveyor..."
-                            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-tertiary)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                            placeholder="Cari nomor surat, nama klien, objek survey, atau surveyor..."
+                            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] focus:bg-[var(--bg-card)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                         />
                     </div>
                     <div className="flex flex-wrap gap-1.5 items-center">
-                        <Filter size={13} className="text-[var(--text-muted)] mr-1" />
                         {(["all", "AR", "PCO"] as const).map(v => (
                             <button
                                 key={v}
                                 onClick={() => { setFilterKat(v); setPage(1); }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                                     filterKat === v
                                         ? "bg-[var(--accent)] text-white"
-                                        : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-slate-200"
+                                        : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 }`}
                             >
-                                {v === "all" ? "Semua Kategori" : v === "AR" ? "🛡 Anti Rayap (AR)" : "🦟 Pest Control (PCO)"}
+                                {v === "all" ? "Semua Kategori" : v === "AR" ? "Anti Rayap (AR)" : "Pest Control (PCO)"}
                             </button>
                         ))}
                         <select
                             value={filterStatus}
                             onChange={e => { setFilterStatus(e.target.value as typeof filterStatus); setPage(1); }}
-                            className="px-3 py-1.5 text-xs font-semibold border border-[var(--border-subtle)] rounded-lg bg-white text-[var(--text-primary)]"
+                            className="px-3 py-2 text-xs font-semibold border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-card)] text-[var(--text-primary)]"
                         >
                             <option value="all">Semua Status</option>
                             <option value="pending">Draft / Menunggu (GP-DRF)</option>
                             <option value="approved">Disetujui (Resmi)</option>
                             <option value="sent_to_client">Dikirim ke Klien</option>
-                            <option value="deal">Deal ✓</option>
+                            <option value="deal">Deal Kontrak</option>
                             <option value="rejected">Perlu Revisi</option>
                         </select>
                     </div>
@@ -522,16 +514,15 @@ export function QuotationPage() {
             <div className="clean-card overflow-hidden">
                 {loading ? (
                     <div className="py-16 text-center text-sm text-[var(--text-muted)] flex items-center justify-center gap-2">
-                        <RefreshCw size={18} className="animate-spin text-[var(--accent)]" /> Memuat daftar penawaran...
+                        <RefreshCw size={18} className="animate-spin text-[var(--accent-text)]" /> Memuat daftar penawaran...
                     </div>
                 ) : paged.length === 0 ? (
                     <div className="py-16 text-center text-[var(--text-muted)] space-y-2">
-                        <FileText size={36} className="mx-auto opacity-30" />
-                        <p className="font-semibold text-[var(--text-secondary)]">Belum ada dokumen penawaran yang sesuai filter</p>
+                        <p className="font-semibold text-sm text-[var(--text-secondary)]">Belum ada dokumen penawaran yang sesuai filter</p>
                         {canCreate && (
                             <button
                                 onClick={() => setSubTab("new")}
-                                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold"
+                                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold cursor-pointer"
                             >
                                 <Plus size={14} /> Buat Draft Survey Pertama (GP-DRF)
                             </button>
@@ -564,8 +555,8 @@ export function QuotationPage() {
                                     const isActing = actionLoading === q.id;
 
                                     return (
-                                        <tr key={q.id} className={`row-fade-in hover:bg-[var(--bg-tertiary)]/60 transition-colors ${isPending ? "bg-amber-50/20" : ""}`}>
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                        <tr key={q.id} className={`row-fade-in hover:bg-[var(--bg-tertiary)]/60 transition-colors ${isPending ? "bg-[var(--status-draft-bg)]/20" : ""}`}>
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
                                                 <code className={`px-2 py-1 rounded-md font-mono font-bold text-xs block w-max ${
                                                     isAprStage
                                                         ? "bg-[var(--status-approved-bg)] text-[var(--status-approved-text)]"
@@ -574,132 +565,125 @@ export function QuotationPage() {
                                                     {q.noSurat}
                                                 </code>
                                                 {q.draftNoSurat && q.draftNoSurat !== q.noSurat && (
-                                                    <span className="text-[10px] font-mono text-[var(--text-muted)] block mt-0.5">
+                                                    <span className="text-xs font-mono text-[var(--text-muted)] block mt-0.5">
                                                         Ex-Draft: {q.draftNoSurat}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3.5">
                                                 <div className="flex items-center gap-1.5">
                                                     <KategoriBadge kategori={q.kategori} />
-                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+                                                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                                                         {q.tipeKontrak}
                                                     </span>
                                                 </div>
-                                                <span className="text-[11px] text-[var(--text-secondary)] block mt-1">
+                                                <span className="text-xs text-[var(--text-secondary)] block mt-1">
                                                     {LAYANAN_CONFIG[q.jenisLayanan]?.label.split("—")[1]?.trim() ?? q.jenisLayanan}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 max-w-[220px]">
-                                                <div className="font-bold text-[var(--text-primary)] truncate">{q.kepadaNama}</div>
+                                            <td className="px-4 py-3.5 max-w-[240px]">
+                                                <div className="font-bold text-sm text-[var(--text-primary)] truncate">{q.kepadaNama}</div>
                                                 {q.objekPekerjaan && (
-                                                    <div className="text-[11px] text-[var(--accent)] font-medium truncate">
+                                                    <div className="text-xs text-[var(--accent-text)] font-medium truncate mt-0.5">
                                                         Objek: {q.objekPekerjaan}
                                                     </div>
                                                 )}
                                                 {q.kepadaAlamatLines?.[0] && (
-                                                    <div className="text-[11px] text-[var(--text-muted)] truncate">{q.kepadaAlamatLines[0]}</div>
+                                                    <div className="text-xs text-[var(--text-muted)] truncate mt-0.5">{q.kepadaAlamatLines[0]}</div>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--status-draft-bg)] text-[var(--status-draft-text)] border border-[var(--status-draft-border)]">
                                                     {gText}
                                                 </span>
                                                 {(q.adjustmentHistory?.length ?? 0) > 0 && (
-                                                    <span className="block text-[10px] text-amber-700 font-semibold mt-0.5">
-                                                        ↺ {q.adjustmentHistory!.length}x Adjust Nego
+                                                    <span className="block text-xs text-[var(--status-draft-text)] font-medium mt-1">
+                                                        {q.adjustmentHistory!.length}x penyesuaian
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono font-bold text-sm text-[var(--text-primary)] whitespace-nowrap tabular-nums">
+                                            <td className="px-4 py-3.5 text-right font-mono font-bold text-sm text-[var(--text-primary)] whitespace-nowrap tabular-nums">
                                                 {formatRupiah(q.total)}
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
                                                 <span className="font-semibold text-[var(--text-primary)] block">{q.surveyor || q.marketingNama}</span>
-                                                <span className="text-[10px] text-[var(--text-muted)]">{formatDate(q.tanggal)}</span>
+                                                <span className="text-xs text-[var(--text-muted)]">{formatDate(q.tanggal)}</span>
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
                                                 <StatusBadge status={q.status} />
                                             </td>
-                                            <td className="px-4 py-3 text-right whitespace-nowrap">
-                                                <div className="inline-flex items-center gap-1 justify-end">
-                                                    {/* Lihat / Pratinjau PDF (bisa untuk GP-DRF maupun GP-APR) */}
+                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                <div className="inline-flex items-center gap-1.5 justify-end">
                                                     <button
                                                         onClick={() => handleOpenOrRenderPdf(q, false)}
                                                         disabled={isActing}
-                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--accent)] text-[11px] font-semibold cursor-pointer"
+                                                        className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold cursor-pointer"
                                                         title="Lihat / Pratinjau PDF Surat Penawaran"
                                                     >
-                                                        <Eye size={13} /> Lihat PDF
+                                                        Lihat PDF
                                                     </button>
 
-                                                    {/* Adjust Garansi / Harga / Edit Draft */}
                                                     <button
                                                         onClick={() => { setEditingQuotationId(q.id); setSubTab("edit"); }}
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11px] font-bold"
-                                                        title="Adjust Garansi (Bulan/Tahun), Volume, atau Harga"
+                                                        className="px-2.5 py-1.5 rounded-lg bg-[var(--status-draft-bg)] hover:opacity-90 text-[var(--status-draft-text)] border border-[var(--status-draft-border)] text-xs font-semibold cursor-pointer"
+                                                        title="Ubah Garansi, Volume, atau Harga"
                                                     >
-                                                        <SlidersHorizontal size={12} /> Ubah Harga / Garansi
+                                                        Ubah
                                                     </button>
 
-                                                    {/* Tombol Approve Admin (Konversi GP-DRF -> GP-APR) */}
                                                     {canApprove && isPending && (
                                                         <>
                                                             <button
                                                                 onClick={() => setApproveTarget(q)}
                                                                 disabled={isActing}
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold"
-                                                                title="Approve & Terbitkan Nomor GP-APR"
+                                                                className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold cursor-pointer"
+                                                                title="Approve & Terbitkan Nomor Resmi"
                                                             >
-                                                                <CheckCircle2 size={12} /> Setujui
+                                                                Setujui
                                                             </button>
                                                             <button
                                                                 onClick={() => setRejectTarget(q)}
                                                                 disabled={isActing}
-                                                                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
+                                                                className="px-2.5 py-1.5 rounded-lg border border-[var(--status-flagged-border)] text-[var(--status-flagged-text)] hover:bg-[var(--status-flagged-bg)] text-xs font-semibold cursor-pointer"
                                                                 title="Minta Revisi ke Surveyor"
                                                             >
-                                                                <XCircle size={15} />
+                                                                Revisi
                                                             </button>
                                                         </>
                                                     )}
 
-                                                    {/* Unduh PDF Resmi (setelah Approved GP-APR) */}
                                                     {isApproved && (
                                                         <button
                                                             onClick={() => handleOpenOrRenderPdf(q, true)}
-                                                            className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50"
-                                                            title="Download PDF Resmi (GP-APR)"
+                                                            className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-semibold cursor-pointer"
+                                                            title="Unduh PDF Resmi"
                                                         >
-                                                            <Download size={15} />
+                                                            Unduh
                                                         </button>
                                                     )}
 
-                                                    {/* Bukti TTD Approval Internal (Non-Download) */}
                                                     {isApproved && (
                                                         <button
                                                             onClick={() => setViewProofTarget(q)}
-                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold"
+                                                            className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold cursor-pointer"
                                                             title="Lihat Bukti TTD Approval (Non-Download)"
                                                         >
-                                                            <PenLine size={12} /> Bukti Approve
+                                                            Bukti Approve
                                                         </button>
                                                     )}
 
-                                                    {/* Kirim WA ke Klien */}
                                                     {q.kepadaWa && isApproved && (
                                                         <a
                                                             href={`https://wa.me/${q.kepadaWa.replace(/^0/, "62").replace(/\D/g, "")}?text=${encodeURIComponent(`Halo Bapak/Ibu ${q.kepadaUp || q.kepadaNama},\n\nBerikut kami sampaikan Surat Penawaran Resmi PT Guci Emas Pratama:\nNo. Surat: ${q.noSurat}\nLayanan: ${LAYANAN_CONFIG[q.jenisLayanan]?.label}\nGaransi: ${gText}\nTotal Biaya: Rp ${q.total.toLocaleString("id-ID")}\n\nTerima kasih atas kepercayaan Anda.`)}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50"
+                                                            className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold"
                                                             title={`Kirim via WhatsApp ke ${q.kepadaWa}`}
                                                         >
-                                                            <MessageCircle size={15} />
+                                                            Kirim WA
                                                         </a>
                                                     )}
 
-                                                    {/* Hapus (Admin) */}
                                                     {canDelete && (
                                                         <button
                                                             onClick={async () => {
@@ -707,10 +691,10 @@ export function QuotationPage() {
                                                                 await deleteQuotation(q.id);
                                                                 await load();
                                                             }}
-                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                            className="px-2.5 py-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--status-flagged-text)] hover:bg-[var(--status-flagged-bg)] text-xs font-semibold cursor-pointer"
                                                             title="Hapus Penawaran"
                                                         >
-                                                            <Trash2 size={14} />
+                                                            Hapus
                                                         </button>
                                                     )}
                                                 </div>
@@ -762,7 +746,6 @@ export function QuotationPage() {
                             </p>
                         </div>
 
-                        {/* Kotak Bukti TTD Approval Non-Download */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <label className="text-xs font-bold text-[var(--text-primary)]">
@@ -842,7 +825,7 @@ export function QuotationPage() {
                                 Tutup
                             </button>
                         </div>
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                        <div className="p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs space-y-1">
                             <div>No. Surat Resmi: <strong className="font-mono">{viewProofTarget.noSurat}</strong></div>
                             {viewProofTarget.draftNoSurat && (
                                 <div>Asal Draft: <span className="font-mono text-amber-800">{viewProofTarget.draftNoSurat}</span></div>

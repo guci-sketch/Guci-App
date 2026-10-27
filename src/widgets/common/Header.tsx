@@ -1,12 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppUser } from '@/entities/types';
 import {
-  Menu, X, BookOpen, RefreshCw, KeyRound, LogOut,
-  CheckCircle2, FileText, ShieldCheck, Wrench, Search, ChevronRight, Command,
-  User, ChevronDown,
+  Menu,
+  X,
+  BookOpen,
+  RefreshCw,
+  KeyRound,
+  LogOut,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { RoleGuidebookModal } from './RoleGuidebookModal';
+import { useTheme } from '@/shared/hooks/useTheme';
+
 export interface QuickJumpModuleItem {
   id: string;
   label: string;
@@ -34,17 +45,17 @@ interface HeaderProps {
 }
 
 const ROLE_BADGE_LABELS: Record<string, string> = {
-  SUPERADMIN: 'DIREKTUR',
-  ADMIN: 'ADMIN',
-  TEKNISI_LAPANGAN: 'TEKNISI',
-  MARKETING: 'MARKETING',
-  INVENTORY: 'GUDANG',
+  SUPERADMIN: 'Direktur',
+  ADMIN: 'Admin',
+  TEKNISI_LAPANGAN: 'Teknisi',
+  MARKETING: 'Marketing',
+  INVENTORY: 'Gudang',
 };
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onLogout,
-  pageTitle = 'Automation Quotation & Fieldwork',
+  pageTitle = 'Dashboard Operasional',
   pageGroup,
   pageSubtitle,
   pendingCount = 0,
@@ -65,6 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
 
+  const { theme, resolvedTheme, setTheme, cycleTheme, options: themeOptions } = useTheme();
   const isMasterSuper = currentUser.role === 'MASTER_SUPER_ADMIN';
 
   // Global keyboard shortcut Ctrl+K / Cmd+K for Quick Jump
@@ -76,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
       }
       if (e.key === 'Escape') {
         setShowQuickJump(false);
+        setProfileMenuOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -105,119 +118,127 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const userInitial = (currentUser.name || 'U').trim().charAt(0).toUpperCase();
+
   return (
     <>
-      <header className="bg-white/95 backdrop-blur-md border-b border-[#e8e5e0] text-[#2d2a26] sticky top-0 z-40 px-3 sm:px-5 py-1.5 shadow-[0_1px_2px_rgba(45,42,38,0.03)]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
-          {/* Left: Hamburger Button + Breadcrumb + Dynamic Page Title */}
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+      <header className="bg-[var(--bg-card)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-3 sm:px-6 py-2 shadow-[var(--shadow-sm)]">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          {/* Left: Hamburger Button + Page Title */}
+          <div className="flex items-center gap-2.5 min-w-0">
             {!hideMobileMenu && (
               <button
                 type="button"
                 onClick={onMenuToggle}
-                aria-label={mobileMenuOpen ? 'Tutup Navigasi Sidebar' : 'Buka Navigasi Sidebar'}
+                aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
                 aria-expanded={Boolean(mobileMenuOpen)}
-                title="Buka / Tutup Menu Navigasi"
-                className="xl:hidden h-9 px-2.5 sm:px-3 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] flex items-center justify-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="xl:hidden h-10 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shrink-0 cursor-pointer btn-tactile"
               >
-                {mobileMenuOpen ? <X size={15} /> : <Menu size={15} />}
-                <span className="text-[11px] font-bold hidden sm:inline xl:hidden">Menu</span>
+                {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+                <span className="text-xs font-semibold hidden sm:inline xl:hidden">Menu</span>
               </button>
             )}
 
             <div className="min-w-0">
               {pageGroup && (
-                <div className="flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-[var(--accent)] leading-none mb-0.5 truncate">
-                  <span>{pageGroup}</span>
-                  <ChevronRight size={10} className="text-[#8a8580]" />
+                <div className="text-xs font-medium text-[var(--text-muted)] leading-none mb-1 truncate">
+                  {pageGroup.replace(/^\d+\.\s*/, '')}
                 </div>
               )}
-              <h1 className="font-bold text-sm sm:text-base tracking-tight text-[#2d2a26] truncate leading-tight">
+              <h1 className="font-bold text-base sm:text-lg tracking-tight text-[var(--text-primary)] truncate leading-tight">
                 {pageTitle}
               </h1>
               {pageSubtitle && !pageGroup && (
-                <p className="text-[11px] text-[#8a8580] truncate hidden sm:block">
+                <p className="text-xs text-[var(--text-muted)] truncate hidden sm:block">
                   {pageSubtitle}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Right: Quick Jump Search (Ctrl+K) + Role Badge + Guidebook + Refresh + Profile */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Right: Clean, minimal controls (Search, Theme Toggle, Refresh, Profile Menu with the ONLY Logout button) */}
+          <div className="flex items-center gap-2 shrink-0">
             {pendingCount > 0 && (
               <button
                 type="button"
                 onClick={onSync}
                 disabled={isSyncing}
-                className="flex items-center gap-1 text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1 rounded-lg hover:bg-amber-100 transition-colors"
-                title="Sinkronkan antrean data offline"
+                className="flex items-center gap-1.5 text-xs font-semibold bg-[var(--status-draft-bg)] border border-[var(--status-draft-border)] text-[var(--status-draft-text)] px-3 py-1.5 rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+                title="Sinkronkan data offline"
               >
-                {isSyncing ? 'Sync...' : `${pendingCount} Pending`}
+                {isSyncing ? 'Menyinkronkan...' : `${pendingCount} Belum Sinkron`}
               </button>
             )}
 
-            {/* Quick Jump Command Palette Trigger (disembunyikan untuk Master Super Admin karena hanya punya 1 konsol SaaS) */}
+            {/* Quick Search (Ctrl+K) */}
             {!isMasterSuper && modules.length > 1 && onSelectModule && (
               <button
                 type="button"
-                onClick={() => { setJumpQuery(''); setShowQuickJump(true); }}
-                title="Pencarian Cepat Fitur & Modul (Ctrl+K)"
-                className="hidden sm:flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-[#e8e5e0] bg-[#faf9f7] hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] text-[11px] font-medium transition-colors cursor-pointer"
+                onClick={() => {
+                  setJumpQuery('');
+                  setShowQuickJump(true);
+                }}
+                aria-label="Cari halaman atau menu (Ctrl+K)"
+                className="hidden sm:flex items-center gap-2 px-3 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs sm:text-sm font-medium transition-colors cursor-pointer"
               >
-                <Search size={13} className="text-[#8a8580]" />
-                <span className="hidden md:inline">Cari Fitur...</span>
-                <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9.5px] font-mono font-semibold text-[#8a8580] bg-white border border-[#e8e5e0] rounded">
+                <Search size={15} className="text-[var(--text-muted)]" aria-hidden="true" />
+                <span>Cari menu...</span>
+                <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[11px] font-mono text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded">
                   Ctrl K
                 </kbd>
               </button>
             )}
 
-            {/* Badge Peran Statis (Tanpa Mode Uji) */}
-            {!isMasterSuper && (
-              <span className="hidden sm:inline-flex items-center px-2.5 h-8 rounded-lg bg-[#faf9f7] border border-[#e8e5e0] text-[10.5px] font-bold text-[#5a554f]">
-                {ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role}
+            {/* Theme Quick Toggle (Light / Dark) */}
+            <button
+              type="button"
+              onClick={cycleTheme}
+              aria-label={`Ubah tampilan tema (saat ini ${resolvedTheme === 'dark' ? 'Gelap' : 'Terang'})`}
+              title={`Tema: ${resolvedTheme === 'dark' ? 'Gelap' : 'Terang'} (Klik untuk mengganti)`}
+              className="h-10 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium transition-colors cursor-pointer btn-tactile"
+            >
+              {resolvedTheme === 'dark' ? (
+                <Moon size={16} aria-hidden="true" />
+              ) : (
+                <Sun size={16} aria-hidden="true" />
+              )}
+              <span className="hidden md:inline">
+                {resolvedTheme === 'dark' ? 'Gelap' : 'Terang'}
               </span>
-            )}
+            </button>
 
-            {/* Tombol Panduan Alur Role */}
-            {!isMasterSuper && (
-              <button
-                type="button"
-                onClick={() => setShowGuidebook(true)}
-                title={`Buku Panduan & Alur Kerja (${ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role})`}
-                className="flex items-center gap-1.5 px-2.5 h-8 sm:h-9 rounded-lg border border-emerald-500/70 bg-emerald-50/70 hover:bg-emerald-100/80 text-[var(--accent)] text-xs font-bold transition-colors cursor-pointer shrink-0"
-              >
-                <BookOpen size={15} />
-                <span className="hidden lg:inline">Panduan</span>
-              </button>
-            )}
-
-            {/* Tombol Refresh Data */}
+            {/* Refresh Button */}
             <button
               type="button"
               onClick={handleRefreshClick}
-              title="Muat Ulang Data Halaman Ini"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#5a554f] hover:text-[#2d2a26] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              aria-label="Muat ulang data"
+              title="Muat ulang data halaman ini"
+              className="w-10 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors cursor-pointer btn-tactile"
             >
-              <RefreshCw size={14} className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''} />
+              <RefreshCw
+                size={16}
+                className={refreshSpin ? 'animate-spin text-[var(--accent-text)]' : ''}
+                aria-hidden="true"
+              />
             </button>
 
-            {/* Menu Akun & Profil */}
+            {/* Profile Dropdown Menu (Contains the SINGLE Logout button) */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen(v => !v)}
-                title="Profil Akun & Pengaturan"
-                className="flex items-center gap-1.5 px-2 sm:px-2.5 h-8 sm:h-9 rounded-lg border border-[#e8e5e0] bg-white hover:bg-[#f5f3ef] text-[#2d2a26] text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+                aria-label="Menu Akun dan Pengaturan"
+                className="flex items-center gap-2 px-2.5 sm:px-3 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs sm:text-sm font-semibold transition-colors cursor-pointer btn-tactile"
               >
-                <div className="w-5 h-5 rounded-full bg-[var(--accent-glow)] text-[var(--accent)] flex items-center justify-center text-[10px] font-black shrink-0">
-                  <User size={12} />
+                <div className="w-6 h-6 rounded-full bg-[var(--accent-glow)] text-[var(--accent-text)] flex items-center justify-center text-xs font-bold shrink-0">
+                  {userInitial}
                 </div>
-                <span className="max-w-[70px] sm:max-w-[100px] truncate hidden md:inline-block">
+                <span className="max-w-[90px] sm:max-w-[140px] truncate hidden sm:inline-block">
                   {currentUser.name}
                 </span>
-                <ChevronDown size={12} className="text-[#8a8580]" />
+                <ChevronDown size={14} className="text-[var(--text-muted)]" aria-hidden="true" />
               </button>
 
               {profileMenuOpen && (
@@ -225,57 +246,107 @@ export const Header: React.FC<HeaderProps> = ({
                   <div
                     className="fixed inset-0 z-40"
                     onClick={() => setProfileMenuOpen(false)}
+                    aria-hidden="true"
                   />
-                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-[#e8e5e0] shadow-xl z-50 p-3 space-y-2">
-                    <div className="p-2.5 rounded-xl bg-[#faf9f7] border border-[#e8e5e0]">
+                  <div
+                    role="menu"
+                    aria-label="Menu Akun"
+                    className="absolute right-0 mt-2 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-xl z-50 p-3 space-y-2 text-[var(--text-primary)]"
+                  >
+                    {/* User Identity */}
+                    <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-xs text-[#2d2a26] truncate">{currentUser.name}</span>
+                        <span className="font-bold text-sm text-[var(--text-primary)] truncate">
+                          {currentUser.name}
+                        </span>
                         {!isMasterSuper && (
-                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800">
+                          <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] shrink-0">
                             {ROLE_BADGE_LABELS[currentUser.role] ?? currentUser.role}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#8a8580] truncate mt-0.5">{currentUser.email}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                        {currentUser.email}
+                      </p>
                     </div>
+
+                    {/* Theme Selector (Terang / Gelap / Sistem) */}
+                    <div className="p-2.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
+                      <span className="block text-xs font-semibold text-[var(--text-secondary)]">
+                        Mode Tampilan
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Pilih mode tampilan">
+                        {themeOptions.map(opt => {
+                          const isSelected = theme === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={isSelected}
+                              onClick={() => setTheme(opt.value)}
+                              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
+                              }`}
+                            >
+                              {opt.value === 'light' && <Sun size={13} aria-hidden="true" />}
+                              {opt.value === 'dark' && <Moon size={13} aria-hidden="true" />}
+                              {opt.value === 'system' && <Monitor size={13} aria-hidden="true" />}
+                              <span>{opt.shortLabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {!isMasterSuper && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setShowGuidebook(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
+                      >
+                        <BookOpen size={16} className="text-[var(--text-muted)]" aria-hidden="true" />
+                        <span>Panduan Penggunaan</span>
+                      </button>
+                    )}
 
                     <button
                       type="button"
+                      role="menuitem"
                       onClick={() => {
                         setProfileMenuOpen(false);
                         setShowChangePassword(true);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#2d2a26] hover:bg-[#f5f3ef] transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
                     >
-                      <KeyRound size={14} className="text-[#8a8580]" /> Ubah Password Akun
+                      <KeyRound size={16} className="text-[var(--text-muted)]" aria-hidden="true" />
+                      <span>Ubah Kata Sandi</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        onLogout();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
-                    >
-                      <LogOut size={14} className="text-rose-600" /> Keluar dari Sesi (Logout)
-                    </button>
+                    <div className="pt-1 border-t border-[var(--border-subtle)]">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          onLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--status-flagged-text)] hover:bg-[var(--status-flagged-bg)] transition-colors cursor-pointer"
+                      >
+                        <LogOut size={16} aria-hidden="true" />
+                        <span>Keluar</span>
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
             </div>
-
-            {/* Tombol Logout Jelas & Langsung (Dedicated Logout Button) */}
-            <button
-              type="button"
-              onClick={onLogout}
-              title="Keluar dari Akun (Logout)"
-              className="flex items-center gap-1.5 px-2.5 h-8 sm:h-9 rounded-lg border border-rose-200 bg-rose-50/80 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold transition-colors cursor-pointer shrink-0"
-              aria-label="Tombol Keluar"
-            >
-              <LogOut size={14} className="text-rose-600" />
-              <span className="hidden sm:inline">Keluar</span>
-            </button>
           </div>
         </div>
       </header>
@@ -283,35 +354,39 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Modal Quick Jump / Command Palette (Ctrl+K) */}
       {showQuickJump && onSelectModule && (
         <div
-          className="fixed inset-0 z-[95] bg-black/45 backdrop-blur-[2px] flex items-start justify-center pt-14 sm:pt-20 p-4 modal-overlay-in"
+          className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-[2px] flex items-start justify-center pt-14 sm:pt-20 p-4 modal-overlay-in"
           onClick={() => setShowQuickJump(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pencarian cepat menu"
         >
           <div
-            className="bg-white rounded-2xl border border-[#e8e5e0] max-w-lg w-full shadow-2xl overflow-hidden modal-card-in"
+            className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] max-w-lg w-full shadow-2xl overflow-hidden modal-card-in text-[var(--text-primary)]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-3 border-b border-[#e8e5e0] flex items-center gap-2.5 bg-[#faf9f7]">
-              <Search size={16} className="text-[var(--accent)] shrink-0 ml-1" />
+            <div className="p-3.5 border-b border-[var(--border-subtle)] flex items-center gap-2.5 bg-[var(--bg-primary)]">
+              <Search size={16} className="text-[var(--text-muted)] shrink-0 ml-1" aria-hidden="true" />
               <input
                 autoFocus
                 value={jumpQuery}
                 onChange={e => setJumpQuery(e.target.value)}
-                placeholder="Ketik nama menu atau fitur (mis: Penawaran, Gudang, SPK, GPS, Garansi)..."
-                className="w-full bg-transparent text-xs sm:text-sm text-[#2d2a26] focus:outline-none"
+                aria-label="Ketik nama menu"
+                placeholder="Cari menu (contoh: Dashboard, Penawaran, Gudang, SPK)..."
+                className="w-full bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setShowQuickJump(false)}
-                className="px-2 py-0.5 rounded text-[10px] font-bold text-[#8a8580] bg-white border border-[#e8e5e0] hover:text-[#2d2a26]"
+                className="px-2 py-1 rounded text-xs font-semibold text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
               >
-                ESC
+                Tutup
               </button>
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto p-2 space-y-1">
               {filteredModules.length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#8a8580]">
-                  Tidak ada modul yang cocok dengan &ldquo;{jumpQuery}&rdquo;.
+                <div className="py-8 text-center text-sm text-[var(--text-muted)]">
+                  Menu &ldquo;{jumpQuery}&rdquo; tidak ditemukan.
                 </div>
               ) : (
                 filteredModules.map(m => {
@@ -324,45 +399,35 @@ export const Header: React.FC<HeaderProps> = ({
                         onSelectModule(m.id);
                         setShowQuickJump(false);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                         isCurrent
-                          ? 'bg-[var(--accent-glow)] text-[var(--accent)] font-bold'
-                          : 'hover:bg-[#f5f3ef] text-[#2d2a26]'
+                          ? 'bg-[var(--accent-glow)] text-[var(--accent-text)] font-bold'
+                          : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-[var(--accent)] shrink-0">{m.icon}</span>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold truncate">{m.label}</div>
-                          {m.group && (
-                            <div className="text-[10px] text-[#8a8580] truncate">{m.group}</div>
-                          )}
-                        </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{m.label}</div>
+                        {m.group && (
+                          <div className="text-xs text-[var(--text-muted)] truncate">
+                            {m.group.replace(/^\d+\.\s*/, '')}
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[10px] font-semibold text-[#8a8580] flex items-center gap-1 shrink-0">
-                        {isCurrent ? 'Sedang Aktif' : 'Buka'} <ChevronRight size={12} />
+                      <span className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1 shrink-0">
+                        {isCurrent ? 'Aktif' : 'Buka'}
+                        <ChevronRight size={14} aria-hidden="true" />
                       </span>
                     </button>
                   );
                 })
               )}
             </div>
-
-            <div className="px-3.5 py-2 border-t border-[#e8e5e0] bg-[#faf9f7] flex items-center justify-between text-[10px] text-[#8a8580]">
-              <span className="flex items-center gap-1">
-                <Command size={11} /> Tekan <b>Ctrl + K</b> kapan saja untuk berpindah modul secara instan
-              </span>
-              <span>{filteredModules.length} modul tersedia</span>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Modal Interaktif Panduan Sistem & Alur Role */}
-      <RoleGuidebookModal
-        isOpen={showGuidebook}
-        onClose={() => setShowGuidebook(false)}
-      />
+      {/* Modal Panduan Alur Kerja */}
+      <RoleGuidebookModal isOpen={showGuidebook} onClose={() => setShowGuidebook(false)} />
 
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />

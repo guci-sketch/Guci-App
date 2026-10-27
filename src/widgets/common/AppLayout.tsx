@@ -51,7 +51,6 @@ export function AppLayout({
         try {
             const saved = localStorage.getItem('gep_sidebar_pinned');
             if (saved !== null) return saved === 'true';
-            // Preferensi pin hanya berpengaruh pada layout desktop; tablet tetap menggunakan drawer
             return false;
         } catch {
             return false;
@@ -72,7 +71,6 @@ export function AppLayout({
     }, []);
 
     const isSidebarOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-    // Sidebar tampil penuh (252px) jika dibuka via Hamburger (Mobile/Tablet), sedang di-hover (Desktop), atau di-Pin (Stay Open)
     const isExpanded = isSidebarOpen || isHovered || isPinnedDesktop;
 
     const setSidebarOpen = (val: boolean) => {
@@ -179,7 +177,6 @@ export function AppLayout({
     }, [isSidebarOpen]);
 
     const handleTabClick = (id: string) => {
-        // Pada desktop sentuh, tap pertama dapat memperluas rail sebelum memilih item.
         if (isTouchDevice && !isExpanded && typeof window !== 'undefined' && window.innerWidth >= 1280) {
             setSidebarOpen(true);
             return;
@@ -203,11 +200,11 @@ export function AppLayout({
     }, [sidebarItems]);
 
     return (
-        <div className="flex flex-col h-screen h-dvh min-h-[100dvh] bg-[var(--bg-primary)] font-sans overflow-hidden">
+        <div className="flex flex-col h-screen h-dvh min-h-[100dvh] bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans overflow-hidden">
             {/* Ruang di kiri header hanya disediakan pada desktop; tablet selalu memakai drawer hamburger. */}
             <div
                 className={cn(
-                    ' transition-[padding] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0',
+                    'transition-[padding] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0',
                     isPinnedDesktop ? 'xl:pl-[252px]' : 'xl:pl-[56px]'
                 )}
             >
@@ -223,15 +220,16 @@ export function AppLayout({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.18, ease: 'easeOut' }}
-                            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1.5px]"
+                            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1.5px]"
                             aria-hidden="true"
                             onClick={() => setSidebarOpen(false)}
                         />
                     )}
                 </AnimatePresence>
 
-                {/* Supabase-Style Expandable Sidebar Rail + Tablet Stay/Absolute Support */}
+                {/* Expandable Sidebar Rail + Tablet/Mobile Drawer */}
                 <motion.aside
+                    aria-label="Navigasi Utama"
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                     initial={false}
@@ -244,16 +242,16 @@ export function AppLayout({
                         ease: [0.16, 1, 0.3, 1],
                     }}
                     className={cn(
-                        'fixed inset-y-0 left-0 z-50 bg-white border-r border-[#e8e5e0] flex flex-col select-none overflow-hidden',
+                        'fixed inset-y-0 left-0 z-50 bg-[var(--bg-card)] border-r border-[var(--border-subtle)] flex flex-col select-none overflow-hidden',
                         'transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
                         isSidebarOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0',
                         isExpanded && !isPinnedDesktop
-                            ? 'shadow-[8px_0_30px_rgba(45,42,38,0.12)]'
+                            ? 'shadow-[8px_0_30px_rgba(0,0,0,0.16)]'
                             : 'shadow-none'
                     )}
                 >
                     {/* Tombol brand untuk membuka atau menutup navigasi sidebar */}
-                    <div className="h-12 px-2.5 border-b border-[#e8e5e0] flex items-center justify-between shrink-0">
+                    <div className="h-12 px-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
                         <div className="flex items-center min-w-0">
                             <button
                                 type="button"
@@ -284,7 +282,7 @@ export function AppLayout({
                                     setSidebarOpen(false);
                                     setIsHovered(false);
                                 }}
-                                className="xl:hidden w-8 h-8 rounded-lg border border-[#e8e5e0] flex items-center justify-center text-[#5a554f] hover:bg-[#f5f3ef] shrink-0"
+                                className="xl:hidden w-8 h-8 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] shrink-0"
                                 aria-label="Tutup Menu"
                             >
                                 <X size={14} />
@@ -292,19 +290,19 @@ export function AppLayout({
                         )}
                     </div>
 
-                    {/* Daftar Menu dengan Posisi Ikon Terkunci (Tidak Bergeser Saat Hover / Buka) */}
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-2 no-scrollbar">
+                    {/* Daftar Menu dengan Posisi Ikon Terkunci */}
+                    <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-2 no-scrollbar" aria-label="Daftar modul aplikasi">
                         {groupedItems.map((group, groupIdx) => (
                             <div key={group.name} className="space-y-0.5">
                                 <div className="h-5 flex items-center px-1.5 overflow-hidden">
                                     {isExpanded ? (
-                                        <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#8a8580] whitespace-nowrap">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap">
                                             {group.name}
                                         </span>
                                     ) : groupIdx > 0 ? (
-                                        <div className="w-full h-px bg-[#e8e5e0]" />
+                                        <div className="w-full h-px bg-[var(--border-subtle)]" />
                                     ) : (
-                                        <div className="w-2 h-1 rounded-full bg-[#e8e5e0] mx-auto" />
+                                        <div className="w-2 h-1 rounded-full bg-[var(--border-subtle)] mx-auto" />
                                     )}
                                 </div>
 
@@ -317,14 +315,15 @@ export function AppLayout({
                                             type="button"
                                             onClick={() => handleTabClick(item.id)}
                                             aria-current={active ? 'page' : undefined}
+                                            aria-label={item.label}
                                             title={!isExpanded ? item.label : undefined}
                                             className={cn(
                                                 'w-full h-10 flex items-center rounded-xl text-[13px] transition-colors duration-200 relative group/item cursor-pointer select-none',
                                                 active
                                                     ? danger
-                                                        ? 'bg-rose-50 text-rose-700 font-semibold shadow-2xs'
-                                                        : 'bg-[var(--accent-glow)] text-[var(--accent)] font-semibold shadow-2xs'
-                                                    : 'text-[#5a554f] hover:bg-[#f5f3ef] hover:text-[#2d2a26] font-medium'
+                                                        ? 'bg-[var(--status-flagged-bg)] text-[var(--status-flagged-text)] font-semibold shadow-2xs'
+                                                        : 'bg-[var(--accent-glow)] text-[var(--accent-text)] font-semibold shadow-2xs'
+                                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] font-medium'
                                             )}
                                         >
                                             {active && (
@@ -333,7 +332,7 @@ export function AppLayout({
                                                     transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                                                     className={cn(
                                                         'absolute inset-0 rounded-xl pointer-events-none -z-10',
-                                                        danger ? 'bg-rose-50' : 'bg-[var(--accent-glow)]'
+                                                        danger ? 'bg-[var(--status-flagged-bg)]' : 'bg-[var(--accent-glow)]'
                                                     )}
                                                 />
                                             )}
@@ -343,9 +342,9 @@ export function AppLayout({
                                                     'w-9 h-9 flex items-center justify-center shrink-0 [&_svg]:w-[16px] [&_svg]:h-[16px] transition-transform duration-150 group-hover/item:scale-105',
                                                     active
                                                         ? danger
-                                                            ? 'text-rose-600'
-                                                            : 'text-[var(--accent)]'
-                                                        : 'text-[#8a8580] group-hover/item:text-[#2d2a26]'
+                                                            ? 'text-[var(--status-flagged-text)]'
+                                                            : 'text-[var(--accent-text)]'
+                                                        : 'text-[var(--text-muted)] group-hover/item:text-[var(--text-primary)]'
                                                 )}
                                             >
                                                 {item.icon}
@@ -364,12 +363,12 @@ export function AppLayout({
                                                 {item.badge !== undefined && item.badge !== 0 && item.badge !== '0' && (
                                                     <span
                                                         className={cn(
-                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 leading-none',
+                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 leading-none tabular-nums',
                                                             active
                                                                 ? danger
-                                                                    ? 'bg-rose-200 text-rose-800'
-                                                                    : 'bg-emerald-200 text-emerald-900'
-                                                                : 'bg-slate-200 text-slate-700'
+                                                                    ? 'bg-rose-500/20 text-[var(--status-flagged-text)]'
+                                                                    : 'bg-emerald-500/20 text-[var(--accent-text)]'
+                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                                                         )}
                                                     >
                                                         {item.badge}
@@ -381,10 +380,10 @@ export function AppLayout({
                                 })}
                             </div>
                         ))}
-                    </div>
+                    </nav>
 
                     {/* Footer: tutup drawer pada mobile/tablet, atau pin sidebar pada desktop */}
-                    <div className="flex h-10 px-2 border-t border-[#e8e5e0] items-center bg-[#faf9f7] shrink-0">
+                    <div className="flex h-10 px-2 border-t border-[var(--border-subtle)] items-center bg-[var(--bg-primary)] shrink-0">
                         <button
                             type="button"
                             onClick={() => {
@@ -394,10 +393,11 @@ export function AppLayout({
                                     togglePinDesktop();
                                 }
                             }}
+                            aria-label={!isDesktopLayout ? 'Tutup menu navigasi' : isPinnedDesktop ? 'Ubah ke Mode Ringkas' : 'Kunci Sidebar Agar Tetap Terbuka'}
                             title={!isDesktopLayout ? 'Tutup menu navigasi' : isPinnedDesktop ? 'Ubah ke Mode Ringkas / Hover' : 'Kunci Sidebar Agar Tetap Terbuka (Stay Open)'}
-                            className="w-full h-7 flex items-center rounded-md text-[11px] text-[#5a554f] hover:text-[#2d2a26] hover:bg-[#f5f3ef] transition-colors cursor-pointer overflow-hidden"
+                            className="w-full h-7 flex items-center rounded-md text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer overflow-hidden"
                         >
-                            <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[#8a8580]">
+                            <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[var(--text-muted)]">
                                 {isPinnedDesktop || isSidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
                             </div>
                             <span

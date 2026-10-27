@@ -181,9 +181,6 @@ function buildReportFilter(q: z.infer<typeof filterSchema>, companyId: string) {
   const params: unknown[] = [companyId];
   let i = 2;
 
-  // Tanggal & jam dari UI adalah waktu setempat (WIB). Kolom timestamptz dibandingkan setelah
-  // dikonversi ke zona waktu bisnis — bukan zona waktu sesi database (UTC di Supabase), yang
-  // sebelumnya membuat filter jam/tanggal bergeser 7 jam.
   if (q.startDate) {
     clauses.push(`(wr.created_at at time zone $${i++})::date >= $${i++}::date`);
     params.push(APP_TIMEZONE, q.startDate);
@@ -288,11 +285,6 @@ adminRouter.get(
   })
 );
 
-/**
- * Sel CSV aman: kutip ganda di-escape, dan sel yang diawali = + - @ (atau tab/CR) diberi awalan `'`
- * agar Excel/Sheets tidak mengeksekusinya sebagai rumus (CSV/formula injection — nama proyek &
- * nama pelaksana berasal dari input pengguna).
- */
 function csvCell(v: unknown): string {
   let str = v === null || v === undefined ? '' : String(v);
   if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
@@ -304,8 +296,7 @@ function fmtLocalDateTime(d: unknown): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: APP_TIMEZONE, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(d as string));
 }
 
-// PENTING: rute statis ini HARUS didaftarkan sebelum '/reports/:id'. Jika tidak, Express mencocokkan
-// "export.csv" sebagai :id dan ekspor CSV selalu gagal (500).
+// PENTING: rute statis ini HARUS didaftarkan sebelum '/reports/:id'.
 adminRouter.get(
   '/reports/export.csv',
   asyncHandler(async (req, res) => {
@@ -339,7 +330,6 @@ adminRouter.get(
     await logAction(req.user!, 'EXPORT_REPORTS', 'system', null, `Mengekspor ${rows.length} laporan ke CSV.`);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="fieldwork-reports-${new Date().toISOString().slice(0, 10)}.csv"`);
-    // BOM agar Excel membaca UTF-8 (nama berhuruf non-ASCII) dengan benar.
     res.send('\uFEFF' + lines.join('\r\n'));
   })
 );
@@ -352,25 +342,163 @@ adminRouter.get(
   })
 );
 
+const summaryQuerySchema = z.object({
+  days: z.coerce.number().int().min(7).max(90).optional(),
+});
+
+const CANONICAL_STATUSES = ['COMPLETED', 'REVIEWED', 'WORKING', 'READY', 'DRAFT', 'FLAGGED'] as const;
+
 adminRouter.get(
   '/summary',
   asyncHandler(async (req, res) => {
-    const rows = await query<{
-      total: string; completed: string; working: string; flagged: string; high_risk: string;
-      avg_duration: string | null; avg_risk: string | null;
-    }>(`
-      select
-        count(*) as total,
-        count(*) filter (where status in ('COMPLETED','REVIEWED')) as completed,
-        count(*) filter (where status = 'WORKING') as working,
-        count(*) filter (where status = 'FLAGGED') as flagged,
-        count(*) filter (where risk_level in ('HIGH_RISK','CRITICAL')) as high_risk,
-        avg(duration_seconds) filter (where duration_seconds is not null) as avg_duration,
-        avg(risk_score) as avg_risk
-      from work_reports
-      where created_at >= now() - interval '30 days' and company_id = $1
-    `, [req.user!.companyId]);
-    const s = rows[0] || { total: '0', completed: '0', working: '0', flagged: '0', high_risk: '0', avg_duration: null, avg_risk: null };
+    const parsed = summaryQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new HttpError(400, 'Parameter periode ringkasan tidak valid.');
+    const windowDays = parsed.data.days ?? 30;
+    const companyId = req.user!.companyId!;
+
+    const [kpiRows, trendRows, statusRows, priorityRows] = await Promise.all([
+      query<{
+        total: string;
+        completed: string;
+        working: string;
+        flagged: string;
+        high_risk: string;
+        priority_unique: string;
+        avg_duration: string | null;
+        avg_risk: string | null;
+        period_start: string;
+        period_end: string;
+      }>(`
+        with bounds as (
+          select
+            ((now() at time zone $2)::date - ($3::int - 1)) as start_date,
+            (now() at time zone $2)::date as end_date
+        )
+        select
+          count(*) as total,
+          count(*) filter (where wr.status in ('COMPLETED','REVIEWED')) as completed,
+          count(*) filter (where wr.status = 'WORKING') as working,
+          count(*) filter (where wr.status = 'FLAGGED') as flagged,
+          count(*) filter (where wr.risk_level in ('HIGH_RISK','CRITICAL')) as high_risk,
+          count(*) filter (where wr.status = 'FLAGGED' or wr.risk_level in ('HIGH_RISK','CRITICAL')) as priority_unique,
+          avg(wr.duration_seconds) filter (where wr.duration_seconds is not null and wr.duration_seconds > 0) as avg_duration,
+          avg(wr.risk_score) as avg_risk,
+          (select start_date::text from bounds) as period_start,
+          (select end_date::text from bounds) as period_end
+        from work_reports wr
+        cross join bounds b
+        where wr.company_id = $1
+          and (wr.created_at at time zone $2)::date between b.start_date and b.end_date
+      `, [companyId, APP_TIMEZONE, windowDays]),
+
+      query<{
+        day: string;
+        total: string;
+        completed: string;
+        flagged: string;
+      }>(`
+        with days as (
+          select generate_series(
+            (now() at time zone $2)::date - ($3::int - 1),
+            (now() at time zone $2)::date,
+            interval '1 day'
+          )::date as d
+        )
+        select
+          days.d::text as day,
+          count(wr.id) as total,
+          count(wr.id) filter (where wr.status in ('COMPLETED','REVIEWED')) as completed,
+          count(wr.id) filter (where wr.status = 'FLAGGED') as flagged
+        from days
+        left join work_reports wr
+          on wr.company_id = $1
+         and (wr.created_at at time zone $2)::date = days.d
+        group by days.d
+        order by days.d asc
+      `, [companyId, APP_TIMEZONE, windowDays]),
+
+      query<{ status: string; count: string }>(`
+        with bounds as (
+          select
+            ((now() at time zone $2)::date - ($3::int - 1)) as start_date,
+            (now() at time zone $2)::date as end_date
+        )
+        select wr.status, count(*)::text as count
+        from work_reports wr
+        cross join bounds b
+        where wr.company_id = $1
+          and (wr.created_at at time zone $2)::date between b.start_date and b.end_date
+        group by wr.status
+      `, [companyId, APP_TIMEZONE, windowDays]),
+
+      query<{
+        id: string;
+        project_id: string;
+        project_name: string;
+        client_name: string;
+        service_type: string;
+        executor_name: string;
+        status: string;
+        risk_score: number;
+        risk_level: string;
+        check_in_valid: boolean | null;
+        check_in_distance: number | null;
+        duration_seconds: number | null;
+        created_at: string;
+      }>(`
+        with bounds as (
+          select
+            ((now() at time zone $2)::date - ($3::int - 1)) as start_date,
+            (now() at time zone $2)::date as end_date
+        )
+        select
+          wr.id,
+          p.id as project_id,
+          p.project_name,
+          p.client_name,
+          p.service_type,
+          coalesce(u.name, 'Teknisi Lapangan') as executor_name,
+          wr.status,
+          wr.risk_score,
+          wr.risk_level,
+          wr.check_in_valid,
+          wr.check_in_distance,
+          wr.duration_seconds,
+          wr.created_at
+        from work_reports wr
+        join projects p on p.id = wr.project_id
+        left join users u on u.id = wr.executor_id
+        cross join bounds b
+        where wr.company_id = $1
+          and (wr.created_at at time zone $2)::date between b.start_date and b.end_date
+          and (wr.status = 'FLAGGED' or wr.risk_level in ('HIGH_RISK', 'CRITICAL'))
+        order by
+          (case when wr.risk_level = 'CRITICAL' then 40 when wr.risk_level = 'HIGH_RISK' then 30 else 0 end
+           + case when wr.status = 'FLAGGED' then 25 else 0 end) desc,
+          wr.risk_score desc,
+          wr.created_at desc
+        limit 5
+      `, [companyId, APP_TIMEZONE, windowDays]),
+    ]);
+
+    const s = kpiRows[0] || {
+      total: '0',
+      completed: '0',
+      working: '0',
+      flagged: '0',
+      high_risk: '0',
+      priority_unique: '0',
+      avg_duration: null,
+      avg_risk: null,
+      period_start: '',
+      period_end: '',
+    };
+
+    const statusMap = new Map<string, number>();
+    for (const r of statusRows) {
+      statusMap.set(r.status, Number(r.count));
+    }
+
     res.json({
       totalJobs: Number(s.total),
       completedJobs: Number(s.completed),
@@ -379,6 +507,36 @@ adminRouter.get(
       highRiskCount: Number(s.high_risk),
       avgDurationMinutes: s.avg_duration ? Math.round(Number(s.avg_duration) / 60) : 0,
       avgRiskScore: s.avg_risk ? Math.round(Number(s.avg_risk)) : 0,
+      windowDays,
+      periodStart: s.period_start,
+      periodEnd: s.period_end,
+      generatedAt: new Date().toISOString(),
+      priorityUniqueCount: Number(s.priority_unique),
+      dailyTrend: trendRows.map(r => ({
+        date: r.day,
+        total: Number(r.total),
+        completed: Number(r.completed),
+        flagged: Number(r.flagged),
+      })),
+      statusBreakdown: CANONICAL_STATUSES.map(status => ({
+        status,
+        count: statusMap.get(status) ?? 0,
+      })),
+      priorityReports: priorityRows.map(r => ({
+        id: r.id,
+        projectId: r.project_id,
+        projectName: r.project_name,
+        clientName: r.client_name,
+        serviceType: r.service_type,
+        executorName: r.executor_name,
+        status: r.status,
+        riskScore: Number(r.risk_score ?? 0),
+        riskLevel: r.risk_level,
+        checkInValid: r.check_in_valid,
+        checkInDistance: r.check_in_distance != null ? Number(r.check_in_distance) : null,
+        durationSeconds: r.duration_seconds != null ? Number(r.duration_seconds) : null,
+        createdAt: r.created_at,
+      })),
     });
   })
 );
@@ -529,8 +687,6 @@ adminRouter.put(
   asyncHandler(async (req, res) => {
     const parsed = riskConfigUpdateSchema.safeParse(req.body);
     if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Konfigurasi tidak valid.');
-    // Validasi pada hasil GABUNGAN (nilai lama + perubahan): ambang harus berurutan, jika tidak
-    // level risiko menjadi tidak konsisten (mis. CRITICAL lebih rendah dari REVIEW).
     const merged = { ...(await getRiskConfig(req.user!.companyId!)), ...parsed.data };
     if (!(merged.lowRiskThreshold <= merged.reviewThreshold && merged.reviewThreshold <= merged.highRiskThreshold && merged.highRiskThreshold <= merged.criticalThreshold)) {
       throw new HttpError(400, 'Ambang risiko harus berurutan: Low ≤ Review ≤ High ≤ Critical.');
@@ -548,8 +704,6 @@ const purgeQuerySchema = z.object({
   olderThanMonths: z.coerce.number().int().min(1).max(60).optional(),
 });
 
-// Preview before committing to a purge — how many photo *files* would be
-// deleted, and how far back the oldest one goes. Nothing is deleted here.
 adminRouter.get(
   '/photos/purge-preview',
   asyncHandler(async (req, res) => {
@@ -560,10 +714,6 @@ adminRouter.get(
   })
 );
 
-// Deletes the underlying file for photos older than the retention window.
-// Everything else — work reports, risk events, treatment records, customer
-// reviews, audit logs, and the photo rows themselves (GPS/timestamp/
-// metadata) — is left exactly as it was. See modules/photos/retention.ts.
 adminRouter.post(
   '/photos/purge',
   asyncHandler(async (req, res) => {
@@ -582,5 +732,3 @@ adminRouter.post(
     res.json(result);
   })
 );
-
-

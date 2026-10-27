@@ -1,7 +1,13 @@
 import { supabase, createIsolatedSupabaseClient } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
 import { mapDbProject } from './projects';
-import { mapDbWorkReportFull, fetchWorkReport } from './workReports';
+import { fetchWorkReport } from './workReports';
+import { ApiError } from './client';
+import {
+  aggregateOperationalSummaryFromRows,
+  DEFAULT_SUMMARY_WINDOW_DAYS,
+  RawOperationalReportRow,
+} from '@/shared/utils/operationalSummary';
 import {
   ApplicationMethod,
   AuditLogEntry,
@@ -42,10 +48,24 @@ export const DEFAULT_RISK_CONFIG_CLIENT: RiskConfig = {
 
 function getTargetCompanyId(): string | null {
   const st = useAuthStore.getState();
-  if ((st.user?.role === 'MASTER_SUPER_ADMIN' || st.user?.role === 'SUPERADMIN')) {
+  if (st.user?.role === 'MASTER_SUPER_ADMIN' || st.user?.role === 'SUPERADMIN') {
     return st.activeCompanyId || st.user.companyId || null;
   }
   return st.user?.companyId || null;
+}
+
+function toHumanReadableApiError(err: { message?: string; code?: string; status?: number } | null, fallbackMessage: string): ApiError {
+  const msg = String(err?.message || '').toLowerCase();
+  if (msg.includes('jwt') || msg.includes('token') || msg.includes('expired') || err?.status === 401) {
+    return new ApiError(401, 'Sesi masuk Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.');
+  }
+  if (msg.includes('permission') || msg.includes('policy') || msg.includes('rls') || err?.status === 403) {
+    return new ApiError(403, 'Akses ditolak untuk perusahaan atau peran saat ini. Pastikan perusahaan aktif sudah benar.');
+  }
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')) {
+    return new ApiError(0, 'Koneksi ke server terputus. Periksa jaringan internet Anda lalu coba lagi.');
+  }
+  return new ApiError(err?.status || 500, fallbackMessage);
 }
 
 export async function fetchAdminReports(filters: Partial<ReportFilters>): Promise<{
@@ -94,8 +114,10 @@ export async function fetchAdminReports(filters: Partial<ReportFilters>): Promis
 
   const { data, error } = await q;
   if (error) {
-    console.warn('[fetchAdminReports] query warning:', error.message);
-    return { reports: [], count: 0, totalCount: 0, page: 1, totalPages: 1 };
+    throw toHumanReadableApiError(
+      error,
+      'Daftar laporan lapangan belum dapat dimuat. Periksa koneksi Anda lalu coba lagi.'
+    );
   }
 
   let items: WorkReportListItem[] = (data || []).map((row: any) => {
@@ -169,46 +191,49 @@ export async function fetchAdminReportDetail(id: string): Promise<WorkReport> {
   return fetchWorkReport(id);
 }
 
-export async function fetchAdminSummary(): Promise<KPIStats> {
+/**
+ * Mengambil ringkasan operasional 30 hari terakhir beserta agregasi tren harian,
+ * distribusi status laporan, dan daftar prioritas verifikasi yang terisolasi per perusahaan (company_id).
+ */
+export async function fetchAdminSummary(windowDays = DEFAULT_SUMMARY_WINDOW_DAYS): Promise<KPIStats> {
   const companyId = getTargetCompanyId();
-  let q = supabase.from('work_reports').select('status, risk_score, risk_level, duration_seconds');
-  if (companyId) q = q.eq('company_id', companyId);
+  const now = new Date();
+  // Ambil margin 31 hari UTC untuk memastikan batas waktu lokal Asia/Jakarta (UTC+7) 30 hari terakhir tercakup utuh
+  const cutoffDate = new Date(now.getTime() - (windowDays + 1) * 24 * 60 * 60 * 1000);
 
-  const { data, error } = await q;
-  if (error || !data) {
-    return {
-      totalJobs: 0,
-      completedJobs: 0,
-      workingJobs: 0,
-      flaggedJobs: 0,
-      highRiskCount: 0,
-      avgDurationMinutes: 0,
-      avgRiskScore: 0,
-    };
+  let q = supabase
+    .from('work_reports')
+    .select(
+      `
+      id,
+      status,
+      risk_score,
+      risk_level,
+      duration_seconds,
+      check_in_valid,
+      check_in_distance,
+      created_at,
+      project_id,
+      projects(id, project_name, client_name, service_type),
+      users!work_reports_executor_id_fkey(id, name)
+    `
+    )
+    .gte('created_at', cutoffDate.toISOString())
+    .order('created_at', { ascending: false });
+
+  if (companyId) {
+    q = q.eq('company_id', companyId);
   }
 
-  const totalJobs = data.length;
-  const completedJobs = data.filter(r => r.status === 'COMPLETED' || r.status === 'REVIEWED').length;
-  const workingJobs = data.filter(r => r.status === 'WORKING').length;
-  const flaggedJobs = data.filter(r => r.status === 'FLAGGED').length;
-  const highRiskCount = data.filter(r => r.risk_level === 'HIGH_RISK' || r.risk_level === 'CRITICAL').length;
+  const { data, error } = await q;
+  if (error) {
+    throw toHumanReadableApiError(
+      error,
+      'Ringkasan operasional belum dapat dimuat. Periksa koneksi internet Anda lalu coba lagi.'
+    );
+  }
 
-  const durations = data.map(r => Number(r.duration_seconds ?? 0)).filter(d => d > 0);
-  const avgDurationMinutes =
-    durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60) : 0;
-
-  const avgRiskScore =
-    totalJobs > 0 ? Math.round(data.reduce((a, r) => a + Number(r.risk_score ?? 0), 0) / totalJobs) : 0;
-
-  return {
-    totalJobs,
-    completedJobs,
-    workingJobs,
-    flaggedJobs,
-    highRiskCount,
-    avgDurationMinutes,
-    avgRiskScore,
-  };
+  return aggregateOperationalSummaryFromRows((data || []) as RawOperationalReportRow[], now, windowDays);
 }
 
 export async function fetchExecutors(): Promise<ExecutorStats[]> {
@@ -226,7 +251,11 @@ export async function fetchExecutors(): Promise<ExecutorStats[]> {
       : supabase.from('work_reports').select('executor_id, status, risk_level, duration_seconds'),
   ]);
 
-  const techs = (usersData || []).filter((u: any) => (u.role === 'TEKNISI_LAPANGAN' || u.role === 'ADMIN') && String(u.email || '').toLowerCase() !== 'lieziragroup@gmail.com');
+  const techs = (usersData || []).filter(
+    (u: any) =>
+      (u.role === 'TEKNISI_LAPANGAN' || u.role === 'ADMIN') &&
+      String(u.email || '').toLowerCase() !== 'lieziragroup@gmail.com'
+  );
   const reps = reportsData || [];
 
   return techs.map((u: any) => {
@@ -408,7 +437,10 @@ export async function fetchUsers(): Promise<AdminUser[]> {
   const { data, error } = await q;
   if (error || !data) return [];
   return (data as AdminUser[]).filter(
-    u => (u.role as string) !== 'MASTER_SUPER_ADMIN' && (u.role as string) !== 'SUPERADMIN' && u.email.toLowerCase() !== 'lieziragroup@gmail.com'
+    u =>
+      (u.role as string) !== 'MASTER_SUPER_ADMIN' &&
+      (u.role as string) !== 'SUPERADMIN' &&
+      u.email.toLowerCase() !== 'lieziragroup@gmail.com'
   );
 }
 
@@ -451,7 +483,6 @@ export async function createUser(input: NewUserInput): Promise<AdminUser> {
   });
 
   if (rpcErr) {
-    // Fallback jika RPC belum dijalankan: baca dari tabel users (dibuat oleh trigger trg_sync_auth_user_guci_emas)
     const { data: existing } = await supabase
       .from('users')
       .select('id, name, email, nip, phone, role, is_active, created_at')
@@ -496,12 +527,16 @@ export async function fetchPhotoPurgePreview(olderThanMonths = 2): Promise<Photo
   cutoff.setMonth(cutoff.getMonth() - olderThanMonths);
   const cutoffIso = cutoff.toISOString();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('documentation_photos')
     .select('captured_at')
     .is('purged_at', null)
     .lt('captured_at', cutoffIso)
     .order('captured_at', { ascending: true });
+
+  if (error) {
+    throw toHumanReadableApiError(error, 'Perkiraan retensi foto belum dapat dimuat.');
+  }
 
   return {
     cutoffDate: cutoffIso.slice(0, 10),
@@ -522,9 +557,13 @@ export async function purgeOldPhotos(olderThanMonths = 2): Promise<PhotoPurgeRes
     .lt('captured_at', cutoffIso)
     .select('id');
 
+  if (error) {
+    throw toHumanReadableApiError(error, 'Gagal menghapus file foto lama. Coba lagi beberapa saat.');
+  }
+
   return {
     cutoffDate: cutoffIso.slice(0, 10),
-    purgedCount: error ? 0 : (data?.length ?? 0),
-    failedCount: error ? 1 : 0,
+    purgedCount: data?.length ?? 0,
+    failedCount: 0,
   };
 }
