@@ -95,6 +95,13 @@ adminRouter.post('/users/:id/suspend', asyncHandler(async (req, res) => {
   const companyId = req.user!.companyId!;
   if (req.user?.id === id) throw new HttpError(400, 'Tidak dapat menonaktifkan akun Anda sendiri.');
   await assertNotLastActiveAdmin(id, companyId);
+
+  const targetUserRows = await query<{ role: string }>('select role from users where id = $1 and company_id = $2', [id, companyId]);
+  if (targetUserRows.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
+  if (req.user!.role === 'ADMIN' && targetUserRows[0].role === 'ADMIN') {
+    throw new HttpError(403, 'Admin tidak memiliki wewenang untuk menonaktifkan akun Admin lainnya. Hanya Direktur yang berwenang.');
+  }
+
   const result = await query(
     "update users set is_active = false, updated_at = now() where id = $1 and company_id = $2 returning id",
     [id, companyId]
@@ -106,9 +113,16 @@ adminRouter.post('/users/:id/suspend', asyncHandler(async (req, res) => {
 
 adminRouter.post('/users/:id/activate', asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const companyId = req.user!.companyId!;
+  const targetUserRows = await query<{ role: string }>('select role from users where id = $1 and company_id = $2', [id, companyId]);
+  if (targetUserRows.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
+  if (req.user!.role === 'ADMIN' && targetUserRows[0].role === 'ADMIN') {
+    throw new HttpError(403, 'Admin tidak memiliki wewenang untuk mengaktifkan akun Admin lainnya. Hanya Direktur yang berwenang.');
+  }
+
   const result = await query(
     "update users set is_active = true, updated_at = now() where id = $1 and company_id = $2 returning id",
-    [id, req.user!.companyId]
+    [id, companyId]
   );
   if (result.length === 0) throw new HttpError(404, 'User tidak ditemukan.');
   await logAction(req.user!, 'ACTIVATE_USER', 'users', id, 'Akun diaktifkan kembali.');
@@ -122,11 +136,12 @@ adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
   await assertNotLastActiveAdmin(id, companyId);
 
   await withTransaction(async (client) => {
-    const userCheck = await client.query('select name from users where id = $1 and company_id = $2', [id, companyId]);
+    const userCheck = await client.query('select name, role from users where id = $1 and company_id = $2', [id, companyId]);
     if (userCheck.rowCount === 0) throw new HttpError(404, 'User tidak ditemukan.');
+    if (req.user!.role === 'ADMIN' && userCheck.rows[0].role === 'ADMIN') {
+      throw new HttpError(403, 'Admin tidak memiliki wewenang untuk menghapus akun Admin lainnya. Hanya Direktur yang berwenang.');
+    }
     const userName = userCheck.rows[0].name;
-
-    // Lepaskan semua referensi ke user ini (soft detach); riwayat laporan tetap utuh.
     await client.query('update audit_logs set user_id = null where user_id = $1', [id]);
     await client.query('update risk_config set updated_by = null where updated_by = $1', [id]);
     await client.query('update company_settings set updated_by = null where updated_by = $1', [id]);

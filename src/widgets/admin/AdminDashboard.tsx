@@ -90,6 +90,9 @@ import {
   Moon,
   Monitor,
   ArrowLeft,
+  Lock,
+  Plus,
+  Copy,
 } from 'lucide-react';
 
 import { useAuth } from '@/app/providers/AuthContext';
@@ -177,6 +180,7 @@ export const AdminDashboard: React.FC = () => {
   const isAdmin = user?.role === 'SUPERADMIN' || user?.role === 'ADMIN';
   const isSuper = user?.role === 'SUPERADMIN';
   const isMasterSuper = user?.role === 'MASTER_SUPER_ADMIN';
+  const isDirector = isDirectorUser(user);
   const activeCompanyId = useAuthStore(st => st.activeCompanyId) || user?.companyId || null;
 
   // Tab awal: SUPERADMIN & ADMIN langsung membuka Dashboard Utama ('dashboard') agar ringkasan langsung terlihat
@@ -205,8 +209,8 @@ export const AdminDashboard: React.FC = () => {
     phone: '',
   });
   const [creatingUser, setCreatingUser] = useState(false);
+  const [userSearchQ, setUserSearchQ] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [inviteLink, setInviteLink] = useState<{ url: string; expiresAt: string } | null>(null);
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
@@ -593,6 +597,13 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleActivate = async (targetUser: AdminUser) => {
+    if (!isDirector && targetUser.role === 'ADMIN') {
+      setActionBanner({
+        tone: 'error',
+        message: 'Admin tidak memiliki wewenang untuk mengubah status akun Admin lain. Hanya Direktur yang berwenang.',
+      });
+      return;
+    }
     try {
       await activateUser(targetUser.id);
       setAdminUsers(prev => prev.map(u => (u.id === targetUser.id ? { ...u, is_active: true } : u)));
@@ -615,6 +626,13 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleSuspend = async (targetUser: AdminUser) => {
+    if (!isDirector && targetUser.role === 'ADMIN') {
+      setActionBanner({
+        tone: 'error',
+        message: 'Admin tidak memiliki wewenang untuk menonaktifkan akun Admin lainnya. Hanya Direktur yang berwenang.',
+      });
+      return;
+    }
     try {
       await suspendUser(targetUser.id);
       setAdminUsers(prev => prev.map(u => (u.id === targetUser.id ? { ...u, is_active: false } : u)));
@@ -637,6 +655,14 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string) => {
+    const targetUser = adminUsers.find(u => u.id === id);
+    if (!isDirector && targetUser?.role === 'ADMIN') {
+      setActionBanner({
+        tone: 'error',
+        message: 'Admin tidak memiliki wewenang untuk menghapus akun Admin lainnya. Hanya Direktur yang berwenang.',
+      });
+      return;
+    }
     try {
       await deleteUser(id);
       setAdminUsers(prev => prev.filter(u => u.id !== id));
@@ -717,7 +743,6 @@ export const AdminDashboard: React.FC = () => {
 
   // Menu menggunakan Bahasa Indonesia yang jelas dan mudah dipahami; Dashboard ditempatkan paling atas untuk Direktur & Admin
   const isMarketingUser = user?.role === 'MARKETING';
-  const isDirector = isDirectorUser(user);
   const ALL_ITEMS: {
     id: Tab;
     label: string;
@@ -2063,107 +2088,169 @@ export const AdminDashboard: React.FC = () => {
               )}
 
               {activeTab === 'approval' && (
-                <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)] shadow-sm overflow-hidden p-4 sm:p-5">
-                  <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">Manajemen Akun Pengguna</h3>
+                <div className="clean-card p-5 sm:p-6 lg:p-7 space-y-6">
+                  {/* Header Halaman */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--border-subtle)]">
+                    <div>
+                      <h3 className="text-base sm:text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
+                        <UserCheck size={20} className="text-[var(--accent)]" />
+                        Manajemen Akun Staf Perusahaan
+                      </h3>
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                        Direktur dan Admin dapat menambahkan staf baru atau membuat link undangan resmi.
+                      </p>
+                    </div>
+                    <div className="self-start sm:self-center">
+                      {isDirector ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-bold text-xs">
+                          👑 Otoritas Penuh Direktur
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold text-xs">
+                          🛡️ Mode Admin (Akun Admin Lain Dilindungi)
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
+                  {/* 1. Form Tambah Pengguna Langsung */}
                   <form
                     onSubmit={handleCreateUser}
-                    className="mb-6 p-4 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-subtle)]"
+                    className="clean-card p-5 sm:p-6 bg-[#faf9f7] border border-[#e8e5e0] space-y-4"
                   >
-                    <h4 className="font-bold text-sm text-[var(--text-primary)] mb-1">Tambah Pengguna Langsung</h4>
-                    <p className="text-xs text-[var(--text-secondary)] mb-3">
-                      Akun langsung aktif di perusahaan Anda. Pengguna dapat mengganti password setelah login pertama.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <input
-                        required
-                        placeholder="Nama lengkap"
-                        value={newUser.name}
-                        onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-                        className="px-3 py-2 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                      />
-                      <input
-                        required
-                        type="email"
-                        placeholder="Email"
-                        value={newUser.email}
-                        onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                        className="px-3 py-2 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                      />
-                      <input
-                        required
-                        type="password"
-                        minLength={8}
-                        placeholder="Password awal (min. 8 karakter)"
-                        value={newUser.password}
-                        onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                        className="px-3 py-2 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                      />
-                      <input
-                        placeholder="No. HP (opsional)"
-                        value={newUser.phone}
-                        onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
-                        className="px-3 py-2 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                      />
-                      <select
-                        value={newUser.role}
-                        onChange={e => setNewUser({ ...newUser, role: e.target.value as AdminUser['role'] })}
-                        className="px-3 py-2 text-sm rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
-                      >
-                        <option value="TEKNISI_LAPANGAN">Teknisi Lapangan</option>
-                        <option value="MARKETING">Marketing</option>
-                        <option value="INVENTORY">Inventory / Gudang</option>
-                        <option value="ADMIN">Admin Perusahaan</option>
-                      </select>
-                      <button
-                        type="submit"
-                        disabled={creatingUser}
-                        className="px-3 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-bold rounded-lg disabled:opacity-50 cursor-pointer"
-                      >
-                        {creatingUser ? 'Membuat...' : 'Buat Akun'}
-                      </button>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-2">
+                          <Plus size={16} className="text-[var(--accent)]" /> Tambah Pengguna Langsung
+                        </h4>
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                          Akun langsung aktif dan dapat langsung digunakan untuk login.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-[var(--text-secondary)]">Nama Lengkap *</label>
+                        <input
+                          required
+                          placeholder="Contoh: Budi Santoso"
+                          value={newUser.name}
+                          onChange={e => setNewUser({ ...newUser, name: e.target.value })}
+                          className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-[var(--text-secondary)]">Email Perusahaan *</label>
+                        <input
+                          required
+                          type="email"
+                          placeholder="nama@perusahaan.com"
+                          value={newUser.email}
+                          onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                          className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-[var(--text-secondary)]">Password Awal *</label>
+                        <input
+                          required
+                          type="password"
+                          minLength={8}
+                          placeholder="Min. 8 karakter"
+                          value={newUser.password}
+                          onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                          className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-[var(--text-secondary)]">No. WhatsApp / HP</label>
+                        <input
+                          placeholder="Contoh: 0812-3456-7890"
+                          value={newUser.phone}
+                          onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
+                          className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-[var(--text-secondary)]">Pilih Peran / Role *</label>
+                        <select
+                          value={newUser.role}
+                          onChange={e => setNewUser({ ...newUser, role: e.target.value as AdminUser['role'] })}
+                          className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[var(--accent)]"
+                        >
+                          <option value="TEKNISI_LAPANGAN">Teknisi Lapangan (PWA Mobile)</option>
+                          <option value="MARKETING">Marketing / Surveyor</option>
+                          <option value="INVENTORY">Inventory / Staf Gudang</option>
+                          <option value="ADMIN">Admin Operasional</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <button
+                          type="submit"
+                          disabled={creatingUser}
+                          className="w-full min-h-[44px] px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold rounded-xl disabled:opacity-50 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Plus size={15} />
+                          {creatingUser ? 'Membuat...' : 'Buat Akun Sekarang'}
+                        </button>
+                      </div>
                     </div>
                   </form>
 
-                  <div className="mb-6 p-4 bg-[var(--status-completed-bg)] rounded-xl border border-[var(--status-completed-border)]">
-                    <h4 className="font-bold text-sm text-[var(--status-completed-text)] mb-1.5">
-                      Buat Link Undangan (Berlaku 7 Hari)
-                    </h4>
-                    <p className="text-xs text-[var(--text-secondary)] mb-3">
-                      Pendaftaran kini dibatasi hanya melalui link undangan. Buat link di bawah ini dan bagikan ke teknisi atau admin baru untuk mendaftar.
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-3 items-center">
+                  {/* 2. Form Buat Link Undangan */}
+                  <div className="clean-card p-5 sm:p-6 bg-emerald-50/30 border border-emerald-200/80 space-y-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-emerald-950 flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-[var(--accent)]" />
+                          Buat Link Undangan Mandiri (Berlaku 7 Hari)
+                        </h4>
+                        <p className="text-xs text-emerald-800 mt-0.5">
+                          Calon staf dapat mengisi data diri dan password secara mandiri melalui tautan ini.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2.5 items-center">
                       <select
                         value={inviteRole}
                         onChange={e => setInviteRole(e.target.value as AdminUser['role'])}
-                        className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--status-completed-border)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                        className="px-3.5 py-2 min-h-[44px] text-xs sm:text-sm font-semibold rounded-xl border border-emerald-300 bg-white text-[var(--text-primary)]"
                       >
-                        <option value="TEKNISI_LAPANGAN">Teknisi Lapangan</option>
-                        <option value="MARKETING">Marketing</option>
-                        <option value="INVENTORY">Inventory / Gudang</option>
-                        <option value="ADMIN">Admin Perusahaan</option>
+                        <option value="TEKNISI_LAPANGAN">Undangan: Teknisi Lapangan</option>
+                        <option value="MARKETING">Undangan: Marketing</option>
+                        <option value="INVENTORY">Undangan: Inventory / Gudang</option>
+                        <option value="ADMIN">Undangan: Admin Perusahaan</option>
                       </select>
                       <button
                         type="button"
                         onClick={() => handleGenerateInvite(inviteRole)}
                         disabled={isGeneratingInvite}
-                        className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                        className="min-h-[44px] px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer shadow-xs flex items-center gap-1.5"
                       >
-                        {isGeneratingInvite ? 'Membuat...' : 'Buat Undangan'}
+                        <Plus size={14} />
+                        {isGeneratingInvite ? 'Membuat...' : 'Buat Tautan Undangan'}
                       </button>
                     </div>
 
                     {inviteLink && (
-                      <div className="mt-4 p-3 bg-[var(--bg-card)] rounded-lg border border-[var(--border-subtle)] shadow-sm">
-                        <p className="text-xs font-bold text-[var(--text-secondary)] mb-1">
-                          Link Undangan (Kedaluwarsa: {inviteLink.expiresAt})
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-2">
+                        <p className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span>Tautan Pendaftaran Resmi</span>
+                          <span className="font-normal text-slate-500 font-mono text-[11px]">Kedaluwarsa: {inviteLink.expiresAt}</span>
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                           <input
                             type="text"
                             readOnly
                             value={inviteLink.url}
-                            className="flex-1 text-xs px-2.5 py-1.5 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded outline-none text-[var(--text-primary)]"
+                            className="flex-1 text-xs px-3 py-2.5 min-h-[42px] bg-[#faf9f7] border border-slate-200 rounded-xl font-mono text-[var(--text-primary)] select-all"
                           />
                           <button
                             type="button"
@@ -2174,130 +2261,211 @@ export const AdminDashboard: React.FC = () => {
                                 message: 'Link undangan berhasil disalin ke clipboard.',
                               });
                             }}
-                            className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded transition-colors cursor-pointer"
+                            className="min-h-[42px] px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shrink-0"
                           >
-                            Salin
+                            <Copy size={13} /> Salin Link
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {adminUsers.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-[var(--text-muted)]">Tidak ada data pengguna.</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {adminUsers
-                        .filter(
-                          u =>
-                            (u.role as string) !== 'MASTER_SUPER_ADMIN' &&
-                            (u.role as string) !== 'SUPERADMIN' &&
-                            u.email.toLowerCase() !== 'lieziragroup@gmail.com'
-                        )
-                        .map(u => (
-                          <div
-                            key={u.id}
-                            className={`p-4 rounded-xl border ${
-                              u.is_active
-                                ? 'bg-[var(--bg-tertiary)] border-[var(--border-subtle)]'
-                                : 'bg-[var(--status-flagged-bg)] border-[var(--status-flagged-border)]'
-                            } flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs`}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="font-bold text-[var(--text-primary)] text-sm">{u.name}</span>
-                                <span
-                                  className={`text-xs font-mono px-2 py-0.5 rounded font-bold border ${
-                                    u.is_active
-                                      ? 'bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border-[var(--status-completed-border)]'
-                                      : 'bg-[var(--status-flagged-bg)] text-[var(--status-flagged-text)] border-[var(--status-flagged-border)]'
-                                  }`}
-                                >
-                                  {u.is_active ? 'AKTIF' : 'DITANGGUHKAN'}
-                                </span>
-                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] font-bold">
-                                  {u.role}
-                                </span>
-                              </div>
-                              <p className="text-[var(--text-secondary)] font-mono">
-                                {u.email} • NIP: {u.nip || '-'}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)] mt-1">
-                                Mendaftar pada: {new Date(u.created_at).toLocaleString('id-ID')} WIB
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {u.is_active ? (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="px-3 py-1.5 rounded-lg border border-[var(--status-flagged-border)] text-[var(--status-flagged-text)] hover:bg-[var(--status-flagged-bg)] font-bold transition-colors cursor-pointer"
-                                    >
-                                      Nonaktifkan Akun
-                                    </button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Nonaktifkan Akun {u.name}?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Pengguna tidak akan dapat masuk ke sistem selama akun dinonaktifkan. Anda dapat mengaktifkan kembali akun ini kapan saja.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel className="font-medium">Batalkan</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => void handleSuspend(u)}
-                                        className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
-                                      >
-                                        Ya, Nonaktifkan
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleActivate(u)}
-                                  className="px-4 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold transition-colors shadow-sm cursor-pointer"
-                                >
-                                  Aktifkan Akun
-                                </button>
-                              )}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <button
-                                    type="button"
-                                    aria-label={`Hapus akun ${u.name} secara permanen`}
-                                    className="p-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--status-flagged-bg)] hover:text-[var(--status-flagged-text)] hover:border-[var(--status-flagged-border)] transition-colors cursor-pointer"
-                                    title="Hapus Akun Permanen"
-                                  >
-                                    <Trash2 size={16} aria-hidden="true" />
-                                  </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Hapus Akun Pengguna Secara Permanen?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tindakan ini tidak dapat dibatalkan. Menghapus akun <strong>{u.name}</strong> akan mencabut kredensial loginnya secara permanen, sementara riwayat laporan kerja tetap tersimpan untuk audit.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel className="font-medium">Batalkan</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => void handleDeleteUser(u.id)}
-                                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm"
-                                    >
-                                      Ya, Hapus Permanen
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        ))}
+                  {/* 3. Daftar Akun Pengguna Terdaftar */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-extrabold text-[var(--text-primary)]">
+                          Daftar Akun Karyawan Terdaftar
+                        </h4>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          Total {adminUsers.filter(u => u.email.toLowerCase() !== 'lieziragroup@gmail.com' && (u.role as string) !== 'MASTER_SUPER_ADMIN').length} akun terdata di perusahaan ini.
+                        </p>
+                      </div>
+
+                      {/* Search Bar Pengguna */}
+                      <div className="relative w-full sm:w-64">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={userSearchQ}
+                          onChange={e => setUserSearchQ(e.target.value)}
+                          placeholder="Cari nama, email, NIP..."
+                          className="w-full pl-8 pr-3 py-2 min-h-[40px] text-xs rounded-xl border border-[var(--border)] bg-white text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                        />
+                      </div>
                     </div>
-                  )}
+
+                    {adminUsers.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-[var(--text-muted)] clean-card p-6">
+                        Tidak ada data pengguna terdaftar.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {adminUsers
+                          .filter(
+                            u =>
+                              (u.role as string) !== 'MASTER_SUPER_ADMIN' &&
+                              (u.role as string) !== 'SUPERADMIN' &&
+                              u.email.toLowerCase() !== 'lieziragroup@gmail.com'
+                          )
+                          .filter(u => {
+                            if (!userSearchQ.trim()) return true;
+                            const q = userSearchQ.toLowerCase();
+                            return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.nip || '').toLowerCase().includes(q);
+                          })
+                          .map(u => {
+                            const isSelf = u.id === user?.id;
+                            const isTargetAdmin = u.role === 'ADMIN';
+                            const cannotManage = !isDirector && isTargetAdmin;
+
+                            return (
+                              <div
+                                key={u.id}
+                                className={`clean-card p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
+                                  u.is_active ? 'hover:border-emerald-300' : 'bg-rose-50/20 border-rose-200'
+                                }`}
+                              >
+                                <div className="space-y-1.5 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-extrabold text-[var(--text-primary)] text-sm sm:text-base">{u.name}</span>
+                                    <span
+                                      className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                        u.is_active
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                                      }`}
+                                    >
+                                      {u.is_active ? 'AKTIF' : 'DITANGGUHKAN'}
+                                    </span>
+                                    <span
+                                      className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                        u.role === 'ADMIN'
+                                          ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                          : u.role === 'MARKETING'
+                                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                          : u.role === 'INVENTORY'
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-teal-50 text-teal-800 border-teal-200'
+                                      }`}
+                                    >
+                                      {u.role === 'ADMIN'
+                                        ? 'ADMIN'
+                                        : u.role === 'MARKETING'
+                                        ? 'MARKETING'
+                                        : u.role === 'INVENTORY'
+                                        ? 'GUDANG'
+                                        : 'TEKNISI'}
+                                    </span>
+                                    {isSelf && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                        Akun Anda
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-xs text-[var(--text-secondary)] font-mono flex items-center gap-2 flex-wrap">
+                                    <span>{u.email}</span>
+                                    {u.nip && <span>• NIP: {u.nip}</span>}
+                                    {u.phone && <span>• WA: {u.phone}</span>}
+                                  </div>
+
+                                  <div className="text-[11px] text-[var(--text-muted)]">
+                                    Terdaftar: {new Date(u.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </div>
+                                </div>
+
+                                {/* Aksi Manajemen Akun */}
+                                <div className="flex items-center gap-2 shrink-0 self-start md:self-center flex-wrap">
+                                  {isSelf ? (
+                                    <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 font-semibold text-xs border border-slate-200">
+                                      Sesi Aktif
+                                    </span>
+                                  ) : cannotManage ? (
+                                    <div
+                                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold"
+                                      title="Admin tidak memiliki wewenang menonaktifkan akun Admin lainnya. Tindakan ini hanya dapat dilakukan oleh Direktur."
+                                    >
+                                      <Lock size={13} className="text-amber-600" />
+                                      <span>Khusus Wewenang Direktur</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {u.is_active ? (
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <button
+                                              type="button"
+                                              className="min-h-[42px] px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50/70 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer"
+                                            >
+                                              Nonaktifkan Akun
+                                            </button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Nonaktifkan Akun {u.name}?</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Pengguna tidak akan dapat masuk ke sistem selama akun dinonaktifkan. Anda dapat mengaktifkan kembali akun ini kapan saja.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel className="font-medium">Batalkan</AlertDialogCancel>
+                                              <AlertDialogAction
+                                                onClick={() => void handleSuspend(u)}
+                                                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                                              >
+                                                Ya, Nonaktifkan
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleActivate(u)}
+                                          className="min-h-[42px] px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                                        >
+                                          Aktifkan Akun
+                                        </button>
+                                      )}
+
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <button
+                                            type="button"
+                                            aria-label={`Hapus akun ${u.name} secara permanen`}
+                                            className="min-h-[42px] min-w-[42px] flex items-center justify-center p-2 rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors cursor-pointer"
+                                            title="Hapus Akun Permanen"
+                                          >
+                                            <Trash2 size={16} aria-hidden="true" />
+                                          </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Hapus Akun Pengguna Secara Permanen?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Tindakan ini tidak dapat dibatalkan. Menghapus akun <strong>{u.name}</strong> akan mencabut kredensial loginnya secara permanen, sementara riwayat laporan kerja tetap tersimpan untuk audit.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel className="font-medium">Batalkan</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={() => void handleDeleteUser(u.id)}
+                                              className="bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs"
+                                            >
+                                              Ya, Hapus Permanen
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

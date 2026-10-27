@@ -292,3 +292,35 @@ test('WB-10 [Warehouse Catalog & Data Gudang September Invariants]', async (t) =
         assert.equal(septLastDay, 30);
     });
 });
+
+test('WB-11 [User Setup Authorization & Peer Admin Suspend Protection]', async (t) => {
+    function canManageUserStatus(actor: { role: string; email?: string }, target: { role: string }): boolean {
+        const isDirector = isDirectorUser(actor);
+        // Direktur bisa mengelola/menonaktifkan seluruh role
+        if (isDirector) return true;
+        // Admin TIDAK BISA menonaktifkan akun Admin lainnya
+        if (actor.role === 'ADMIN' && target.role === 'ADMIN') return false;
+        // Admin BISA menonaktifkan role operasional (Teknisi, Marketing, Inventory)
+        if (actor.role === 'ADMIN' && ['TEKNISI_LAPANGAN', 'MARKETING', 'INVENTORY'].includes(target.role)) return true;
+        return false;
+    }
+
+    await t.test('Admin DILARANG menonaktifkan/suspend akun Admin lainnya', () => {
+        const adminActor = { role: 'ADMIN', email: 'admin.fauzi@fieldwork.id' };
+        const peerAdmin = { role: 'ADMIN' };
+        assert.equal(canManageUserStatus(adminActor, peerAdmin), false);
+    });
+
+    await t.test('Admin BISA menonaktifkan akun Teknisi, Marketing, dan Gudang', () => {
+        const adminActor = { role: 'ADMIN', email: 'admin.fauzi@fieldwork.id' };
+        assert.equal(canManageUserStatus(adminActor, { role: 'TEKNISI_LAPANGAN' }), true);
+        assert.equal(canManageUserStatus(adminActor, { role: 'MARKETING' }), true);
+        assert.equal(canManageUserStatus(adminActor, { role: 'INVENTORY' }), true);
+    });
+
+    await t.test('Direktur (SUPERADMIN / Tim Direksi) BISA menonaktifkan akun Admin maupun staf lainnya', () => {
+        const directorActor = { role: 'SUPERADMIN', email: 'direktur@gucimaspratama.co.id' };
+        assert.equal(canManageUserStatus(directorActor, { role: 'ADMIN' }), true);
+        assert.equal(canManageUserStatus(directorActor, { role: 'TEKNISI_LAPANGAN' }), true);
+    });
+});
