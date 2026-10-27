@@ -3,7 +3,7 @@ import {
     Package, FileText, Search, Plus, Download, UploadCloud,
     ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle,
     ClipboardList, Trash2, Briefcase, Calculator, TrendingUp, CheckCircle2,
-    Lock, ShieldAlert,
+    Lock, ShieldAlert, ArrowRight, Check,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuthStore } from '@/app/store/authStore';
@@ -384,10 +384,10 @@ export function InventoryPage() {
         { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ] : [
         { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
-        { id: "proyek", label: "Alokasi Chemical ke Proyek", shortLabel: "Alokasi Chemical", icon: <Calculator size={15} />, badge: projects.length },
-        { id: "rekap",  label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileText size={15} /> },
-        { id: "log",    label: "Riwayat Masuk / Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
-        { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+        { id: "proyek", label: "Alokasi Pemakaian ke Proyek", shortLabel: "Dipakai Proyek", icon: <Briefcase size={15} />, badge: projects.length },
+        { id: "rekap",  label: "Rekap Mutasi Bulanan", shortLabel: "Rekap Bulanan", icon: <FileText size={15} /> },
+        { id: "log",    label: "Riwayat Masuk & Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "alert",  label: "Stok Mau Habis (Perlu Beli)", shortLabel: "Mau Habis", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ];
 
     if (!companyId) {
@@ -395,7 +395,66 @@ export function InventoryPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
+            {/* Pusat Aksi Cepat (Senior Staff & Mobile Friendly Attention Bar) */}
+            {canWrite && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const defaultItem = items[0];
+                            if (defaultItem) openMutationModal(defaultItem, "IN", "", "REALISASI");
+                            else setShowNew(true);
+                        }}
+                        className="clean-card p-4 sm:p-5 flex items-center justify-between gap-3 text-left hover:border-emerald-500 bg-gradient-to-r from-emerald-50/70 to-white transition-all cursor-pointer group shadow-2xs"
+                    >
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                                <ArrowDownCircle size={22} />
+                            </div>
+                            <div>
+                                <span className="font-extrabold text-sm sm:text-base text-emerald-950 block">
+                                    + Catat Barang Masuk (IN)
+                                </span>
+                                <span className="text-xs text-emerald-800/90 mt-0.5 block">
+                                    Tambah stok obat atau alat yang baru dibeli / datang dari supplier
+                                </span>
+                            </div>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-700 hidden sm:inline-flex items-center gap-1 shrink-0">
+                            Catat <ArrowRight size={13} />
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const defaultItem = items[0];
+                            if (defaultItem) openMutationModal(defaultItem, "OUT", projects[0]?.id || "", "REALISASI");
+                            else setTab("proyek");
+                        }}
+                        className="clean-card p-4 sm:p-5 flex items-center justify-between gap-3 text-left hover:border-amber-500 bg-gradient-to-r from-amber-50/70 to-white transition-all cursor-pointer group shadow-2xs"
+                    >
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                                <ArrowUpCircle size={22} />
+                            </div>
+                            <div>
+                                <span className="font-extrabold text-sm sm:text-base text-amber-950 block">
+                                    - Catat Dipakai Proyek / Teknisi (OUT)
+                                </span>
+                                <span className="text-xs text-amber-800/90 mt-0.5 block">
+                                    Keluarkan obat/alat yang dibawa teknisi ke lokasi proyek klien
+                                </span>
+                            </div>
+                        </div>
+                        <span className="text-xs font-bold text-amber-700 hidden sm:inline-flex items-center gap-1 shrink-0">
+                            Catat <ArrowRight size={13} />
+                        </span>
+                    </button>
+                </div>
+            )}
+
             {/* Sub-tab internal Gudang & Analisis Direktur */}
             {(isWarehouseRole || isDirector) && (
                 <TabContainer
@@ -428,13 +487,13 @@ export function InventoryPage() {
                     <div className="flex flex-wrap items-center gap-2 bg-[#f5f3ef] border border-[#e8e5e0] rounded-2xl p-1.5">
                         <button
                             onClick={() => setTab("proyek")}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer"
                         >
-                            <Calculator size={14} /> Estimasi Chemical Proyek
+                            <Calculator size={14} /> Estimasi Proyek
                         </button>
                         <button
                             onClick={() => setShowNew(true)}
-                            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] transition-colors shadow-xs"
+                            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] transition-colors shadow-xs cursor-pointer"
                         >
                             <Plus size={14} /> Tambah Barang Baru
                         </button>
@@ -779,21 +838,25 @@ export function InventoryPage() {
                                                 )}
                                             </td>
                                             {canWrite && (
-                                                <td className="p-3 text-center whitespace-nowrap bg-emerald-50/20">
-                                                    <div className="inline-flex items-center gap-1.5">
+                                                <td className="p-3 text-center whitespace-nowrap bg-emerald-50/15">
+                                                    <div className="inline-flex items-center gap-2">
                                                         <button
+                                                            type="button"
                                                             onClick={() => openMutationModal(s, "IN", "", "REALISASI")}
-                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full transition-colors"
-                                                            title="Catat Barang Masuk (IN)"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                                            title="Catat Barang Masuk (+)"
                                                         >
-                                                            <ArrowDownCircle size={13} /> + Masuk
+                                                            <ArrowDownCircle size={15} className="text-emerald-700 shrink-0" />
+                                                            <span>+ Masuk</span>
                                                         </button>
                                                         <button
-                                                            onClick={() => openMutationModal(s, "OUT", projects[0]?.id ?? "", "ESTIMASI")}
-                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-full transition-colors"
-                                                            title="Catat Estimasi / Pemakaian ke ID Proyek"
+                                                            type="button"
+                                                            onClick={() => openMutationModal(s, "OUT", projects[0]?.id ?? "", "REALISASI")}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                                            title="Catat Dipakai Proyek (-)"
                                                         >
-                                                            <ArrowUpCircle size={13} /> Pakai / Estimasi Proyek
+                                                            <ArrowUpCircle size={15} className="text-amber-700 shrink-0" />
+                                                            <span>- Pakai Proyek</span>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -868,67 +931,89 @@ export function InventoryPage() {
                 </div>
             )}
 
-            {/* Modal Mutasi & Input Estimasi Chemical per ID Proyek */}
+            {/* Modal Mutasi & Input Alokasi Gudang */}
             {mutation && (
-                <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4" onClick={() => !busy && setMutation(null)}>
-                    <div className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3.5 shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-slate-900 text-sm sm:text-base">
-                                {mutation.type === "IN" ? "Catat Barang Masuk (IN)" : "Input Estimasi / Pemakaian Chemical Proyek"}
-                            </h3>
-                            <button onClick={() => setMutation(null)} disabled={busy}><X size={16} /></button>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 modal-overlay-in" onClick={() => !busy && setMutation(null)}>
+                    <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl modal-card-in border border-[var(--border)]" onClick={e => e.stopPropagation()}>
+                        {/* Header Modal */}
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                            <div className="flex items-center gap-2.5">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-2xs ${
+                                    mutation.type === "IN" ? "bg-emerald-600" : "bg-amber-600"
+                                }`}>
+                                    {mutation.type === "IN" ? <ArrowDownCircle size={18} /> : <ArrowUpCircle size={18} />}
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
+                                        {mutation.type === "IN" ? "Catat Barang Masuk (Stok Nambah)" : "Catat Dipakai Proyek / Teknisi (Stok Keluar)"}
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        {mutation.type === "IN" ? "Saldo stok di gudang akan otomatis bertambah." : "Pilih proyek atau nama teknisi yang membawa barang ini."}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setMutation(null)}
+                                disabled={busy}
+                                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
+                            >
+                                <X size={16} />
+                            </button>
                         </div>
 
-                        <div className="space-y-2 text-xs">
-                            <label className="block font-bold text-slate-700">Bahan Chemical / Alat</label>
+                        {/* Preview Saldo Stok Otomatis */}
+                        <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+                            mutation.type === "IN"
+                                ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
+                                : "bg-amber-50/70 border-amber-200 text-amber-950"
+                        }`}>
+                            <div>
+                                <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">Stok Saat Ini</span>
+                                <span className="text-base font-extrabold font-mono text-slate-900">{fmt(mutation.item.stok)} {mutation.item.satuan}</span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                                    {mutation.type === "IN" ? "Saldo Nanti (Setelah Masuk)" : "Sisa Nanti (Setelah Keluar)"}
+                                </span>
+                                <span className={`text-base font-extrabold font-mono ${
+                                    mutation.type === "IN"
+                                        ? "text-emerald-700"
+                                        : (mutation.item.stok - (Number(mQty.replace(",", ".")) || 0)) < 0
+                                        ? "text-rose-700 font-bold"
+                                        : "text-amber-800"
+                                }`}>
+                                    {mutation.type === "IN"
+                                        ? fmt(mutation.item.stok + (Number(mQty.replace(",", ".")) || 0))
+                                        : fmt(Math.max(0, mutation.item.stok - (Number(mQty.replace(",", ".")) || 0)))} {mutation.item.satuan}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Pilihan Barang / Item */}
+                        <div className="space-y-1.5 text-xs">
+                            <label className="block font-bold text-slate-800">Nama Barang / Obat / Alat *</label>
                             <select
                                 value={mutation.item.id}
                                 onChange={e => {
                                     const found = items.find(i => i.id === e.target.value);
                                     if (found) setMutation({ ...mutation, item: found });
                                 }}
-                                className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold"
+                                className="w-full px-3.5 py-2.5 min-h-[44px] rounded-xl border border-slate-300 bg-white font-semibold text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-[var(--accent)]"
                             >
                                 {items.map(it => (
                                     <option key={it.id} value={it.id}>
-                                        {it.nama} (Stok: {fmt(it.stok)} {it.satuan} • HPP: {formatRupiah(it.hargaSatuan)})
+                                        {it.nama} — Sisa: {fmt(it.stok)} {it.satuan}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
+                        {/* Jika Barang Keluar: Pilih Proyek / Klien */}
                         {mutation.type === "OUT" && (
-                            <>
+                            <div className="space-y-3">
                                 <div className="space-y-1.5 text-xs">
-                                    <label className="block font-bold text-slate-700">Jenis Pencatatan Gudang</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setMTipeCatatan("ESTIMASI")}
-                                            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-                                                mTipeCatatan === "ESTIMASI"
-                                                    ? "border-amber-600 bg-amber-50 text-amber-900"
-                                                    : "border-slate-200 bg-white text-slate-600"
-                                            }`}
-                                        >
-                                            Catatan Estimasi Proyek
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setMTipeCatatan("REALISASI")}
-                                            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-                                                mTipeCatatan === "REALISASI"
-                                                    ? "border-emerald-600 bg-emerald-50 text-emerald-900"
-                                                    : "border-slate-200 bg-white text-slate-600"
-                                            }`}
-                                        >
-                                            Pemakaian Aktual (Potong Stok)
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1.5 text-xs">
-                                    <label className="block font-bold text-slate-700">Pilih ID Proyek (Untuk Analisis Untung Rugi)</label>
+                                    <label className="block font-bold text-slate-800">Pilih Proyek / Nama Klien Tujuan *</label>
                                     <select
                                         value={mProjectId}
                                         onChange={e => {
@@ -936,53 +1021,93 @@ export function InventoryPage() {
                                             const p = projects.find(x => x.id === e.target.value);
                                             if (p) setMProyek(`[ID:${p.code}] ${p.projectName}`);
                                         }}
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold"
+                                        className="w-full px-3.5 py-2.5 min-h-[44px] rounded-xl border border-slate-300 bg-white font-semibold text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-[var(--accent)]"
                                     >
-                                        <option value="">-- Pilih Proyek Terdaftar --</option>
+                                        <option value="">-- Pilih Nama Klien / Proyek --</option>
                                         {projects.map(p => (
                                             <option key={p.id} value={p.id}>
-                                                [{p.code}] {p.projectName} ({formatRupiah(p.contractValue)})
+                                                {p.clientName} — {p.projectName} ({p.code})
                                             </option>
                                         ))}
                                     </select>
                                 </div>
-                            </>
+
+                                <div className="space-y-1.5 text-xs">
+                                    <label className="block font-bold text-slate-800">Status Pencatatan</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setMTipeCatatan("REALISASI")}
+                                            className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                                mTipeCatatan === "REALISASI"
+                                                    ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-2xs"
+                                                    : "border-slate-200 bg-white text-slate-600"
+                                            }`}
+                                        >
+                                            Pemakaian Aktual (Potong Stok)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setMTipeCatatan("ESTIMASI")}
+                                            className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                                mTipeCatatan === "ESTIMASI"
+                                                    ? "border-amber-600 bg-amber-50 text-amber-900 shadow-2xs"
+                                                    : "border-slate-200 bg-white text-slate-600"
+                                            }`}
+                                        >
+                                            Catatan Estimasi Saja
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
+                        {/* Input Jumlah Qty */}
                         <div className="space-y-1.5 text-xs">
-                            <label className="block font-bold text-slate-700">Jumlah ({mutation.item.satuan}) *</label>
+                            <label className="block font-bold text-slate-800">
+                                Jumlah ({mutation.item.satuan}) Yang {mutation.type === "IN" ? "Masuk (+)" : "Dikeluarkan (-)"} *
+                            </label>
                             <input
                                 autoFocus
                                 inputMode="decimal"
-                                placeholder={`Contoh: 4 (${mutation.item.satuan})`}
+                                placeholder="Ketik angka jumlah (mis: 2 atau 5)"
                                 value={mQty}
                                 onChange={e => setMQty(e.target.value)}
-                                className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 font-mono font-bold"
+                                className="w-full px-3.5 py-2.5 min-h-[46px] text-base rounded-xl border border-slate-300 font-mono font-bold text-slate-900 focus:outline-none focus:border-[var(--accent)]"
                             />
-                            {Number(mQty.replace(",", ".")) > 0 && (
-                                <p className="text-[11px] text-emerald-800 font-semibold">
-                                    Estimasi Nilai HPP Chemical: {formatRupiah(Number(mQty.replace(",", ".")) * mutation.item.hargaSatuan)}
+                            {isDirector && Number(mQty.replace(",", ".")) > 0 && (
+                                <p className="text-[11px] text-emerald-800 font-semibold pt-0.5">
+                                    Estimasi Nilai HPP: {formatRupiah(Number(mQty.replace(",", ".")) * mutation.item.hargaSatuan)}
                                 </p>
                             )}
                         </div>
 
+                        {/* Input Catatan / Nama Teknisi */}
                         <div className="space-y-1.5 text-xs">
-                            <label className="block font-bold text-slate-700">Catatan Gudang (Internal)</label>
+                            <label className="block font-bold text-slate-800">Catatan / Nama Teknisi Pembawa</label>
                             <input
-                                placeholder="Catatan dosis / area pemakaian untuk tim..."
+                                placeholder="Contoh: Dibawa Teknisi Budi / Kunjungan rutin"
                                 value={mNote}
                                 onChange={e => setMNote(e.target.value)}
-                                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                                className="w-full px-3.5 py-2.5 min-h-[44px] text-xs sm:text-sm rounded-xl border border-slate-300 text-slate-900 focus:outline-none focus:border-[var(--accent)]"
                             />
                         </div>
 
-                        <button
-                            onClick={submitMutation}
-                            disabled={busy}
-                            className="w-full py-2.5 text-xs sm:text-sm font-bold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white disabled:opacity-50"
-                        >
-                            {busy ? "Menyimpan..." : "Simpan ke ID Proyek & Gudang"}
-                        </button>
+                        {/* Tombol Simpan */}
+                        <div className="pt-2">
+                            <button
+                                type="button"
+                                onClick={submitMutation}
+                                disabled={busy}
+                                className={`w-full min-h-[48px] py-3 text-xs sm:text-sm font-extrabold rounded-xl text-white transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${
+                                    mutation.type === "IN"
+                                        ? "bg-emerald-700 hover:bg-emerald-800"
+                                        : "bg-amber-600 hover:bg-amber-700"
+                                }`}
+                            >
+                                {busy ? "Menyimpan ke Sistem..." : mutation.type === "IN" ? "Simpan Barang Masuk (+)" : "Simpan Barang Keluar (-)"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
