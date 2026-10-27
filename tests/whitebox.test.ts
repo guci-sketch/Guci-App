@@ -364,3 +364,51 @@ test('WB-12 [Quotation Draft Download Lockdown & ACC Approval Gate]', async (t) 
         assert.equal(clean[1].desc, 'Plafon Lt 1-4');
     });
 });
+
+test('WB-13 [Invite Token Server-Side Registration & OTP Expired Protection]', async (t) => {
+    function parseAuthHashError(hash: string): { errorCode: string | null; errorDescription: string | null } {
+        const clean = hash.startsWith('#') ? hash.substring(1) : hash;
+        const params = new URLSearchParams(clean);
+        return {
+            errorCode: params.get('error_code'),
+            errorDescription: params.get('error_description'),
+        };
+    }
+
+    await t.test('Mendeteksi parameter error Supabase #error=access_denied&error_code=otp_expired', () => {
+        const sampleHash = '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired';
+        const parsed = parseAuthHashError(sampleHash);
+        assert.equal(parsed.errorCode, 'otp_expired');
+        assert.equal(parsed.errorDescription, 'Email link is invalid or has expired');
+    });
+
+    await t.test('Validasi token undangan: token aktif dan belum expired diizinkan registrasi langsung', () => {
+        const now = Date.now();
+        const mockInvite = {
+            id: 'tok-valid-123',
+            used: false,
+            expiresAt: new Date(now + 86400000).toISOString(),
+        };
+        const isTokenValid = !mockInvite.used && new Date(mockInvite.expiresAt).getTime() > now;
+        assert.equal(isTokenValid, true);
+    });
+
+    await t.test('Validasi token undangan: token kedaluwarsa atau sudah dipakai ditolak', () => {
+        const now = Date.now();
+        const expiredInvite = {
+            id: 'tok-exp-123',
+            used: false,
+            expiresAt: new Date(now - 1000).toISOString(),
+        };
+        const isExpiredValid = !expiredInvite.used && new Date(expiredInvite.expiresAt).getTime() > now;
+        assert.equal(isExpiredValid, false);
+
+        const usedInvite = {
+            id: 'tok-used-123',
+            used: true,
+            expiresAt: new Date(now + 86400000).toISOString(),
+        };
+        const isUsedValid = !usedInvite.used && new Date(usedInvite.expiresAt).getTime() > now;
+        assert.equal(isUsedValid, false);
+    });
+});

@@ -37,6 +37,24 @@ export function SignupPage() {
     });
     const [showPassword, setShowPassword] = useState(false);
 
+    // Deteksi dan bersihkan parameter hash error Supabase (contoh: #error=access_denied&error_code=otp_expired)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.location.hash) {
+            const hashStr = window.location.hash.substring(1);
+            const params = new URLSearchParams(hashStr);
+            const errCode = params.get("error_code");
+            const errDesc = params.get("error_description");
+            if (errCode || errDesc) {
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
+                    setError("Tautan konfirmasi email dari tautan sebelumnya telah kedaluwarsa. Jika Anda mendaftar melalui token undangan, akun Anda akan langsung diaktifkan tanpa menunggu verifikasi email.");
+                } else {
+                    setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi."));
+                }
+            }
+        }
+    }, []);
+
     useEffect(() => {
         if (!inviteToken) {
             setInvite(null);
@@ -108,23 +126,60 @@ export function SignupPage() {
 
         setLoading(true);
         try {
-            const { data: authData, error: authErr } = await supabase.auth.signUp({
-                email: form.email.trim(),
-                password: form.password,
-            });
-            if (authErr) throw authErr;
-            if (!authData.user) throw new Error("Gagal mendaftar. Silakan coba lagi.");
-
-            if (authData.session) {
-                await acceptInvite(inviteToken, form.userName);
-            } else {
-                rememberPendingInvite(inviteToken, form.userName);
+            // 1. Coba registrasi server-side langsung via backend API (email_confirm: true, anti-otp_expired)
+            let registeredViaApi = false;
+            try {
+                const resp = await fetch("/api/auth/register-invite", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        token: inviteToken.trim(),
+                        name: form.userName.trim(),
+                        email: form.email.trim(),
+                        password: form.password,
+                    }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(data.message || "Gagal mendaftar dengan token undangan.");
+                }
+                registeredViaApi = true;
+            } catch (apiErr: any) {
+                console.warn("[signup] API register-invite gagal, beralih ke fallback client-side:", apiErr.message);
+                // Jika error karena token sudah dipakai atau email duplikat, lempar error asli
+                if (apiErr.message && (apiErr.message.includes("sudah") || apiErr.message.includes("kedaluwarsa") || apiErr.message.includes("tidak ditemukan"))) {
+                    throw apiErr;
+                }
             }
+
+            // 2. Fallback client-side jika API backend tidak merespons
+            if (!registeredViaApi) {
+                const { data: authData, error: authErr } = await supabase.auth.signUp({
+                    email: form.email.trim(),
+                    password: form.password,
+                });
+                if (authErr) throw authErr;
+                if (!authData.user) throw new Error("Gagal mendaftar. Silakan coba lagi.");
+
+                if (authData.session) {
+                    await acceptInvite(inviteToken, form.userName);
+                } else {
+                    rememberPendingInvite(inviteToken, form.userName);
+                }
+            }
+
+            // 3. Login otomatis jika akun sudah terkonfirmasi
+            try {
+                await supabase.auth.signInWithPassword({
+                    email: form.email.trim(),
+                    password: form.password,
+                });
+            } catch { /* abaikan jika gagal, tetap arahkan */ }
 
             setSuccess(true);
             setTimeout(() => {
-                navigate("/login");
-            }, 2500);
+                navigate("/");
+            }, 1800);
         } catch (err: any) {
             setError(err.message || "Gagal menyelesaikan pendaftaran.");
             await supabase.auth.signOut();
@@ -132,7 +187,6 @@ export function SignupPage() {
             setLoading(false);
         }
     };
-
     return (
         <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 selection:bg-[var(--accent-glow)]">
             <div className="w-full max-w-sm sm:max-w-[410px] md:max-w-[430px] mx-auto">

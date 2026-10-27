@@ -49,6 +49,24 @@ export function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Deteksi dan bersihkan parameter hash error Supabase (contoh: #error=access_denied&error_code=otp_expired)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.location.hash) {
+            const hashStr = window.location.hash.substring(1);
+            const params = new URLSearchParams(hashStr);
+            const errCode = params.get("error_code");
+            const errDesc = params.get("error_description");
+            if (errCode || errDesc) {
+                window.history.replaceState(null, "", window.location.pathname);
+                if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
+                    setError("Tautan email telah kedaluwarsa atau sudah pernah diklik. Silakan langsung login dengan email dan password akun Anda di bawah ini.");
+                } else {
+                    setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi email."));
+                }
+            }
+        }
+    }, []);
+
     // Jika URL memiliki ?invite=..., arahkan otomatis ke halaman aktivasi token /signup
     useEffect(() => {
         const inv = searchParams.get("invite") || searchParams.get("token");
@@ -62,10 +80,31 @@ export function LoginPage() {
         setLoading(true);
 
         try {
-            const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+            let { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
                 email: loginEmail.trim(),
                 password: loginPassword,
             });
+
+            // Jika gagal karena email belum terkonfirmasi, coba auto-confirm lewat server API dan retry
+            if (authErr && (authErr.message.toLowerCase().includes("not confirmed") || authErr.message.toLowerCase().includes("unconfirmed"))) {
+                try {
+                    const confirmRes = await fetch("/api/auth/auto-confirm-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: loginEmail.trim() }),
+                    });
+                    const confirmData = await confirmRes.json();
+                    if (confirmData.success) {
+                        const retry = await supabase.auth.signInWithPassword({
+                            email: loginEmail.trim(),
+                            password: loginPassword,
+                        });
+                        authData = retry.data;
+                        authErr = retry.error;
+                    }
+                } catch { /* abaikan error fallback */ }
+            }
+
             if (authErr) throw authErr;
             if (!authData.user) throw new Error("Login gagal. Silakan coba lagi.");
 
