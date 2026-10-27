@@ -56,12 +56,12 @@ export function FieldJobsPage() {
     useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
     return (
-        <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="clean-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-lg font-bold text-slate-900 tracking-tight">Daftar Penugasan Kerja</h1>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <h1 className="text-lg sm:text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Daftar Penugasan Kerja</h1>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         Jadwal penanganan operasional layanan di lokasi klien
                     </p>
                 </div>
@@ -69,14 +69,14 @@ export function FieldJobsPage() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={loadData}
-                        className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+                        className="p-2.5 rounded-xl border border-[var(--border)] bg-[#faf9f7] hover:bg-[#f5f3ef] text-[var(--text-secondary)] transition-colors cursor-pointer shrink-0"
                         title="Segarkan data"
                     >
                         <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
                     </button>
                     <Link
                         to="/quotations/new"
-                        className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
+                        className="px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs"
                     >
                         <Plus size={14} /> Buat Penawaran
                     </Link>
@@ -84,25 +84,25 @@ export function FieldJobsPage() {
             </div>
 
             {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2.5">
                 <div className="relative flex-1">
-                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                         type="text"
                         placeholder="Cari nama klien, lokasi, nomor surat..."
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-slate-800"
+                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-[var(--border)] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[var(--accent)]"
                     />
                 </div>
 
-                <div className="flex bg-slate-100 p-1 rounded-lg text-xs font-medium overflow-x-auto">
+                <div className="flex bg-[#f5f3ef] border border-[#e8e5e0] p-1 rounded-xl text-xs font-bold overflow-x-auto shrink-0">
                     {(["all", "assigned", "in_progress", "done"] as const).map((st) => (
                         <button
                             key={st}
                             onClick={() => { setFilterStatus(st); setPage(1); }}
-                            className={`px-3 py-1 rounded-md whitespace-nowrap transition-colors ${
-                                filterStatus === st ? "bg-white text-slate-900 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                                filterStatus === st ? "bg-white text-[var(--text-primary)] font-bold shadow-xs" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                             }`}
                         >
                             {st === "all" ? "Semua" : st === "assigned" ? "Terjadwal" : st === "in_progress" ? "Berjalan" : "Selesai"}
@@ -126,7 +126,7 @@ export function FieldJobsPage() {
                     pagedSpks.map((spk) => (
                         <div
                             key={spk.id}
-                            className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
+                            className="clean-card p-5 sm:p-6 space-y-3.5 hover:border-emerald-300 transition-colors"
                         >
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                                 <div>

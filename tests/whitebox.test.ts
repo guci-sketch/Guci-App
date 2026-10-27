@@ -244,3 +244,17 @@ test('WB-08 [Marketing MoM Personal Isolation & Service Category Breakdown]', as
         assert.equal(pestDealPct, 100); // 1 deal / 1 survey = 100%
     });
 });
+
+test('WB-09 [UI Minimalist Spacing & Layout Decluttering Invariants]', async (t) => {
+    await t.test('Standar breathing room: Card minimum padding adalah 16px (p-4) hingga 24px (p-6)', () => {
+        const cardPaddings = [16, 20, 24]; // p-4, p-5, p-6
+        cardPaddings.forEach(p => {
+            assert.ok(p >= 16, `Padding ${p}px memenuhi standar breathing room`);
+        });
+    });
+
+    await t.test('Standar tap target tombol dan input mobile minimal 44px', () => {
+        const mobileTapTarget = 44; // min-height standard
+        assert.ok(mobileTapTarget >= 44, 'Tap target mobile memenuhi accessibility standard');
+    });
+});

@@ -469,7 +469,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
         }
     >
-      <div className="p-3 sm:p-4 space-y-3.5 max-w-7xl w-full mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
           {isSuper && !activeCompanyId && (
             <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
               Pilih perusahaan yang akan dikelola pada menu di sidebar untuk mulai melihat data dan mengatur template.
@@ -487,35 +487,35 @@ export const AdminDashboard: React.FC = () => {
             <>
               {activeTab === 'dashboard' && (<>
               {/* KPI Strip */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="clean-card clean-card p-4">
-                  <span className="text-xs font-medium text-[var(--text-secondary)] block">Total Penugasan (30 hari)</span>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.totalJobs}</span>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="clean-card p-4 sm:p-5">
+                  <span className="text-xs font-semibold text-[var(--text-secondary)] block">Total Penugasan (30 hari)</span>
+                  <div className="flex items-baseline justify-between mt-2">
+                    <span className="text-2xl sm:text-3xl font-bold font-mono text-[var(--text-primary)]">{kpi.totalJobs}</span>
                     <span className="text-xs text-[var(--text-muted)]">pekerjaan</span>
                   </div>
                 </div>
-                <div className="clean-card clean-card p-4">
-                  <span className="text-xs font-medium text-emerald-700 block">Selesai Terverifikasi</span>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-2xl font-bold font-mono text-emerald-700">{kpi.completedJobs}</span>
-                    <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <div className="clean-card p-4 sm:p-5">
+                  <span className="text-xs font-semibold text-emerald-700 block">Selesai Terverifikasi</span>
+                  <div className="flex items-baseline justify-between mt-2">
+                    <span className="text-2xl sm:text-3xl font-bold font-mono text-emerald-700">{kpi.completedJobs}</span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
                       {kpi.totalJobs > 0 ? Math.round((kpi.completedJobs / kpi.totalJobs) * 100) : 0}%
                     </span>
                   </div>
                 </div>
-                <div className="clean-card clean-card p-4">
-                  <span className="text-xs font-medium text-zinc-700 block">Sedang Berlangsung</span>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-2xl font-bold font-mono text-[var(--text-primary)]">{kpi.workingJobs}</span>
+                <div className="clean-card p-4 sm:p-5">
+                  <span className="text-xs font-semibold text-zinc-700 block">Sedang Berlangsung</span>
+                  <div className="flex items-baseline justify-between mt-2">
+                    <span className="text-2xl sm:text-3xl font-bold font-mono text-[var(--text-primary)]">{kpi.workingJobs}</span>
                     <span className="text-xs text-[var(--text-secondary)]">aktif di lapangan</span>
                   </div>
                 </div>
-                <div className="clean-card bg-[var(--bg-card)] p-4 rounded-lg border border-rose-200 bg-rose-50/20">
-                  <span className="text-xs font-semibold text-rose-700 block flex items-center gap-1"><ShieldAlert size={14} /> Perlu Dicek (Di Luar Area)</span>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-2xl font-bold font-mono text-rose-700">{kpi.flaggedJobs}</span>
-                    <span className="text-xs font-medium text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">{kpi.highRiskCount} Risiko Tinggi</span>
+                <div className="clean-card p-4 sm:p-5 border-rose-200 bg-rose-50/30">
+                  <span className="text-xs font-bold text-rose-700 block flex items-center gap-1.5"><ShieldAlert size={14} /> Perlu Dicek (Di Luar Area)</span>
+                  <div className="flex items-baseline justify-between mt-2">
+                    <span className="text-2xl sm:text-3xl font-bold font-mono text-rose-700">{kpi.flaggedJobs}</span>
+                    <span className="text-xs font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-200">{kpi.highRiskCount} Risiko Tinggi</span>
                   </div>
                 </div>
               </div>
@@ -564,7 +564,7 @@ export const AdminDashboard: React.FC = () => {
                 )}
 
                 {/* Filter Bar */}
-                <div className="clean-card bg-[var(--bg-card)] p-4 rounded-xl border border-[var(--border-subtle)]/90  space-y-3">
+                <div className="clean-card p-4 sm:p-5 space-y-3.5">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="relative flex-1">
                       <Search size={16} className="absolute left-3.5 top-3 text-[var(--text-muted)]" />

@@ -23,6 +23,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 Styling-Reference/
+Data Gudang/
 
 # Local AI agents, skills, and prompts (development & memory only)
 .agents/

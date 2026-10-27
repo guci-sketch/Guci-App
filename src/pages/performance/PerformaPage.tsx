@@ -407,9 +407,9 @@ export function PerformaPage() {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {/* Header Ringkas + Tombol Custom Setup MoM */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 clean-card p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 clean-card p-5 sm:p-6">
                 <div>
                     <h1 className="text-base sm:text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
                         <BarChart3 size={20} className="text-[var(--accent)]" />
@@ -584,9 +584,9 @@ export function PerformaPage() {
                     )}
 
                     {/* 3 Kartu Visual MoM: Breakdown Kategori Pest & Anti Rayap */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
                         {/* KARTU 1: ANTI RAYAP (TERMITE CONTROL) */}
-                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-purple-100 bg-gradient-to-br from-white to-purple-50/30">
+                        <div className="clean-card p-5 sm:p-6 flex items-center justify-between gap-3 border-purple-100 bg-gradient-to-br from-white to-purple-50/25">
                             <div className="space-y-1">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
                                     <ShieldCheck size={14} className="text-purple-600" />
@@ -611,7 +611,7 @@ export function PerformaPage() {
                         </div>
 
                         {/* KARTU 2: PEST CONTROL (PCO / GENERAL PEST) */}
-                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-emerald-100 bg-gradient-to-br from-white to-emerald-50/30">
+                        <div className="clean-card p-5 sm:p-6 flex items-center justify-between gap-3 border-emerald-100 bg-gradient-to-br from-white to-emerald-50/25">
                             <div className="space-y-1">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
                                     <Bug size={14} className="text-emerald-600" />
@@ -636,7 +636,7 @@ export function PerformaPage() {
                         </div>
 
                         {/* KARTU 3: TOTAL DEAL SEMUA LAYANAN */}
-                        <div className="clean-card p-4 flex items-center justify-between gap-3 border-amber-100 bg-gradient-to-br from-white to-amber-50/30">
+                        <div className="clean-card p-5 sm:p-6 flex items-center justify-between gap-3 border-amber-100 bg-gradient-to-br from-white to-amber-50/25">
                             <div className="space-y-1">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
                                     <TrendingUp size={14} className="text-amber-600" />
@@ -662,7 +662,7 @@ export function PerformaPage() {
                     </div>
 
                     {/* Grafik Batang Visual MoM (Interactive Visual Bar Chart) */}
-                    <div className="clean-card p-4 sm:p-5 space-y-4">
+                    <div className="clean-card p-5 sm:p-6 space-y-5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
                                 <h2 className="text-sm font-bold text-[var(--text-primary)]">

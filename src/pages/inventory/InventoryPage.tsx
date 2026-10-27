@@ -356,7 +356,7 @@ export function InventoryPage() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {/* Sub-tab internal Gudang & Analisis Direktur */}
             {(isWarehouseRole || isDirector) && (
                 <TabContainer
@@ -409,20 +409,18 @@ export function InventoryPage() {
 
             {/* SUB-TAB BARU: PROYEK BARU, ESTIMASI CHEMICAL PER ID PROYEK, & ANALISIS UNTUNG RUGI */}
             {!loading && tab === "proyek" && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                     {/* Quick Input Bar untuk Gudang / Admin: Pilih Proyek + Pilih Chemical + Input Estimasi ke ID Proyek */}
                     {canWrite && items.length > 0 && projects.length > 0 && (
-                        <div className="clean-card p-4 border-emerald-200 bg-emerald-50/35 space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
-                                        <Briefcase size={14} className="text-emerald-700" />
-                                        Input Cepat Estimasi / Realisasi Chemical ke ID Proyek
-                                    </h3>
-                                    <p className="text-[11px] text-emerald-800">
-                                        Pilih proyek baru dan bahan chemical untuk dicatat ke ID proyek tersebut sebagai bahan analisis untung rugi internal.
-                                    </p>
-                                </div>
+                        <div className="clean-card p-5 sm:p-6 border-emerald-200/80 bg-emerald-50/25 space-y-4">
+                            <div>
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                                    <Briefcase size={14} className="text-emerald-700" />
+                                    Input Cepat Estimasi / Realisasi Chemical ke ID Proyek
+                                </h3>
+                                <p className="text-[11px] text-emerald-800">
+                                    Pilih proyek baru dan bahan chemical untuk dicatat ke ID proyek tersebut sebagai bahan analisis untung rugi internal.
+                                </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                                 <div className="sm:col-span-5">
@@ -474,13 +472,13 @@ export function InventoryPage() {
 
                     {/* Tabel & Kartu Analisis Untung Rugi per Proyek */}
                     <div className="clean-card overflow-hidden">
-                        <div className="p-4 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="p-5 sm:p-6 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
-                                <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                                     <TrendingUp size={16} className="text-[var(--accent)]" />
                                     Daftar Proyek Baru, Estimasi Chemical Gudang &amp; Analisis Untung Rugi (Internal)
                                 </h3>
-                                <p className="text-xs text-[var(--text-secondary)]">
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                                     Terintegrasi lintas role untuk Gudang, Admin, Marketing, dan Superadmin (Direktur)
                                 </p>
                             </div>
@@ -607,9 +605,9 @@ export function InventoryPage() {
             )}
 
             {!loading && (tab === "stok" || tab === "alert") && (
-                <div className="bg-white border border-[#e8e5e0] rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs">
+                <div className="clean-card p-5 sm:p-6 space-y-5">
                     {/* Barventis Filter & Action Row */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
                         <div className="flex flex-wrap items-center gap-3">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-slate-700">Tanggal:</span>
