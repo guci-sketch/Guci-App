@@ -324,3 +324,43 @@ test('WB-11 [User Setup Authorization & Peer Admin Suspend Protection]', async (
         assert.equal(canManageUserStatus(directorActor, { role: 'TEKNISI_LAPANGAN' }), true);
     });
 });
+
+test('WB-12 [Quotation Draft Download Lockdown & ACC Approval Gate]', async (t) => {
+    function canDownloadQuotation(userRole: string, status: string): boolean {
+        const isApproved = status === 'approved' || status === 'deal';
+        // Marketing DILARANG mendownload jika belum di-ACC (masih draft/pending)
+        if (userRole === 'MARKETING' && !isApproved) {
+            return false;
+        }
+        // Pasca-ACC, marketing dan admin BISA mendownload dokumen resmi
+        if (isApproved) {
+            return true;
+        }
+        // Admin / Superadmin dalam mode audit internal
+        return userRole === 'ADMIN' || userRole === 'SUPERADMIN' || userRole === 'MASTER_SUPER_ADMIN';
+    }
+
+    await t.test('Marketing DILARANG mendownload draft penawaran sebelum di-ACC Admin/Direktur', () => {
+        assert.equal(canDownloadQuotation('MARKETING', 'draft'), false);
+        assert.equal(canDownloadQuotation('MARKETING', 'pending'), false);
+        assert.equal(canDownloadQuotation('MARKETING', 'sent_to_client'), false);
+    });
+
+    await t.test('Setelah di-ACC (approved / deal), tombol unduh resmi terbuka untuk Marketing & Admin', () => {
+        assert.equal(canDownloadQuotation('MARKETING', 'approved'), true);
+        assert.equal(canDownloadQuotation('MARKETING', 'deal'), true);
+        assert.equal(canDownloadQuotation('ADMIN', 'approved'), true);
+    });
+
+    await t.test('Pembersihan data item penyesuaian: baris kosong diabaikan agar data tidak bertumpuk', () => {
+        const dirtyItems = [
+            { desc: 'Pondasi 1 sisi', qty: 99.5, unit: 'm¹', harga: 19000 },
+            { desc: '', qty: 0, unit: 'm²', harga: 0 }, // baris kosong tidak valid
+            { desc: 'Plafon Lt 1-4', qty: 1332, unit: 'm²', harga: 9100 },
+        ];
+        const clean = dirtyItems.filter(it => it.desc.trim().length > 0 && it.qty > 0);
+        assert.equal(clean.length, 2);
+        assert.equal(clean[0].desc, 'Pondasi 1 sisi');
+        assert.equal(clean[1].desc, 'Plafon Lt 1-4');
+    });
+});

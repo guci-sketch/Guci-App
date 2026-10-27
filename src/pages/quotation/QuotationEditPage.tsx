@@ -223,49 +223,63 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
         }));
     };
 
-    const buildUpdatedFields = (): Partial<Quotation> => ({
-        kepadaNama: nama.trim(),
-        kepadaAlamatLines: alamatLines.map(l => l.trim()).filter(Boolean),
-        kepadaUp: up || undefined,
-        kepadaWa: wa || undefined,
-        objekPekerjaan: objekPekerjaan || undefined,
-        lokasiPekerjaan: lokasiPekerjaan || undefined,
-        pdfVariant,
-        isRevisi,
-        items,
-        biayaTambahan,
-        upahPeralatanPct: upahPeralatanPct || undefined,
-        diskonUpahPct: diskonUpahPct || undefined,
-        upahPeralatanRp: calc.upahPeralatanRp || undefined,
-        diskonUpahRp: calc.diskonUpahRp || undefined,
-        diskonPct,
-        ppn,
-        ppnDppFaktor: ppnDppFaktor || undefined,
-        garansiTahun: garansiUnit === "tahun" ? garansiNilai : Number((garansiNilai / 12).toFixed(2)),
-        garansiNilai,
-        garansiUnit,
-        jenisGaransi,
-        tampilkanPengontrolan,
-        subtotal: calc.subtotal,
-        diskonRp: calc.diskonRp,
-        ppnRp: calc.ppnRp,
-        total: totalFinal,
-        surveyor: surveyor || undefined,
-        tanggalSurvey: tanggalSurvey || undefined,
-        hasilSurvey: hasilSurvey || undefined,
-        surveyPhotos: surveyPhotos.length > 0 ? surveyPhotos : undefined,
-        chemicals: chemicals.length > 0 ? chemicals : undefined,
-        metode: isAR && metode.length > 0 ? metode : undefined,
-        adjustmentHistory: quotation.adjustmentHistory ?? [],
-    });
+    const buildUpdatedFields = (): Partial<Quotation> => {
+        const cleanItems = items
+            .map(it => ({
+                ...it,
+                desc: it.desc.trim(),
+                qty: Number(it.qty) || 0,
+                harga: Math.round(Number(it.harga) || 0),
+            }))
+            .filter(it => it.desc.length > 0 || it.qty > 0 || it.harga > 0);
+
+        return {
+            kepadaNama: nama.trim(),
+            kepadaAlamatLines: alamatLines.map(l => l.trim()).filter(Boolean),
+            kepadaUp: up || undefined,
+            kepadaWa: wa || undefined,
+            objekPekerjaan: objekPekerjaan || undefined,
+            lokasiPekerjaan: lokasiPekerjaan || undefined,
+            pdfVariant,
+            isRevisi,
+            items: cleanItems.length > 0 ? cleanItems : items,
+            biayaTambahan,
+            upahPeralatanPct: upahPeralatanPct || undefined,
+            diskonUpahPct: diskonUpahPct || undefined,
+            upahPeralatanRp: calc.upahPeralatanRp || undefined,
+            diskonUpahRp: calc.diskonUpahRp || undefined,
+            diskonPct,
+            ppn,
+            ppnDppFaktor: ppnDppFaktor || undefined,
+            garansiTahun: garansiUnit === "tahun" ? garansiNilai : Number((garansiNilai / 12).toFixed(2)),
+            garansiNilai,
+            garansiUnit,
+            jenisGaransi,
+            tampilkanPengontrolan,
+            subtotal: calc.subtotal,
+            diskonRp: calc.diskonRp,
+            ppnRp: calc.ppnRp,
+            total: totalFinal,
+            surveyor: surveyor || undefined,
+            tanggalSurvey: tanggalSurvey || undefined,
+            hasilSurvey: hasilSurvey || undefined,
+            surveyPhotos: surveyPhotos.length > 0 ? surveyPhotos : undefined,
+            chemicals: chemicals.length > 0 ? chemicals : undefined,
+            metode: isAR && metode.length > 0 ? metode : undefined,
+            adjustmentHistory: quotation.adjustmentHistory ?? [],
+        };
+    };
 
     // Pratinjau PDF dari isian adjustment saat ini
     const handlePreviewPdf = async () => {
         setPreviewBusy(true);
         try {
             const fields = buildUpdatedFields();
+            const isApproved = quotation.status === "approved" || quotation.status === "deal";
             const blob = await generateCompanyQuotationPDF({
                 noSurat: quotation.noSurat,
+                isDraft: !isApproved,
+                isApproved,
                 tanggal: quotation.tanggal,
                 kepadaNama: fields.kepadaNama!,
                 kepadaAlamatLines: fields.kepadaAlamatLines!,

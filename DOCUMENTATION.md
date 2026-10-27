@@ -82,6 +82,27 @@ Modul analitik performa berbasis *Month-over-Month* (MoM) yang dirancang khusus 
 - **Global Auto-Scroll Centering:** Setiap elemen formulir (`input`, `textarea`, `select`) yang menerima fokus otomatis bergeser ke tengah layar (`block: 'center'`) sehingga tidak pernah tertutup keyboard di Android dan iOS.
 - **Anti-Zoom Safari:** Standardisasi ukuran font input minimal 16px dan clearance scroll bawah `scroll-padding-bottom: 20rem`.
 - **Dynamic Island Navigation:** Menggunakan kapsul melayang tengah bawah (`fixed bottom-5 left-1/2 -translate-x-1/2`) dengan spring physics Framer Motion.
+---
+
+## 7. Kebijakan Otorisasi Unduh Penawaran (Marketing Preview Lockdown)
+
+Guna melindungi integritas dan validitas komersial perusahaan:
+1. **Status Draft (`GP-DRF`):**
+   - Staf `MARKETING` **DILARANG MENGUNDUH (DOWNLOAD)** berkas PDF penawaran yang belum disetujui.
+   - Dokumen draft hanya dapat dilihat melalui **Pratinjau Terbatas (Preview Saja)** dengan watermark diagonal: `DRAFT - BELUM DI-ACC DIREKTUR / ADMIN`.
+   - Tindakan ini mencegah penawaran yang belum divalidasi harga/garansinya terkirim secara prematur ke klien.
+2. **Status Disetujui (`GP-APR` / Resmi):**
+   - Setelah Admin atau Direktur melakukan peninjauan dan menekan tombol **Setujui (Approve)**, kode `-DRF` otomatis dihapus menjadi nomor surat resmi.
+   - Tombol **Unduh PDF Resmi** dan **Kirim WhatsApp** terbuka secara otomatis bagi Marketing dan Admin.
 
 ---
-*Dokumentasi Sistem — Diperbarui pada rilis Phase 5 FieldWork V2.*
+
+## 8. Standar Anti-Cluttering Penyesuaian Penawaran (`QuotationEditPage`)
+
+- **Zero Data Overlap:** Baris item pekerjaan, rumus kalkulasi ukuran (mis. `37+37+5,5 = 99.5 m¹`), dan harga satuan disusun dalam kisi kartu mandiri berjarak lega.
+- **Single Outer Container:** Seluruh rincian finansial (Subtotal, Diskon Upah, PPN 12% DPP Nilai Lain, dan Total Final) tertata rapi tanpa tumpukan kotak ganda (*nested card clutter*).
+- **Integrasi Data Learning 64 Berkas PDF:**
+  - Mengadopsi 5 template resmi dari folder `Data Penawaran/Contoh Penawaran`: Pra-Konstruksi Pipa (8 Hal), Pasca-Konstruksi Sloof & Plafon (4 Hal), Rodent Puskesmas (4 Hal), BOQ Korporat PLN (3 Hal), dan Jadwal Fogging 12 Bulan (1 Hal).
+
+---
+*Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*

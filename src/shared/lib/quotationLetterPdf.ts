@@ -977,15 +977,28 @@ class Renderer {
         if (d.pdfVariant === 'pco_jadwal_fogging_1p' || d.tipeSurat === 'jadwal_fogging') {
             this.chrome();
             this.renderFoggingScheduleLetter(totals);
-            return this.doc.output('blob');
+        } else {
+            this.chrome();
+            this.coverLetter(totals, isAR);
+            if (!d.suratSaja) {
+                if (isAR) this.arDetail(totals); else this.pcoDetail(totals);
+                this.lampiran();
+            }
         }
 
-        this.chrome();
-        this.coverLetter(totals, isAR);
-        if (!d.suratSaja) {
-            if (isAR) this.arDetail(totals); else this.pcoDetail(totals);
-            this.lampiran();
+        // Watermark Tanda Air untuk Surat Draft (Belum di-ACC)
+        const isDraftDoc = d.isDraft || d.noSurat.includes('-DRF');
+        if (isDraftDoc) {
+            const pageCount = (this.doc as any).internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                this.doc.setPage(i);
+                this.doc.setFont('helvetica', 'bold');
+                this.doc.setFontSize(28);
+                this.doc.setTextColor(203, 213, 225);
+                this.doc.text('DRAFT - BELUM DI-ACC', 105, 148, { align: 'center', angle: 45 });
+            }
         }
+
         return this.doc.output('blob');
     }
 }

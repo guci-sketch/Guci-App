@@ -109,14 +109,19 @@ export function QuotationPage() {
     useEffect(() => { load(); }, [user]);
 
     const handleOpenOrRenderPdf = async (q: Quotation, download = false) => {
+        const isApproved = q.status === "approved" || q.status === "deal";
+        if (download && !isApproved) {
+            alert("Dokumen penawaran berstatus Draft belum dapat diunduh. Berkas resmi hanya dapat diunduh setelah disetujui (ACC) oleh Admin atau Direktur.");
+            return;
+        }
         setActionLoading(q.id);
         try {
-            let b64 = q.pdfBase64 ?? (q.hasPdf ? await getQuotationPdf(q.id, "pdfBase64") : null);
+            let b64 = (!download && !isApproved) ? null : (q.pdfBase64 ?? (q.hasPdf ? await getQuotationPdf(q.id, "pdfBase64") : null));
             if (!b64) {
                 const full = (await getQuotationById(q.id)) ?? q;
                 const blob = await generateCompanyQuotationPDF({
-                    noSurat: full.noSurat,
-                    tanggal: full.tanggal,
+                    isDraft: !isApproved,
+                    isApproved: isApproved,
                     kepadaNama: full.kepadaNama,
                     kepadaAlamatLines: full.kepadaAlamatLines,
                     kepadaUp: full.kepadaUp,
@@ -618,9 +623,9 @@ export function QuotationPage() {
                                                         onClick={() => handleOpenOrRenderPdf(q, false)}
                                                         disabled={isActing}
                                                         className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold cursor-pointer"
-                                                        title="Lihat / Pratinjau PDF Surat Penawaran"
+                                                        title={isApproved ? "Lihat PDF Resmi" : "Pratinjau Draft Internal (Belum Di-ACC - Tidak Dapat Diunduh)"}
                                                     >
-                                                        Lihat PDF
+                                                        {isApproved ? "Lihat PDF" : "Pratinjau Draft"}
                                                     </button>
 
                                                     <button
@@ -636,10 +641,10 @@ export function QuotationPage() {
                                                             <button
                                                                 onClick={() => setApproveTarget(q)}
                                                                 disabled={isActing}
-                                                                className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold cursor-pointer"
+                                                                className="px-3 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold cursor-pointer shadow-2xs"
                                                                 title="Approve & Terbitkan Nomor Resmi"
                                                             >
-                                                                Setujui
+                                                                Setujui (ACC)
                                                             </button>
                                                             <button
                                                                 onClick={() => setRejectTarget(q)}
@@ -652,38 +657,39 @@ export function QuotationPage() {
                                                         </>
                                                     )}
 
-                                                    {isApproved && (
-                                                        <button
-                                                            onClick={() => handleOpenOrRenderPdf(q, true)}
-                                                            className="px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs font-semibold cursor-pointer"
-                                                            title="Unduh PDF Resmi"
-                                                        >
-                                                            Unduh
-                                                        </button>
+                                                    {isApproved ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleOpenOrRenderPdf(q, true)}
+                                                                className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold cursor-pointer"
+                                                                title="Unduh PDF Resmi"
+                                                            >
+                                                                Unduh
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setViewProofTarget(q)}
+                                                                className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold cursor-pointer"
+                                                                title="Lihat Bukti TTD Approval (Non-Download)"
+                                                            >
+                                                                Bukti Approve
+                                                            </button>
+                                                            {q.kepadaWa && (
+                                                                <a
+                                                                    href={`https://wa.me/${q.kepadaWa.replace(/^0/, "62").replace(/\D/g, "")}?text=${encodeURIComponent(`Halo Bapak/Ibu ${q.kepadaUp || q.kepadaNama},\n\nBerikut kami sampaikan Surat Penawaran Resmi PT Guci Emas Pratama:\nNo. Surat: ${q.noSurat}\nLayanan: ${LAYANAN_CONFIG[q.jenisLayanan]?.label}\nGaransi: ${gText}\nTotal Biaya: Rp ${q.total.toLocaleString("id-ID")}\n\nTerima kasih atas kepercayaan Anda.`)}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold"
+                                                                    title={`Kirim via WhatsApp ke ${q.kepadaWa}`}
+                                                                >
+                                                                    Kirim WA
+                                                                </a>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <span className="px-2 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10.5px] font-semibold">
+                                                            Menunggu ACC
+                                                        </span>
                                                     )}
-
-                                                    {isApproved && (
-                                                        <button
-                                                            onClick={() => setViewProofTarget(q)}
-                                                            className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold cursor-pointer"
-                                                            title="Lihat Bukti TTD Approval (Non-Download)"
-                                                        >
-                                                            Bukti Approve
-                                                        </button>
-                                                    )}
-
-                                                    {q.kepadaWa && isApproved && (
-                                                        <a
-                                                            href={`https://wa.me/${q.kepadaWa.replace(/^0/, "62").replace(/\D/g, "")}?text=${encodeURIComponent(`Halo Bapak/Ibu ${q.kepadaUp || q.kepadaNama},\n\nBerikut kami sampaikan Surat Penawaran Resmi PT Guci Emas Pratama:\nNo. Surat: ${q.noSurat}\nLayanan: ${LAYANAN_CONFIG[q.jenisLayanan]?.label}\nGaransi: ${gText}\nTotal Biaya: Rp ${q.total.toLocaleString("id-ID")}\n\nTerima kasih atas kepercayaan Anda.`)}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold"
-                                                            title={`Kirim via WhatsApp ke ${q.kepadaWa}`}
-                                                        >
-                                                            Kirim WA
-                                                        </a>
-                                                    )}
-
                                                     {canDelete && (
                                                         <button
                                                             onClick={async () => {

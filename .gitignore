@@ -24,6 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 Styling-Reference/
 Data Gudang/
+Data Penawaran/
 
 # Local AI agents, skills, and prompts (development & memory only)
 .agents/

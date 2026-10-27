@@ -39,6 +39,8 @@ export interface QuotationPDFData {
     jenisLayanan: JenisLayanan;
     pdfVariant?: PdfTemplateVariant;
     isRevisi?: boolean;
+    isDraft?: boolean;
+    isApproved?: boolean;
     perihal?: string;
     paragrafPembuka?: string;
     items: QuotationItem[];

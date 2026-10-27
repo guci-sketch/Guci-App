@@ -418,6 +418,8 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
 
             const blob = await generateCompanyQuotationPDF({
                 noSurat: noPreview || `GP-DRF/${kategori}/${tipe}/2026/10/0001`,
+                isDraft: true,
+                isApproved: false,
                 tanggal: new Date(),
                 kepadaNama: (kepadaNama || kepada).trim() || "PT Contoh Klien",
                 kepadaAlamatLines: kepadaAlamat.filter(Boolean),
