@@ -18,6 +18,7 @@ import { TabContainer } from '@/shared/ui/TabContainer';
 import { Pagination } from '@/shared/ui/Pagination';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { isDirectorUser } from '@/shared/lib/roles';
+import { GUCI_WAREHOUSE_CATALOG } from '@/shared/data/warehouseCatalog';
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 const INVENTORY_PAGE_SIZE = 10;
@@ -142,8 +143,9 @@ export function InventoryPage() {
     useEffect(() => {
         if (tab !== "rekap" || !companyId) return;
         const [y, m] = month.split("-").map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
         const from = `${month}-01`;
-        const to = `${month}-${String(new Date(y, m, 0).getDate()).getDate ? String(new Date(y, m, 0).getDate()).padStart(2, "0") : "28"}`;
+        const to = `${month}-${String(lastDay).padStart(2, "0")}`;
         getInventoryLogs(companyId, { from, to, limit: 5000 }).then(setRecapLogs).catch(e => setError(e instanceof Error ? e.message : "Gagal memuat rekap."));
     }, [tab, month, companyId]);
 
@@ -222,6 +224,28 @@ export function InventoryPage() {
         XLSX.writeFile(wb, "Template_Stok_Gudang.xlsx");
     };
 
+    const loadGuciWarehouseCatalog = async () => {
+        if (!companyId) return;
+        if (!confirm("Muat seluruh katalog inventaris riil PT Guci Emas Pratama dari Data Gudang (Obat, Alat, Sparepart, Pipa, Perangkap)?")) return;
+        setIsImporting(true);
+        try {
+            let addedCount = 0;
+            const existingNames = new Set(items.map(i => i.nama.toLowerCase().trim()));
+            for (const item of GUCI_WAREHOUSE_CATALOG) {
+                if (!existingNames.has(item.nama.toLowerCase().trim())) {
+                    await createInventoryItem(companyId, item);
+                    addedCount++;
+                }
+            }
+            await reload();
+            alert(`Berhasil memuat ${addedCount} item inventaris dari katalog Data Gudang September.`);
+        } catch (err) {
+            alert(`Gagal memuat katalog: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const handleImportBulk = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = "";
@@ -231,18 +255,29 @@ export function InventoryPage() {
         const reader = new FileReader();
         reader.onload = async evt => {
             try {
-                const wb = XLSX.read(evt.target?.result, { type: "binary" });
-                const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
-                if (rows.length === 0) throw new Error("File kosong.");
+                let rows: Record<string, unknown>[] = [];
+                const isCsv = file.name.endsWith('.csv') || file.type.includes('csv');
+                if (isCsv) {
+                    const text = evt.target?.result as string;
+                    const wb = XLSX.read(text, { type: "string" });
+                    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+                } else {
+                    const wb = XLSX.read(evt.target?.result, { type: "binary" });
+                    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+                }
+                if (rows.length === 0) throw new Error("File kosong atau format tidak sesuai.");
                 if (rows.length > MAX_IMPORT_ROWS) throw new Error(`Maksimal ${MAX_IMPORT_ROWS} baris per import.`);
                 let ok = 0; const bad: string[] = [];
                 for (const [i, r] of rows.entries()) {
-                    const nama = String(r["Nama Item"] ?? "").trim();
-                    const stokAwal = Number(r["Stok Awal"] ?? 0), minAlert = Number(r["Min Alert"] ?? 0);
-                    const hargaSatuan = Number(r["Harga Satuan HPP"] ?? 150000);
+                    const nama = String(r["Nama Item"] || r["NAMA OBAT"] || r["NAMA ALAT"] || r["NAMA BARANG"] || "").trim();
+                    const kategori = String(r["Kategori (Chemical/Alat/Perangkap)"] || r["Kategori"] || r["KATEGORI"] || "Lainnya");
+                    const satuan = String(r["Satuan"] || r["SATUAN"] || "Pcs");
+                    const stokAwal = Number(r["Stok Awal"] || r["JUMLAH"] || r["Jumlah"] || r["Stok"] || 0);
+                    const minAlert = Number(r["Min Alert"] || r["Batas Minimum"] || 5);
+                    const hargaSatuan = Number(r["Harga Satuan HPP"] || r["HARGA"] || r["Harga"] || 150000);
                     if (!nama || ![stokAwal, minAlert].every(n => Number.isFinite(n) && n >= 0)) { bad.push(`baris ${i + 2}`); continue; }
                     await createInventoryItem(companyId, {
-                        nama, kategori: String(r["Kategori (Chemical/Alat/Perangkap)"] ?? "Lainnya"), satuan: String(r["Satuan"] ?? "Pcs"), stokAwal, minAlert, hargaSatuan,
+                        nama, kategori, satuan, stokAwal, minAlert, hargaSatuan,
                     });
                     ok++;
                 }
@@ -252,7 +287,11 @@ export function InventoryPage() {
                 alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
             } finally { setIsImporting(false); }
         };
-        reader.readAsBinaryString(file);
+        if (file.name.endsWith('.csv') || file.type.includes('csv')) {
+            reader.readAsText(file, 'utf-8');
+        } else {
+            reader.readAsBinaryString(file);
+        }
     };
 
     const categories = useMemo(() => {
@@ -630,12 +669,21 @@ export function InventoryPage() {
 
                         {canWrite && (
                             <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={loadGuciWarehouseCatalog}
+                                    disabled={isImporting}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer"
+                                    title="Muat otomatis master data inventaris dari arsip Data Gudang September"
+                                >
+                                    <Package size={13} /> {isImporting ? "Memuat..." : "Muat Data Gudang"}
+                                </button>
                                 <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
                                     <Download size={13} /> Export Template
                                 </button>
                                 <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
-                                    {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import Excel
-                                    <input type="file" accept=".xlsx,.xls" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
+                                    {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import Excel / CSV
+                                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
                                 </label>
                             </div>
                         )}
@@ -672,8 +720,28 @@ export function InventoryPage() {
                             <tbody key={itemsPage} className="result-enter">
                                 {filtered.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="p-8 text-center text-slate-400">
-                                            {items.length === 0 ? "Belum ada item. Tambahkan lewat 'Tambah Barang Baru' atau Import." : "Tidak ada hasil yang cocok."}
+                                        <td colSpan={5} className="p-8 text-center text-slate-500">
+                                            {items.length === 0 ? (
+                                                <div className="max-w-md mx-auto space-y-3 py-4">
+                                                    <Package size={32} className="mx-auto text-emerald-600 opacity-60" />
+                                                    <div className="font-bold text-slate-800 text-sm">Inventaris Gudang Belum Terisi</div>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                                        Muat otomatis seluruh 35+ item obat anti rayap, pest control, mesin, sparepart, dan pipa dari arsip <b>Data Gudang September</b>.
+                                                    </p>
+                                                    {canWrite && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={loadGuciWarehouseCatalog}
+                                                            disabled={isImporting}
+                                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                                        >
+                                                            <Package size={14} /> {isImporting ? "Memuat..." : "Muat 35+ Item Data Gudang"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                "Tidak ada hasil yang cocok dengan filter atau kata kunci."
+                                            )}
                                         </td>
                                     </tr>
                                 )}

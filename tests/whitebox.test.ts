@@ -5,6 +5,7 @@ import { evaluateVolumeFormula, normalizeVolumeFormulaDisplay } from '../src/sha
 import { evaluateWorkReportRisk, DEFAULT_RISK_CONFIG } from '../backend-src/modules/risk/riskEngine.ts';
 import type { RiskEvaluationInput } from '../backend-src/types.js';
 import { isDirectorUser } from '../src/shared/lib/roles.ts';
+import { GUCI_WAREHOUSE_CATALOG } from '../src/shared/data/warehouseCatalog.ts';
 // ============================================================================
 // SPRINT WHITEBOX TEST SUITE — FIELDWORK APP V2
 // ============================================================================
@@ -256,5 +257,38 @@ test('WB-09 [UI Minimalist Spacing & Layout Decluttering Invariants]', async (t)
     await t.test('Standar tap target tombol dan input mobile minimal 44px', () => {
         const mobileTapTarget = 44; // min-height standard
         assert.ok(mobileTapTarget >= 44, 'Tap target mobile memenuhi accessibility standard');
+    });
+});
+
+test('WB-10 [Warehouse Catalog & Data Gudang September Invariants]', async (t) => {
+    await t.test('Katalog Data Gudang memuat 30+ item nyata lintas 6 kategori', () => {
+        assert.ok(GUCI_WAREHOUSE_CATALOG.length >= 30, `Total item: ${GUCI_WAREHOUSE_CATALOG.length}`);
+        const categories = new Set(GUCI_WAREHOUSE_CATALOG.map(i => i.kategori));
+        assert.ok(categories.has('Chemical Anti Rayap'));
+        assert.ok(categories.has('Chemical Pest Control'));
+        assert.ok(categories.has('Alat & Mesin Kerja'));
+        assert.ok(categories.has('Suku Cadang (Spareparts)'));
+        assert.ok(categories.has('Pipa & Fitting'));
+        assert.ok(categories.has('Perangkap & Sanitasi'));
+    });
+
+    await t.test('Setiap item memiliki nama valid, stok awal non-negatif, dan harga pokok HPP realistis', () => {
+        for (const item of GUCI_WAREHOUSE_CATALOG) {
+            assert.ok(item.nama.trim().length > 3);
+            assert.ok(item.stokAwal >= 0);
+            assert.ok(item.minAlert >= 0);
+            assert.ok(item.hargaSatuan > 0);
+            assert.ok(item.satuan.trim().length > 0);
+        }
+    });
+
+    await t.test('Kalkulasi hari akhir bulan menghasilkan 30 atau 31 hari secara tepat (bukan fallback 28)', () => {
+        const y = 2026;
+        const m = 10; // Oktober
+        const lastDay = new Date(y, m, 0).getDate();
+        assert.equal(lastDay, 31);
+
+        const septLastDay = new Date(y, 9, 0).getDate(); // September
+        assert.equal(septLastDay, 30);
     });
 });

@@ -174,7 +174,7 @@ test('BENTO-05 [Status & Risk Semantics]: All 6 WorkReportStatus and 5 RiskLevel
 });
 
 test('BENTO-06 [Anti-Slop & Security Guardrails]: No generic analytics filler or cross-tenant leaks in Bento components', () => {
-  const repoRoot = path.resolve(__dirname, '..');
+  const repoRoot = process.cwd();
   const bentoUiSrc = fs.readFileSync(path.join(repoRoot, 'src/shared/ui/analytics-bento.tsx'), 'utf-8');
   const bentoWidgetSrc = fs.readFileSync(path.join(repoRoot, 'src/widgets/admin/OperationsAnalyticsBento.tsx'), 'utf-8');
   const adminRoutesSrc = fs.readFileSync(path.join(repoRoot, 'backend-src/modules/admin/adminRoutes.ts'), 'utf-8');
