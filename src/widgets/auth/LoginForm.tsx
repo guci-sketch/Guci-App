@@ -49,23 +49,22 @@ export function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Deteksi dan bersihkan parameter hash error Supabase (contoh: #error=access_denied&error_code=otp_expired)
+    // Deteksi dan bersihkan parameter hash atau query error Supabase (contoh: #error=access_denied&error_code=otp_expired)
     useEffect(() => {
-        if (typeof window !== "undefined" && window.location.hash) {
-            const hashStr = window.location.hash.substring(1);
-            const params = new URLSearchParams(hashStr);
-            const errCode = params.get("error_code");
-            const errDesc = params.get("error_description");
-            if (errCode || errDesc) {
-                window.history.replaceState(null, "", window.location.pathname);
-                if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
-                    setError("Tautan email telah kedaluwarsa atau sudah pernah diklik. Silakan langsung login dengan email dan password akun Anda di bawah ini.");
-                } else {
-                    setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi email."));
-                }
+        if (typeof window === "undefined") return;
+        const hashStr = window.location.hash.startsWith("#") ? window.location.hash.substring(1) : "";
+        const hashParams = new URLSearchParams(hashStr);
+        const errCode = hashParams.get("error_code") || searchParams.get("error_code");
+        const errDesc = hashParams.get("error_description") || searchParams.get("error_description") || searchParams.get("error");
+        if (errCode || errDesc) {
+            window.history.replaceState(null, "", window.location.pathname);
+            if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
+                setError("Tautan email telah kedaluwarsa atau sudah pernah diklik. Silakan langsung login dengan email dan password akun Anda di bawah ini.");
+            } else {
+                setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi email."));
             }
         }
-    }, []);
+    }, [searchParams]);
 
     // Jika URL memiliki ?invite=..., arahkan otomatis ke halaman aktivasi token /signup
     useEffect(() => {

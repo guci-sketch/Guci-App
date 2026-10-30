@@ -102,6 +102,36 @@ export async function revokeInvite(token: string): Promise<void> {
 export async function getInviteByToken(token: string): Promise<Invite | null> {
     const cleanToken = token.trim();
     if (!cleanToken) return null;
+
+    // 1. Coba verifikasi melalui backend API server
+    try {
+        const res = await fetch(`/api/auth/invite/${encodeURIComponent(cleanToken)}`);
+        if (res.ok) {
+            const d = await res.json();
+            return {
+                id: d.token,
+                companyId: d.companyId,
+                companyName: d.companyName,
+                role: d.role,
+                createdBy: '',
+                createdAt: new Date(),
+                expiresAt: new Date(d.expiresAt),
+                used: false,
+                usedBy: null,
+            };
+        }
+        if (res.status === 400 || res.status === 404) {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.message || 'Token undangan tidak valid atau sudah kedaluwarsa.');
+        }
+    } catch (apiErr) {
+        if (apiErr instanceof Error && (apiErr.message.includes('kedaluwarsa') || apiErr.message.includes('sudah') || apiErr.message.includes('tidak ditemukan'))) {
+            throw apiErr;
+        }
+        console.warn('[inviteService] Backend invite verification fallback ke Supabase RPC:', apiErr);
+    }
+
+    // 2. Fallback via Supabase RPC get_invite_public
     const { data, error } = await supabase.rpc('get_invite_public', { p_token: cleanToken });
     if (error) throw new Error(error.message);
     if (!data) return null;

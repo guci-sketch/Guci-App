@@ -90,18 +90,28 @@ authRouter.post(
 
     // 3. Simpan profil di public.users & tandai token undangan sebagai used
     await withTransaction(async (client) => {
-      await client.query(
-        `insert into users (id, company_id, name, email, password_hash, role, phone, is_active)
-         values ($1, $2, $3, $4, 'managed-by-supabase-auth', $5, $6, true)
-         on conflict (id) do update set
-           company_id = excluded.company_id,
-           name = excluded.name,
-           role = excluded.role,
-           phone = excluded.phone,
-           is_active = true,
-           updated_at = now()`,
-        [uid, companyId, d.name.trim(), emailClean, role, d.phone || null]
-      );
+      const oldUserCheck = await client.query<{ id: string }>('select id from users where lower(email) = $1', [emailClean]);
+      if (oldUserCheck.rows.length > 0 && oldUserCheck.rows[0].id !== uid) {
+        await client.query(
+          `update users
+           set id = $1, company_id = $2, name = $3, role = $4, phone = coalesce($5, phone), is_active = true, updated_at = now()
+           where lower(email) = $6`,
+          [uid, companyId, d.name.trim(), role, d.phone || null, emailClean]
+        );
+      } else {
+        await client.query(
+          `insert into users (id, company_id, name, email, password_hash, role, phone, is_active)
+           values ($1, $2, $3, $4, 'managed-by-supabase-auth', $5, $6, true)
+           on conflict (id) do update set
+             company_id = excluded.company_id,
+             name = excluded.name,
+             role = excluded.role,
+             phone = excluded.phone,
+             is_active = true,
+             updated_at = now()`,
+          [uid, companyId, d.name.trim(), emailClean, role, d.phone || null]
+        );
+      }
 
       await client.query(
         `update invites
@@ -124,6 +134,37 @@ authRouter.post(
         name: d.name.trim(),
         role,
       },
+    });
+  })
+);
+/**
+ * Endpoint publik untuk memvalidasi token undangan sebelum pengguna mengisi form signup.
+ */
+authRouter.get(
+  '/invite/:token',
+  asyncHandler(async (req, res) => {
+    const cleanToken = req.params.token.trim();
+    const inviteRows = await query<{ id: string; company_id: string; payload: any }>(
+      'select id, company_id, payload from invites where id = $1',
+      [cleanToken]
+    );
+    if (inviteRows.length === 0) {
+      throw new HttpError(404, 'Token undangan tidak ditemukan atau tidak valid.');
+    }
+    const inv = inviteRows[0];
+    const payload = inv.payload || {};
+    if (payload.used) {
+      throw new HttpError(400, 'Token undangan ini sudah pernah digunakan.');
+    }
+    if (payload.expiresAt && new Date(payload.expiresAt).getTime() <= Date.now()) {
+      throw new HttpError(400, 'Token undangan ini sudah kedaluwarsa (melebihi 7 hari).');
+    }
+    res.json({
+      token: inv.id,
+      companyId: inv.company_id,
+      companyName: payload.companyName || '',
+      role: payload.role || 'TEKNISI_LAPANGAN',
+      expiresAt: payload.expiresAt,
     });
   })
 );

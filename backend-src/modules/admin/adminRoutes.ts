@@ -167,6 +167,75 @@ adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, authDeleted, message: authDeleted ? 'User berhasil dihapus.' : 'Profil dihapus, tetapi akun login belum terhapus — hapus manual di Supabase → Authentication.' });
 }));
 
+adminRouter.post('/invites', asyncHandler(async (req, res) => {
+  const schema = z.object({
+    role: z.enum(['SUPERADMIN', 'ADMIN', 'MARKETING', 'INVENTORY', 'TEKNISI_LAPANGAN']),
+    companyId: z.string().uuid().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, parsed.error.errors[0]?.message ?? 'Data undangan tidak valid.');
+
+  const companyId = parsed.data.companyId || req.user!.companyId!;
+  const co = await query<{ company_name: string }>('select company_name from companies where id = $1', [companyId]);
+  const companyName = co[0]?.company_name || 'PT Guci Emas Pratama';
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const payload = {
+    companyId,
+    companyName,
+    role: parsed.data.role,
+    createdBy: req.user!.id,
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    used: false,
+    usedBy: null,
+  };
+
+  const result = await query<{ id: string }>(
+    `insert into invites (company_id, payload, created_at)
+     values ($1, $2, now())
+     returning id`,
+    [companyId, JSON.stringify(payload)]
+  );
+
+  await logAction(req.user!, 'CREATE_INVITE', 'invites', result[0].id, `Membuat token undangan ${parsed.data.role}.`);
+  res.status(201).json({
+    token: result[0].id,
+    expiresAt: expiresAt.toISOString(),
+    role: parsed.data.role,
+    companyName,
+  });
+}));
+
+adminRouter.get('/invites', asyncHandler(async (req, res) => {
+  const companyId = req.user!.companyId!;
+  const rows = await query<{ id: string; company_id: string; payload: any; created_at: string }>(
+    'select id, company_id, payload, created_at from invites where company_id = $1 order by created_at desc',
+    [companyId]
+  );
+  res.json({
+    invites: rows.map(r => ({
+      id: r.id,
+      companyId: r.company_id,
+      companyName: r.payload?.companyName || '',
+      role: r.payload?.role || 'TEKNISI_LAPANGAN',
+      createdBy: r.payload?.createdBy || '',
+      createdAt: r.created_at,
+      expiresAt: r.payload?.expiresAt || '',
+      used: Boolean(r.payload?.used),
+      usedBy: r.payload?.usedBy || null,
+    })),
+  });
+}));
+
+adminRouter.delete('/invites/:token', asyncHandler(async (req, res) => {
+  const companyId = req.user!.companyId!;
+  const { token } = req.params;
+  await query('delete from invites where id = $1 and company_id = $2', [token, companyId]);
+  res.json({ success: true });
+}));
+
 // ==========================================
 
 

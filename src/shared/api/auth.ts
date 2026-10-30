@@ -1,6 +1,7 @@
 import { supabase } from '@/shared/lib/supabase';
 import { createInvite } from '@/shared/api/inviteService';
 import type { Invite } from '@/shared/api/inviteService';
+import { api } from '@/shared/api/client';
 
 /**
  * Login, daftar, dan lupa password sepenuhnya ditangani Supabase Auth (lihat LoginForm / SignupPage /
@@ -24,6 +25,18 @@ export async function generateInvite(
   role: Invite['role'],
   ctx: { companyId: string; createdBy: string },
 ): Promise<{ token: string; expiresAt: Date }> {
+  try {
+    const res = await api.post<{ token: string; expiresAt: string }>('/admin/invites', {
+      role,
+      companyId: ctx.companyId,
+    });
+    if (res?.token) {
+      return { token: res.token, expiresAt: new Date(res.expiresAt) };
+    }
+  } catch (apiErr) {
+    console.warn('[auth] Gagal generate invite via server API, mencoba fallback client:', apiErr);
+  }
+
   const { data } = await supabase.from('companies').select('company_name').eq('id', ctx.companyId).maybeSingle();
   const token = await createInvite({ companyId: ctx.companyId, companyName: data?.company_name ?? '', role, createdBy: ctx.createdBy });
   return { token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) };

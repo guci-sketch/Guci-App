@@ -18,7 +18,8 @@ const ROLE_DISPLAY_NAMES: Record<string, string> = {
 export function SignupPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const inviteToken = searchParams.get("invite") || searchParams.get("token") || "";
+    const rawParamToken = searchParams.get("invite") || searchParams.get("token") || "";
+    const inviteToken = rawParamToken.replace(/^["']|["']$/g, "").trim();
 
     const [manualToken, setManualToken] = useState("");
     const [invite, setInvite] = useState<Invite | null>(null);
@@ -37,23 +38,22 @@ export function SignupPage() {
     });
     const [showPassword, setShowPassword] = useState(false);
 
-    // Deteksi dan bersihkan parameter hash error Supabase (contoh: #error=access_denied&error_code=otp_expired)
+    // Deteksi dan bersihkan parameter hash atau query error Supabase (contoh: #error=access_denied&error_code=otp_expired)
     useEffect(() => {
-        if (typeof window !== "undefined" && window.location.hash) {
-            const hashStr = window.location.hash.substring(1);
-            const params = new URLSearchParams(hashStr);
-            const errCode = params.get("error_code");
-            const errDesc = params.get("error_description");
-            if (errCode || errDesc) {
-                window.history.replaceState(null, "", window.location.pathname + window.location.search);
-                if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
-                    setError("Tautan konfirmasi email dari tautan sebelumnya telah kedaluwarsa. Jika Anda mendaftar melalui token undangan, akun Anda akan langsung diaktifkan tanpa menunggu verifikasi email.");
-                } else {
-                    setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi."));
-                }
+        if (typeof window === "undefined") return;
+        const hashStr = window.location.hash.startsWith("#") ? window.location.hash.substring(1) : "";
+        const hashParams = new URLSearchParams(hashStr);
+        const errCode = hashParams.get("error_code") || searchParams.get("error_code");
+        const errDesc = hashParams.get("error_description") || searchParams.get("error_description") || searchParams.get("error");
+        if (errCode || errDesc) {
+            window.history.replaceState(null, "", window.location.pathname + (inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : ""));
+            if (errCode === "otp_expired" || (errDesc && errDesc.toLowerCase().includes("expired"))) {
+                setError("Tautan konfirmasi email dari tautan sebelumnya telah kedaluwarsa. Jika Anda mendaftar melalui token undangan, akun Anda akan langsung aktif tanpa memerlukan verifikasi email.");
+            } else {
+                setError(decodeURIComponent(errDesc?.replace(/\+/g, " ") || "Terjadi kendala pada tautan verifikasi email."));
             }
         }
-    }, []);
+    }, [searchParams, inviteToken]);
 
     useEffect(() => {
         if (!inviteToken) {
@@ -93,16 +93,16 @@ export function SignupPage() {
         e.preventDefault();
         const raw = manualToken.trim();
         if (!raw) return;
-        // Jika pengguna menempelkan URL penuh, ekstrak parameter invite/token
         let extracted = raw;
         try {
-            if (raw.startsWith("http://") || raw.startsWith("https://")) {
-                const u = new URL(raw);
+            if (raw.includes("invite=") || raw.includes("token=")) {
+                const u = new URL(raw.startsWith("http") ? raw : `http://localhost/${raw}`);
                 extracted = u.searchParams.get("invite") || u.searchParams.get("token") || raw;
             }
         } catch {
             extracted = raw;
         }
+        extracted = extracted.replace(/^["']|["']$/g, "").trim();
         setSearchParams({ invite: extracted });
     };
 
