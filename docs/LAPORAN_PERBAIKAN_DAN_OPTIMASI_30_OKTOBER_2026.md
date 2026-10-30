@@ -100,13 +100,21 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
 
 ---
 
-## 9. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
+## 9. Kebijakan Nomor Kontak Penawaran (Wajib & Pengelolaan Internal)
+
+* **Input Bersih & Wajib (*Required*):** Kolom Nomor Telepon / WhatsApp pada formulir pembuatan maupun pengeditan penawaran diwajibkan terisi (minimal 8 digit angka valid). Jika dikosongkan, formulir secara otomatis memblokir langkah berikutnya dengan pesan error jelas.
+* **Pembersihan Tombol Kirim Penawaran WA:** Tombol `Kirim WA` dengan template draf penawaran resmi pada tabel penawaran dieliminasi. Nomor kontak klien disajikan secara bersih untuk keperluan pencatatan dan pelacakan internal yang dikelola secara eksklusif oleh Direktur dan Admin.
+* **Integrasi Modul Tracking CMS:** Nomor telepon klien ditampilkan secara langsung pada kartu pelacakan `TrackingCard` untuk mempermudah monitoring termin pembayaran dan progres pekerjaan.
+
+---
+
+## 10. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
 
 1. **Vite Production Build:**
-   * Status: **SUCCESS** (2505 modules transformed, 0 error, build in ~66s).
+   * Status: **SUCCESS** (2505 modules transformed, 0 error, build in ~68s).
 2. **Whitebox Unit Tests (`npm run test:whitebox`):**
-   * Status: **68 / 68 PASS (100%)**
-   * Mencakup **WB-01 s.d. WB-19** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import multi-sheet validator, jadwal SPK modulo math, default light theme, dan autocomplete rekomendasi alamat).
+   * Status: **72 / 72 PASS (100%)**
+   * Mencakup **WB-01 s.d. WB-20** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import validator, jadwal SPK modulo math, default light theme, autocomplete rekomendasi alamat, dan validasi wajib nomor telepon penawaran).
 3. **Blackbox Integration Tests (`npm run test:blackbox`):**
    * Status: **34 / 34 PASS (100%)**
    * Mencakup **BB-01 s.d. BB-11** (RBAC 6 role, alur SPK & laporan kerja, System Usability Scale, antrean offline idempotency, tanda tangan digital, bulk customer import, SPK recurring dispatch, penomoran resmi bersih tanpa APR, geofence auto-anchor, dan sinkronisasi geser pin peta pelanggan).

@@ -646,3 +646,35 @@ test('WB-19 [Customer Profile & Address Recommendation Autocomplete Engine]', as
         assert.equal(initLng, 106.669810, 'Longitude proyek wajib mewarisi koordinat profil customer');
     });
 });
+
+test('WB-20 [Quotation Mandatory Client Phone/WhatsApp Invariant]', async (t) => {
+    function validateClientPhone(phone: string): { isValid: boolean; error?: string } {
+        const clean = phone.replace(/\D/g, "");
+        if (!phone.trim()) {
+            return { isValid: false, error: "Nomor telepon / WhatsApp wajib diisi." };
+        }
+        if (clean.length < 8 || clean.length > 16) {
+            return { isValid: false, error: "Nomor telepon / WhatsApp tidak valid (minimal 8 digit)." };
+        }
+        return { isValid: true };
+    }
+
+    await t.test('Nomor telepon kosong ditolak dengan pesan error wajib diisi', () => {
+        const res = validateClientPhone("   ");
+        assert.equal(res.isValid, false);
+        assert.equal(res.error, "Nomor telepon / WhatsApp wajib diisi.");
+    });
+
+    await t.test('Nomor telepon kurang dari 8 digit ditolak', () => {
+        const res = validateClientPhone("08123");
+        assert.equal(res.isValid, false);
+        assert.equal(res.error, "Nomor telepon / WhatsApp tidak valid (minimal 8 digit).");
+    });
+
+    await t.test('Nomor telepon valid diterima', () => {
+        const res1 = validateClientPhone("081234567890");
+        const res2 = validateClientPhone("0812-3456-7890");
+        assert.equal(res1.isValid, true);
+        assert.equal(res2.isValid, true);
+    });
+});

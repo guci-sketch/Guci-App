@@ -590,6 +590,11 @@ export function QuotationPage() {
                                             </td>
                                             <td className="px-4 py-3.5 max-w-[240px]">
                                                 <div className="font-bold text-sm text-[var(--text-primary)] truncate">{q.kepadaNama}</div>
+                                                {q.kepadaWa && (
+                                                    <div className="text-[11px] font-mono text-[var(--text-muted)] truncate mt-0.5">
+                                                        📞 {q.kepadaWa}
+                                                    </div>
+                                                )}
                                                 {q.objekPekerjaan && (
                                                     <div className="text-xs text-[var(--accent-text)] font-medium truncate mt-0.5">
                                                         Objek: {q.objekPekerjaan}
@@ -675,17 +680,6 @@ export function QuotationPage() {
                                                             >
                                                                 Bukti Approve
                                                             </button>
-                                                            {q.kepadaWa && (
-                                                                <a
-                                                                    href={`https://wa.me/${q.kepadaWa.replace(/^0/, "62").replace(/\D/g, "")}?text=${encodeURIComponent(`Halo Bapak/Ibu ${q.kepadaUp || q.kepadaNama},\n\nBerikut kami sampaikan Surat Penawaran Resmi PT Guci Emas Pratama:\nNo. Surat: ${q.noSurat}\nLayanan: ${LAYANAN_CONFIG[q.jenisLayanan]?.label}\nGaransi: ${gText}\nTotal Biaya: Rp ${q.total.toLocaleString("id-ID")}\n\nTerima kasih atas kepercayaan Anda.`)}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="px-2.5 py-1.5 rounded-lg bg-[var(--status-completed-bg)] text-[var(--status-completed-text)] border border-[var(--status-completed-border)] text-xs font-semibold"
-                                                                    title={`Kirim via WhatsApp ke ${q.kepadaWa}`}
-                                                                >
-                                                                    Kirim WA
-                                                                </a>
-                                                            )}
                                                         </>
                                                     ) : (
                                                         <span className="px-2 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10.5px] font-semibold">

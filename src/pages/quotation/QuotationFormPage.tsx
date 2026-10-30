@@ -5,7 +5,7 @@ import {
     Plus, Trash2, Loader2, AlertCircle,
     Clock, Hash, Calculator, Ruler, Eye,
     FileCheck2, Database, ShieldCheck,
-    Camera, X, FlaskConical, ChevronDown, ChevronUp, MessageCircle, MapPin, Sparkles, Calendar,
+    Camera, X, FlaskConical, ChevronDown, ChevronUp, MessageCircle, MapPin, Sparkles, Calendar, Phone,
 } from "lucide-react";
 import { useAuthStore } from '@/app/store/authStore';
 import { commitNomorSurat, previewNomorSurat } from '@/shared/api/nomorSuratService';
@@ -373,6 +373,12 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
         if (step === 1) {
             if (!(kepadaNama || kepada).trim()) e.nama = "Nama klien wajib diisi.";
             if (!kepadaAlamat.some(l => l.trim())) e.alamat = "Alamat surat klien minimal 1 baris.";
+            const cleanWa = kepadaWa.replace(/\D/g, "");
+            if (!kepadaWa.trim()) {
+                e.wa = "Nomor telepon / WhatsApp wajib diisi.";
+            } else if (cleanWa.length < 8 || cleanWa.length > 16) {
+                e.wa = "Nomor telepon / WhatsApp tidak valid (minimal 8 digit).";
+            }
         }
         if (step === 2) {
             if (items.length === 0) e.items = "Minimal 1 baris pekerjaan.";
@@ -958,13 +964,16 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             )}
                         </div>
 
-                        <Field label="Nomor WhatsApp Klien (Untuk Pengiriman PDF Penawaran)">
+                        <Field label="Nomor Telepon / WhatsApp *" error={errors.wa}>
                             <div className="relative">
-                                <MessageCircle size={15} className="text-emerald-600 absolute left-3 top-2.5" />
+                                <Phone size={15} className="text-slate-500 absolute left-3 top-2.5" />
                                 <input
                                     className={`${inputCls} pl-9`}
                                     value={kepadaWa}
-                                    onChange={e => setKepadaWa(e.target.value)}
+                                    onChange={e => {
+                                        setKepadaWa(e.target.value);
+                                        if (errors.wa) setErrors(prev => ({ ...prev, wa: "" }));
+                                    }}
                                     placeholder="081234567890"
                                 />
                             </div>

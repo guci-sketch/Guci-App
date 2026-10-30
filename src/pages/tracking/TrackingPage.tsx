@@ -585,7 +585,10 @@ function TrackingCard({ quotation, tracking, onEdit }: {
                             )}
                         </div>
                         <p className="font-semibold text-slate-900 text-sm truncate">{quotation.kepadaNama}</p>
-                        <p className="text-xs text-slate-400">{quotation.marketingNama}</p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 flex-wrap">
+                            {quotation.kepadaWa && <span className="font-mono text-slate-700 font-medium">📞 {quotation.kepadaWa}</span>}
+                            <span>· {quotation.marketingNama}</span>
+                        </div>
                     </div>
                     <div className="text-right shrink-0">
                         <p className="font-bold text-slate-800 font-mono text-sm">{formatRupiah(quotation.total)}</p>

@@ -93,7 +93,7 @@ Guna melindungi integritas dan validitas komersial perusahaan:
    - Tindakan ini mencegah penawaran yang belum divalidasi harga/garansinya terkirim secara prematur ke klien.
 2. **Status Disetujui (Nomor Surat Resmi):**
    - Setelah Admin atau Direktur melakukan peninjauan dan menekan tombol **Setujui (Approve)**, kode `-DRF` otomatis dihapus sehingga nomor surat langsung menjadi format resmi kategori (`GP/AR/PH/...` atau `GP/PCO/PH/...` tanpa kode `APR`).
-   - Tombol **Unduh PDF Resmi** dan **Kirim WhatsApp** terbuka secara otomatis bagi Marketing dan Admin.
+   - Tombol **Unduh PDF Resmi** terbuka secara otomatis bagi Marketing dan Admin setelah disetujui.
 
 ---
 
@@ -168,6 +168,13 @@ Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
    - Komponen `MapPicker` terintegrasi memungkinkan pengguna menggeser pin peta secara manual untuk menunjuk gerbang/pintu masuk gedung dengan presisi tinggi.
    - Tombol *"Posisi GPS Saya Saat Ini"* langsung membaca sensor GPS perangkat dengan akurasi maksimal saat survei di lokasi klien.
    - Kolom numerik Latitude & Longitude mendukung salin-tempel koordinat langsung dari Google Maps.
+
+---
+
+## 14. Kebijakan Kontak Pelanggan pada Penawaran (Wajib & Pengelolaan Internal)
+
+- **Mandatory Field:** Kolom Nomor Telepon / WhatsApp klien pada penawaran bersifat **Wajib (Required)** pada form pembuatan maupun pengeditan penawaran, dengan validasi format numerik minimal 8 digit.
+- **Pengelolaan Eksklusif Internal:** Data kontak ini disimpan murni untuk kebutuhan pengelolaan dan pelacakan internal oleh Direktur dan Admin (terintegrasi langsung pada modul Tracking pesanan & termin pembayaran), bukan untuk pengiriman otomatis pesan penawaran komersial via WhatsApp.
 
 ---
 *Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*

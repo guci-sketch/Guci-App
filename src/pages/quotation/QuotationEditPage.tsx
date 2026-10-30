@@ -323,9 +323,17 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
         }
     };
 
-    // Simpan Revisi Draft (Update GP-DRF)
+    // Simpan Revisi Draft
     const handleSaveDraftAdjustment = async () => {
         if (!quotation || !id || !user) return;
+        if (!nama.trim()) {
+            setError("Nama klien wajib diisi.");
+            return;
+        }
+        if (!wa.trim()) {
+            setError("Nomor telepon / WhatsApp wajib diisi.");
+            return;
+        }
         setSaving(true);
         setError("");
         try {
@@ -359,6 +367,14 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
     // Simpan Adjustment & Langsung Approve (Konversi GP-DRF -> GP-APR + Auto-Generate PDF)
     const handleSaveAndApprove = async () => {
         if (!quotation || !id || !user || !isAdmin) return;
+        if (!nama.trim()) {
+            setError("Nama klien wajib diisi.");
+            return;
+        }
+        if (!wa.trim()) {
+            setError("Nomor telepon / WhatsApp wajib diisi.");
+            return;
+        }
         setApproving(true);
         setError("");
         try {
@@ -702,10 +718,19 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
 
                 {/* 4. Data Klien, Alamat 1 & 2 (dengan Hint), Objek Survey & Varian Template PDF */}
                 <div className="space-y-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
-                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Nama Klien</label>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Nama Klien *</label>
                             <input className={inputCls} value={nama} onChange={e => setNama(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Nomor Telepon / WhatsApp *</label>
+                            <input
+                                className={inputCls}
+                                value={wa}
+                                onChange={e => setWa(e.target.value)}
+                                placeholder="081234567890"
+                            />
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)] mb-1">Objek Pekerjaan Survey</label>

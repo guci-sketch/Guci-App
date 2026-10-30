@@ -154,12 +154,9 @@ function QuotationCard({
                         <p className="font-semibold text-slate-900 text-sm truncate">{q.kepadaNama}</p>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{layananLabel} · {q.marketingNama}</p>
                         {q.kepadaWa && (
-                            <a href={`https://wa.me/${q.kepadaWa.replace(/^0/, "62").replace(/\D/g, "")}?text=${encodeURIComponent(`Halo, kami ingin menindaklanjuti penawaran kami kepada ${q.kepadaNama}.\nNo. Surat: ${q.noSurat}\nTotal: Rp ${q.total.toLocaleString("id-ID")}\n\nApakah ada pertanyaan mengenai penawaran tersebut?`)}`}
-                                target="_blank" rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 mt-1 text-[11px] text-green-600 hover:text-green-700 font-semibold bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
-                                <MessageCircle size={10} /> {q.kepadaWa} — Kirim WA
-                            </a>
+                            <span className="inline-flex items-center gap-1 mt-1 text-[11px] text-slate-600 font-mono bg-slate-100 px-2 py-0.5 rounded-full">
+                                📞 {q.kepadaWa}
+                            </span>
                         )}
                     </div>
                     <div className="text-right shrink-0">
