@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id" class="dark" data-theme="dark">
+<html lang="id" class="light" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -16,7 +16,7 @@
         try {
           var key = 'fw_theme_preference_v1';
           var stored = localStorage.getItem(key);
-          var pref = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'dark';
+          var pref = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'light';
           var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
           var isDark = pref === 'dark' || (pref === 'system' && sysDark);
           var root = document.documentElement;

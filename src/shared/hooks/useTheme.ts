@@ -28,7 +28,7 @@ export const THEME_OPTIONS: { value: ThemePreference; label: string; shortLabel:
 ];
 
 export function readStoredThemePreference(): ThemePreference {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (raw === 'light' || raw === 'dark' || raw === 'system') {
@@ -37,7 +37,7 @@ export function readStoredThemePreference(): ThemePreference {
   } catch {
     // ignore localStorage read errors
   }
-  return 'dark';
+  return 'light';
 }
 
 export function resolveEffectiveTheme(preference: ThemePreference, systemPrefersDark?: boolean): ResolvedTheme {
