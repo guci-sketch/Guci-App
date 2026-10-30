@@ -66,7 +66,15 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
 
 ---
 
-## 5. Bukti Pengujian & Integritas Sistem
+## 6. Konfigurasi Tema Bawaan (Light Theme Default)
+
+* **Inisialisasi Bawaan:** Aplikasi kini langsung aktif dalam tema **Terang (Light)** pada kunjungan pertama atau saat penyimpanan `localStorage` masih kosong.
+* **Mencegah Flash Tampilan (FOUC):** Tag `<html>` pada `index.html` dan skrip *pre-hydration* dikonfigurasi menggunakan `class="light" data-theme="light"`.
+* **Pilihan Pengguna:** Pengguna tetap dapat berganti ke tema Gelap (*Dark*) atau Ikuti Sistem (*System*) melalui tombol toggle pada navigasi atas atau menu Pengaturan Profil.
+
+---
+
+## 7. Bukti Pengujian & Integritas Sistem
 
 1. **Vite Production Build:**
    * Status: **SUCCESS** (2545 modules transformed, 0 error).
@@ -77,5 +85,5 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
    * Status: **21 / 21 PASS (100%)**
    * Mencakup RBAC Matrix, State Machine SPK, Skor SUS Teknisi, dan Offline Queue Idempotency.
 4. **Riwayat Git:**
-   * Commit ID: `0356538` (`fix(field): resolve pdf text collision and mobile geofence anchor accuracy`)
-   * Branch: `origin/main` (di atas commit `c600518`).
+   * Commit ID: `0356538` & `4e4dded` (`feat(ui): set light as default color theme`)
+   * Branch: `origin/main`.

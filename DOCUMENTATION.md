@@ -147,4 +147,11 @@ Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
    - Penambahan kompensasi jarak (*italic overhang kerning* +0.65mm) setelah teks miring dan dukungan pemotongan baris baru eksplisit (`\n`) di dalam sel tabel biaya.
 
 ---
+
+## 12. Konfigurasi Tema Tampilan Bawaan (Light Theme Default)
+
+- **Default Tampilan:** Seluruh antarmuka aplikasi kini diinisialisasi secara bawaan (*by default*) menggunakan tema **Terang (Light)** untuk kenyamanan pembacaan di ruangan kantor maupun di bawah sinar matahari lapangan.
+- **Fleksibilitas Pengguna:** Tombol toggle cepat pada navigasi atas (*Header*) dan panel Pengaturan Profil tetap menyediakan kebebasan penuh bagi pengguna untuk beralih ke tema **Gelap (Dark)** atau **Ikuti Sistem (System)** dengan penyimpanan persisten di `localStorage`.
+
+---
 *Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*
