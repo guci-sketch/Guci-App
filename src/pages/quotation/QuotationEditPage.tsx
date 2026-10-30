@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from '@/app/store/authStore';
 import {
-    getQuotationById, updateQuotationData, approveAndIssueAprNumber,
+    getQuotationById, updateQuotationData, approveAndIssueOfficialNumber,
     attachPdfToQuotation, blobToBase64,
 } from '@/shared/api/quotationService';
 import { generateCompanyQuotationPDF } from '@/shared/api/documentConfig';
@@ -377,14 +377,14 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                 newGaransiLabel: newGaransi,
                 prevTotal: quotation.total,
                 newTotal: totalFinal,
-                reason: adjustmentReason.trim() || `Disetujui & diterbitkan GP-APR oleh ${user.name}`,
+                reason: adjustmentReason.trim() || `Disetujui & diterbitkan nomor resmi oleh ${user.name}`,
             };
 
             await updateQuotationData(id, fields, logEntry);
 
             const mergedQuotation: Quotation = { ...quotation, ...fields };
             const finalSig = approvalSig || generateStampSignatureBase64(user.name, user.role);
-            const { approvedNoSurat } = await approveAndIssueAprNumber({
+            const { approvedNoSurat } = await approveAndIssueOfficialNumber({
                 quotation: mergedQuotation,
                 approvedByUid: user.uid,
                 approvedByName: user.name,
@@ -392,7 +392,7 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
                 approvalSignedByRole: user.role,
             });
 
-            // Generate PDF resmi dengan nomor GP-APR baru
+            // Generate PDF resmi dengan nomor surat resmi baru
             const pdfBlob = await generateCompanyQuotationPDF({
                 noSurat: approvedNoSurat,
                 tanggal: quotation.tanggal,
@@ -433,13 +433,13 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
 
             goBack();
         } catch (e) {
-            setError(e instanceof Error ? e.message : "Gagal menyetujui dan menerbitkan GP-APR.");
+            setError(e instanceof Error ? e.message : "Gagal menyetujui dan menerbitkan nomor resmi.");
         } finally {
             setApproving(false);
         }
     };
 
-    const isDraftStage = quotation.stage !== "APR" && !quotation.noSurat.includes("-APR/");
+    const isDraftStage = quotation.stage === "DRF" || quotation.noSurat.includes("-DRF/");
 
     return (
         <div className="max-w-4xl mx-auto py-2 px-1 sm:px-2 space-y-5">

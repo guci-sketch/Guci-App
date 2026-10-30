@@ -552,7 +552,7 @@ export function QuotationPage() {
                                 {paged.map(q => {
                                     const isPending = q.status === "pending" || q.status === "draft";
                                     const isApproved = q.status === "approved" || q.status === "sent_to_client" || q.status === "deal";
-                                    const isAprStage = q.stage === "APR" || q.noSurat.includes("-APR/");
+                                    const isOfficial = isApproved || q.stage === "OFFICIAL" || (!q.noSurat.includes("-DRF/") && q.noSurat.includes("/"));
                                     const gText = formatWarrantyDurationText(
                                         q.garansiNilai ?? q.garansiTahun ?? 0,
                                         q.garansiUnit ?? "tahun"
@@ -563,7 +563,7 @@ export function QuotationPage() {
                                         <tr key={q.id} className={`row-fade-in hover:bg-[var(--bg-tertiary)]/60 transition-colors ${isPending ? "bg-[var(--status-draft-bg)]/20" : ""}`}>
                                             <td className="px-4 py-3.5 whitespace-nowrap">
                                                 <code className={`px-2 py-1 rounded-md font-mono font-bold text-xs block w-max ${
-                                                    isAprStage
+                                                    isOfficial
                                                         ? "bg-[var(--status-approved-bg)] text-[var(--status-approved-text)]"
                                                         : "bg-[var(--status-draft-bg)] text-[var(--status-draft-text)]"
                                                 }`}>

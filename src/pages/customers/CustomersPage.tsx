@@ -6,7 +6,7 @@ import {
     ChevronDown, ChevronUp, CheckCircle2, MessageCircle,
     Shield, Clock, AlertTriangle, CalendarCheck,
     MapPin, ClipboardCheck, Phone, Building2, Wrench,
-    Navigation, ExternalLink,
+    Navigation, ExternalLink, Eye, AlertCircle, CheckSquare,
 } from "lucide-react";
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from '@/shared/lib/firebase';
 import { db } from '@/shared/lib/firebase';
@@ -406,6 +406,147 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
     );
 }
 
+// ─── BULK IMPORT PREVIEW MODAL ───────────────────────────────────────────────
+
+interface ImportRow {
+    nama: string;
+    kontak: string;
+    alamat: string;
+    proyek: string;
+    kategoriProyek: string;
+    _status: "ok" | "duplicate" | "error";
+    _reason?: string;
+}
+
+function BulkImportPreviewModal({
+    rows,
+    existingNames,
+    onConfirm,
+    onClose,
+    importing,
+}: {
+    rows: ImportRow[];
+    existingNames: Set<string>;
+    onConfirm: (validRows: ImportRow[]) => void;
+    onClose: () => void;
+    importing: boolean;
+}) {
+    const tagged = useMemo<ImportRow[]>(() => rows.map(r => {
+        if (!r.nama.trim()) return { ...r, _status: "error", _reason: "Nama kosong" };
+        const key = r.nama.trim().toLowerCase();
+        if (existingNames.has(key)) return { ...r, _status: "duplicate", _reason: "Nama sudah ada" };
+        return { ...r, _status: "ok" };
+    }), [rows, existingNames]);
+
+    const okRows = tagged.filter(r => r._status === "ok");
+    const dupRows = tagged.filter(r => r._status === "duplicate");
+    const errRows = tagged.filter(r => r._status === "error");
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[88vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <Eye size={16} className="text-blue-600" /> Preview Import Klien
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Periksa data sebelum menyimpan ke sistem
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Ringkasan */}
+                <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-4 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">
+                        <CheckSquare size={13} /> {okRows.length} siap import
+                    </span>
+                    {dupRows.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-700">
+                            <AlertTriangle size={13} /> {dupRows.length} duplikat (dilewati)
+                        </span>
+                    )}
+                    {errRows.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-700">
+                            <AlertCircle size={13} /> {errRows.length} error (dilewati)
+                        </span>
+                    )}
+                </div>
+
+                {/* Tabel */}
+                <div className="overflow-auto flex-1 px-6 py-3">
+                    <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                        <thead className="sticky top-0 bg-white">
+                            <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wide text-[10px]">
+                                <th className="px-3 py-2 rounded-l-lg">Status</th>
+                                <th className="px-3 py-2">Nama</th>
+                                <th className="px-3 py-2">Kontak</th>
+                                <th className="px-3 py-2">Alamat</th>
+                                <th className="px-3 py-2">Proyek</th>
+                                <th className="px-3 py-2 rounded-r-lg">Kategori</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {tagged.map((r, i) => (
+                                <tr key={i} className={
+                                    r._status === "ok" ? "bg-white" :
+                                    r._status === "duplicate" ? "bg-amber-50/60" : "bg-red-50/60"
+                                }>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        {r._status === "ok" ? (
+                                            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                                                <CheckCircle2 size={11} /> OK
+                                            </span>
+                                        ) : r._status === "duplicate" ? (
+                                            <span className="inline-flex items-center gap-1 text-amber-700 font-semibold" title={r._reason}>
+                                                <AlertTriangle size={11} /> Duplikat
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={r._reason}>
+                                                <AlertCircle size={11} /> Error
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2 font-medium text-slate-800 max-w-[140px] truncate">{r.nama || "—"}</td>
+                                    <td className="px-3 py-2 text-slate-600 max-w-[100px] truncate">{r.kontak || "—"}</td>
+                                    <td className="px-3 py-2 text-slate-500 max-w-[160px] truncate">{r.alamat || "—"}</td>
+                                    <td className="px-3 py-2 text-slate-600 max-w-[120px] truncate">{r.proyek || "—"}</td>
+                                    <td className="px-3 py-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                            r.kategoriProyek.toUpperCase() === "AR"
+                                                ? "bg-purple-100 text-purple-700"
+                                                : "bg-cyan-100 text-cyan-700"
+                                        }`}>{r.kategoriProyek.toUpperCase() === "AR" ? "AR" : "PCO"}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200">
+                        Batal
+                    </button>
+                    <button
+                        onClick={() => onConfirm(okRows)}
+                        disabled={okRows.length === 0 || importing}
+                        className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {importing ? <><Loader2 size={13} className="animate-spin" /> Menyimpan...</> : <><CheckSquare size={13} /> Import {okRows.length} Klien</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 const CUSTOMER_PAGE_SIZE = 10;
 
 export function CustomersPage() {
@@ -419,64 +560,79 @@ export function CustomersPage() {
     const [sortBy, setSortBy] = useState<"date" | "name" | "deal" | "area">("date");
     const [filterWarranty, setFilterWarranty] = useState(false);
     const [checklistTarget, setChecklistTarget] = useState<DerivedCustomer | null>(null);
+    const [importPreviewRows, setImportPreviewRows] = useState<ImportRow[] | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
 
     const downloadTemplate = () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([
-            ["Nama", "Kontak", "Alamat", "Proyek", "KategoriProyek"]
+            ["Nama", "Kontak", "Alamat", "Proyek", "KategoriProyek"],
+            ["PT Contoh Klien", "0812-3456-7890", "Jl. Contoh No. 1, Jakarta Selatan", "Pengendalian Rayap Gedung", "AR"],
+            ["CV Maju Bersama", "0857-9876-5432", "Jl. Raya No. 5, Tangerang", "Pest Control Rutin", "PCO"],
         ]);
         XLSX.utils.book_append_sheet(wb, ws, "Template_Klien");
         XLSX.writeFile(wb, "Template_Import_Klien.xlsx");
     };
 
-    const [isImporting, setIsImporting] = useState(false);
-
-    const handleImportBulk = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !user?.companyId) return;
-        
-        setIsImporting(true);
+        e.target.value = "";
+        if (!file) return;
         const reader = new FileReader();
-        reader.onload = async (evt) => {
+        reader.onload = (evt) => {
             try {
-                const bstr = evt.target?.result;
-                const wb = XLSX.read(bstr, { type: "binary" });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
+                const wb = XLSX.read(evt.target?.result, { type: "binary" });
+                const ws = wb.Sheets[wb.SheetNames[0]];
                 const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-                
-                const insertPayload = data.map(row => ({
-                    company_id: user.companyId,
-                    marketing_uid: user.uid,
-                    status: "draft",
-                    payload: {
-                        kepadaNama: String(row["Nama"] || "Klien Baru"),
-                        kepadaKontak: String(row["Kontak"] || ""),
-                        kepadaAlamat: String(row["Alamat"] || ""),
-                        perihal: String(row["Proyek"] || "Penawaran Harga"),
-                        kategori: (String(row["KategoriProyek"])?.toUpperCase() === "AR") ? "AR" : "PCO",
-                        tipeKontrak: "ONE_TIME",
-                        tanggal: new Date().toISOString(),
-                        companyId: user.companyId,
-                        marketingUid: user.uid,
-                        status: "draft"
-                    }
+                if (data.length === 0) { alert("File kosong atau format tidak sesuai."); return; }
+                if (data.length > 500) { alert("Maksimal 500 baris per import."); return; }
+                const rows: ImportRow[] = data.map(row => ({
+                    nama: String(row["Nama"] || "").trim(),
+                    kontak: String(row["Kontak"] || "").trim(),
+                    alamat: String(row["Alamat"] || "").trim(),
+                    proyek: String(row["Proyek"] || "Penawaran Harga").trim(),
+                    kategoriProyek: String(row["KategoriProyek"] || "PCO").trim(),
+                    _status: "ok",
                 }));
-
-                const { error } = await supabase.from('quotations').insert(insertPayload);
-                if (error) throw error;
-
-                alert(`Berhasil mengimpor ${insertPayload.length} data klien ke database!`);
-                load();
+                setImportPreviewRows(rows);
             } catch (err) {
-                console.error("Bulk Import Error:", err);
-                alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
-            } finally {
-                setIsImporting(false);
-                e.target.value = '';
+                alert(`Gagal membaca file: ${err instanceof Error ? err.message : String(err)}`);
             }
         };
         reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmImport = async (validRows: ImportRow[]) => {
+        if (!user?.companyId) return;
+        setIsImporting(true);
+        try {
+            const insertPayload = validRows.map(row => ({
+                company_id: user.companyId,
+                marketing_uid: user.uid,
+                status: "draft",
+                payload: {
+                    kepadaNama: row.nama,
+                    kepadaKontak: row.kontak,
+                    kepadaAlamat: row.alamat,
+                    perihal: row.proyek,
+                    kategori: row.kategoriProyek.toUpperCase() === "AR" ? "AR" : "PCO",
+                    tipeKontrak: "ONE_TIME",
+                    tanggal: new Date().toISOString(),
+                    companyId: user.companyId,
+                    marketingUid: user.uid,
+                    status: "draft",
+                }
+            }));
+            const { error } = await supabase.from('quotations').insert(insertPayload);
+            if (error) throw error;
+            setImportPreviewRows(null);
+            alert(`Berhasil mengimpor ${validRows.length} data klien.`);
+            load();
+        } catch (err) {
+            alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const debouncedSearch = useDebouncedValue(searchQ, 300);
@@ -647,7 +803,7 @@ export function CustomersPage() {
                     </button>
                     <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] cursor-pointer transition-colors shadow-sm">
                         <UploadCloud size={13} /> Import Bulk
-                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImportBulk} />
+                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileSelect} />
                     </label>
                 </div>
             </div>
@@ -780,6 +936,16 @@ export function CustomersPage() {
                         setChecklists(prev => [...prev, { ...entry, customerId: checklistTarget.id }]);
                         setChecklistTarget(null);
                     }} />
+            )}
+
+            {importPreviewRows && (
+                <BulkImportPreviewModal
+                    rows={importPreviewRows}
+                    existingNames={new Set(Array.from(customerMap.keys()))}
+                    onConfirm={handleConfirmImport}
+                    onClose={() => setImportPreviewRows(null)}
+                    importing={isImporting}
+                />
             )}
         </div>
     );

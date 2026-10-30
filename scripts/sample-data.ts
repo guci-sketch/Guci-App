@@ -21,7 +21,7 @@ const METODE_BARRIER = [
 export const SAMPLES: Record<string, QuotationPDFData> = {
   // 1. Contoh PDF 0005: PT Oreka Solusi Kreatif — Pra Konstruksi & Pipa (8 Halaman Lengkap + Garansi 5 Tahun)
   '0005_Oreka_PraKonstruksi_Pipa_8Hal': {
-    noSurat: 'GP-APR/AR/PH/2026/01/0005',
+    noSurat: 'GP/AR/PH/2026/01/0005',
     pdfVariant: 'ar_pra_profile_8p',
     tanggal: new Date('2026-01-05T00:00:00+07:00'),
     kepadaNama: 'PT Oreka Solusi Kreatif',
@@ -52,7 +52,7 @@ export const SAMPLES: Record<string, QuotationPDFData> = {
 
   // 2. Contoh PDF 0022: Bank Victoria Cabang Fatmawati — Retreatment + Tabel Rumus Volume + Upah 25% & Diskon Upah 15%
   '0022_BankVictoria_Retreatment_RumusVolume': {
-    noSurat: 'GP-APR/AR/PH/2026/01/0022',
+    noSurat: 'GP/AR/PH/2026/01/0022',
     pdfVariant: 'ar_pasca_standar_4p',
     isRevisi: true,
     tanggal: new Date('2026-01-12T00:00:00+07:00'),
@@ -92,7 +92,7 @@ export const SAMPLES: Record<string, QuotationPDFData> = {
 
   // 3. Contoh PDF 0009: Proposal Rodent Control UPTD Puskesmas Pisangan (Program Kerja A-E + Tabel Biaya Oranye)
   '0009_PuskesmasPisangan_RodentProposal': {
-    noSurat: 'GP-APR/PCO/PH/2026/01/0009',
+    noSurat: 'GP/PCO/PH/2026/01/0009',
     pdfVariant: 'pco_rodent_survey_4p',
     tanggal: new Date('2026-01-06T00:00:00+07:00'),
     kepadaNama: 'UPTD PUSKESMAS PISANGAN',
@@ -116,7 +116,7 @@ export const SAMPLES: Record<string, QuotationPDFData> = {
 
   // 4. Contoh PDF 0003: Penawaran Pest Control PLN UP3 Bulungan (Total di Cover + DPP Nilai Lain 11/12 + PPN 12%)
   '0003_PLNBulungan_PestRodent_DPP': {
-    noSurat: 'GP-APR/PCO/PH/2026/01/0003',
+    noSurat: 'GP/PCO/PH/2026/01/0003',
     pdfVariant: 'pco_korporat_boq_3p',
     tanggal: new Date('2026-01-05T00:00:00+07:00'),
     kepadaNama: 'PT PLN (Persero) UP3 Bulungan',
@@ -140,7 +140,7 @@ export const SAMPLES: Record<string, QuotationPDFData> = {
 
   // 5. Contoh PDF 0015: Surat Jadwal Kerja Pest Control (Fogging) Ibu Dita 12 Bulan (1 Halaman)
   '0015_IbuDita_JadwalFogging12Bulan': {
-    noSurat: 'GP-APR/PCO/PH/2026/01/0015',
+    noSurat: 'GP/PCO/PH/2026/01/0015',
     pdfVariant: 'pco_jadwal_fogging_1p',
     tipeSurat: 'jadwal_fogging',
     tanggal: new Date('2026-01-07T00:00:00+07:00'),

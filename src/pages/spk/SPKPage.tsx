@@ -4,6 +4,7 @@ import {
     ChevronRight, User, CalendarDays, AlertCircle,
     CheckCircle2, Clock, PlayCircle, X, MapPin,
     FileText, ArrowRight, Wrench, Filter,
+    Repeat, CalendarCheck, Eye,
 } from "lucide-react";
 import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
 import { db } from '@/shared/lib/firebase';
@@ -241,6 +242,402 @@ function InfoBlock({ icon, label, value }: { icon: React.ReactNode; label: strin
     );
 }
 
+// ─── RECURRING SCHEDULE MODAL ─────────────────────────────────────────────────
+
+interface RecurringPreviewRow {
+    tanggal: string; // ISO date string
+    teknisiId: string;
+    teknisiNama: string;
+    quotationId: string;
+    quotationNoSurat: string;
+    customerName: string;
+    perihal: string;
+    lokasi: string;
+    serviceType: SPK["serviceType"];
+}
+
+function RecurringScheduleModal({
+    companyId,
+    user,
+    onClose,
+    onCreated,
+}: {
+    companyId: string;
+    user: AppUser;
+    onClose: () => void;
+    onCreated: () => void;
+}) {
+    const [quotations, setQuotations] = useState<Quotation[]>([]);
+    const [teknisis, setTeknisis] = useState<AppUser[]>([]);
+    const [loadingData, setLoadingData] = useState(true);
+
+    // Form state
+    const [selectedQuoId, setSelectedQuoId] = useState("");
+    const [selectedTekIds, setSelectedTekIds] = useState<string[]>([]);
+    const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+    const [interval, setInterval] = useState<"harian" | "mingguan" | "bulanan">("mingguan");
+    const [count, setCount] = useState(4); // Berapa kali
+    const [notes, setNotes] = useState("");
+
+    const [previewRows, setPreviewRows] = useState<RecurringPreviewRow[] | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [quoSearch, setQuoSearch] = useState("");
+
+    useEffect(() => {
+        const load = async () => {
+            setLoadingData(true);
+            try {
+                const [quoSnap, userSnap] = await Promise.all([
+                    getDocs(query(
+                        collection(db, "quotations"),
+                        where("companyId", "==", companyId),
+                    )),
+                    getDocs(query(
+                        collection(db, "users"),
+                        where("companyId", "==", companyId),
+                        where("role", "==", "TEKNISI_LAPANGAN"),
+                        where("isActive", "==", true),
+                    )),
+                ]);
+                const quoList = quoSnap.docs
+                    .map(d => {
+                        const data = d.data() as Record<string, unknown>;
+                        return {
+                            id: d.id,
+                            noSurat: data.noSurat,
+                            kepadaNama: data.kepadaNama,
+                            perihal: data.perihal,
+                            total: data.total,
+                            jenisLayanan: data.jenisLayanan,
+                            kategori: data.kategori,
+                            kepadaAlamatLines: data.kepadaAlamatLines ?? [],
+                            lokasiPekerjaan: data.lokasiPekerjaan,
+                            tanggal: (data.tanggal as Timestamp).toDate(),
+                            status: data.status,
+                        } as unknown as Quotation;
+                    })
+                    .filter(q => q.status === "approved" || q.status === "deal" || q.status === "sent_to_client");
+                setQuotations(quoList);
+                setTeknisis(userSnap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser)));
+            } finally {
+                setLoadingData(false);
+            }
+        };
+        load();
+    }, [companyId]);
+
+    const selectedQuo = useMemo(() => quotations.find(q => q.id === selectedQuoId), [quotations, selectedQuoId]);
+    const filteredQuos = useMemo(() => {
+        if (!quoSearch) return quotations;
+        const s = quoSearch.toLowerCase();
+        return quotations.filter(q =>
+            q.noSurat.toLowerCase().includes(s) ||
+            q.kepadaNama.toLowerCase().includes(s)
+        );
+    }, [quotations, quoSearch]);
+
+    // Generate tanggal berulang
+    function generateDates(start: string, mode: typeof interval, n: number): string[] {
+        const dates: string[] = [];
+        const d = new Date(start);
+        for (let i = 0; i < n; i++) {
+            dates.push(d.toISOString().split("T")[0]);
+            if (mode === "harian") d.setDate(d.getDate() + 1);
+            else if (mode === "mingguan") d.setDate(d.getDate() + 7);
+            else d.setMonth(d.getMonth() + 1);
+        }
+        return dates;
+    }
+
+    const handlePreview = () => {
+        if (!selectedQuo || selectedTekIds.length === 0 || !startDate || count < 1) return;
+        const dates = generateDates(startDate, interval, count);
+        const svcType = selectedQuo.kategori === "AR" ? "TERMITE_CONTROL" : "GENERAL_PEST_CONTROL";
+        const lokasi = selectedQuo.lokasiPekerjaan || (selectedQuo.kepadaAlamatLines ?? []).join(", ");
+
+        // Rotasi teknisi: setiap jadwal → teknisi berikutnya (round-robin)
+        const rows: RecurringPreviewRow[] = dates.map((tgl, idx) => {
+            const tek = teknisis.find(t => t.uid === selectedTekIds[idx % selectedTekIds.length])!;
+            return {
+                tanggal: tgl,
+                teknisiId: tek.uid,
+                teknisiNama: tek.name,
+                quotationId: selectedQuo.id,
+                quotationNoSurat: selectedQuo.noSurat,
+                customerName: selectedQuo.kepadaNama,
+                perihal: selectedQuo.perihal,
+                lokasi,
+                serviceType: svcType as SPK["serviceType"],
+            };
+        });
+        setPreviewRows(rows);
+    };
+
+    const handleConfirm = async () => {
+        if (!previewRows) return;
+        setSubmitting(true);
+        try {
+            for (const row of previewRows) {
+                await createSPK({
+                    quotationId: row.quotationId,
+                    quotationNoSurat: row.quotationNoSurat,
+                    customerName: row.customerName,
+                    technicianId: row.teknisiId,
+                    technicianName: row.teknisiNama,
+                    scheduleDate: new Date(row.tanggal),
+                    serviceType: row.serviceType,
+                    perihal: row.perihal,
+                    lokasi: row.lokasi,
+                    notes: notes.trim() || `Jadwal rutin ${interval} (disetup oleh ${user.name})`,
+                    companyId,
+                    createdBy: user.uid,
+                    createdByName: user.name,
+                });
+            }
+            onCreated();
+        } catch (e) {
+            alert(`Gagal membuat jadwal: ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const intervalLabel: Record<typeof interval, string> = {
+        harian: "Setiap hari",
+        mingguan: "Setiap minggu",
+        bulanan: "Setiap bulan",
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <Repeat size={16} className="text-blue-600" /> Setup Jadwal Rutin SPK
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Generate beberapa SPK sekaligus untuk jadwal mingguan/bulanan
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                    {loadingData ? (
+                        <div className="flex items-center justify-center py-12 text-slate-400">
+                            <Loader2 size={20} className="animate-spin mr-2" /> Memuat data...
+                        </div>
+                    ) : previewRows ? (
+                        // Preview mode
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-bold text-slate-800">
+                                    Preview {previewRows.length} SPK yang akan dibuat:
+                                </p>
+                                <button
+                                    onClick={() => setPreviewRows(null)}
+                                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                    ← Ubah pengaturan
+                                </button>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 overflow-hidden">
+                                <table className="w-full text-xs">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wide text-[10px]">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left">Tanggal</th>
+                                            <th className="px-3 py-2 text-left">Teknisi</th>
+                                            <th className="px-3 py-2 text-left">Klien</th>
+                                            <th className="px-3 py-2 text-left">Layanan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {previewRows.map((r, i) => (
+                                            <tr key={i} className="hover:bg-slate-50">
+                                                <td className="px-3 py-2 font-mono font-semibold text-slate-700">{r.tanggal}</td>
+                                                <td className="px-3 py-2 text-slate-700">{r.teknisiNama}</td>
+                                                <td className="px-3 py-2 text-slate-600 max-w-[140px] truncate">{r.customerName}</td>
+                                                <td className="px-3 py-2 text-slate-500 max-w-[120px] truncate">{r.perihal}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                    Pesan untuk Teknisi (Opsional)
+                                </label>
+                                <textarea
+                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                                    rows={2}
+                                    placeholder="Contoh: Jadwal rutin bulanan, koordinasi 1 hari sebelum..."
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        // Setup mode
+                        <div className="space-y-5">
+                            {/* Pilih Quotation */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+                                    1. Pilih Penawaran Resmi *
+                                </label>
+                                <div className="relative mb-2">
+                                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                        placeholder="Cari nomor surat atau nama klien..."
+                                        value={quoSearch}
+                                        onChange={e => setQuoSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                                    {filteredQuos.map(q => (
+                                        <button
+                                            key={q.id}
+                                            type="button"
+                                            onClick={() => setSelectedQuoId(q.id)}
+                                            className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all text-xs ${
+                                                selectedQuoId === q.id
+                                                    ? "border-blue-500 bg-blue-50 ring-1 ring-blue-300"
+                                                    : "border-slate-200 hover:border-blue-200 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            <span className="font-mono font-bold text-slate-800">{q.noSurat}</span>
+                                            <span className="text-slate-500 ml-2">{q.kepadaNama} · {q.perihal}</span>
+                                        </button>
+                                    ))}
+                                    {filteredQuos.length === 0 && (
+                                        <p className="text-xs text-slate-400 italic text-center py-3">Tidak ada penawaran yang bisa dijadikan jadwal rutin.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Pilih Teknisi (multi) */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+                                    2. Teknisi yang Bertugas * (bisa lebih dari satu — akan dirotasi)
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {teknisis.map(t => (
+                                        <button
+                                            key={t.uid}
+                                            type="button"
+                                            onClick={() => setSelectedTekIds(prev =>
+                                                prev.includes(t.uid) ? prev.filter(id => id !== t.uid) : [...prev, t.uid]
+                                            )}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all text-xs ${
+                                                selectedTekIds.includes(t.uid)
+                                                    ? "border-blue-500 bg-blue-50 ring-1 ring-blue-300"
+                                                    : "border-slate-200 hover:border-blue-200 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                                                {t.name[0]?.toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-slate-900 truncate">{t.name}</p>
+                                                <p className="text-slate-400 text-[10px]">{t.jabatan || "Teknisi"}</p>
+                                            </div>
+                                            {selectedTekIds.includes(t.uid) && (
+                                                <CalendarCheck size={13} className="ml-auto text-blue-500 shrink-0" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedTekIds.length > 1 && (
+                                    <p className="text-[11px] text-blue-600 mt-1.5 font-medium">
+                                        Rotasi otomatis: {selectedTekIds.map(id => teknisis.find(t => t.uid === id)?.name).join(" → ")} → ulang
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Tanggal mulai, interval, jumlah */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">3. Mulai Tanggal *</label>
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        min={new Date().toISOString().split("T")[0]}
+                                        onChange={e => setStartDate(e.target.value)}
+                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Interval *</label>
+                                    <select
+                                        value={interval}
+                                        onChange={e => setInterval(e.target.value as typeof interval)}
+                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    >
+                                        <option value="harian">Harian</option>
+                                        <option value="mingguan">Mingguan</option>
+                                        <option value="bulanan">Bulanan</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Berapa Kali? *</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={52}
+                                        value={count}
+                                        onChange={e => setCount(Math.max(1, Math.min(52, Number(e.target.value))))}
+                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Ringkasan */}
+                            {selectedQuo && selectedTekIds.length > 0 && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
+                                    <p className="font-bold mb-1">Ringkasan:</p>
+                                    <p>Klien: <strong>{selectedQuo.kepadaNama}</strong> · {selectedQuo.perihal}</p>
+                                    <p className="mt-0.5">{count} SPK · {intervalLabel[interval]} · mulai {startDate}</p>
+                                    <p className="mt-0.5">Teknisi: {selectedTekIds.map(id => teknisis.find(t => t.uid === id)?.name).join(", ")}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200">
+                        Batal
+                    </button>
+                    {previewRows ? (
+                        <button
+                            onClick={handleConfirm}
+                            disabled={submitting}
+                            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {submitting
+                                ? <><Loader2 size={13} className="animate-spin" /> Membuat SPK...</>
+                                : <><CalendarCheck size={13} /> Konfirmasi & Buat {previewRows.length} SPK</>
+                            }
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handlePreview}
+                            disabled={!selectedQuo || selectedTekIds.length === 0 || !startDate}
+                            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <Eye size={13} /> Preview Jadwal
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export function SPKPage() {
@@ -251,6 +648,7 @@ export function SPKPage() {
     const [spkList, setSpkList] = useState<SPK[]>([]);
     const [loading, setLoading] = useState(true);
     const [createOpen, setCreateOpen] = useState(false);
+    const [recurringOpen, setRecurringOpen] = useState(false);
     const [selected, setSelected] = useState<SPK | null>(null);
     const [filterStatus, setFilterStatus] = useState<SPK["status"] | "all">("all");
     const [search, setSearch] = useState("");
@@ -307,12 +705,20 @@ export function SPKPage() {
                         <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
                     </button>
                     {canCreate && (
-                        <button
-                            onClick={() => setCreateOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <Plus size={15} /> Buat SPK
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setRecurringOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                            >
+                                <Repeat size={15} /> Jadwal Rutin
+                            </button>
+                            <button
+                                onClick={() => setCreateOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Plus size={15} /> Buat SPK
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -478,6 +884,15 @@ export function SPKPage() {
                     user={user!}
                     onClose={() => setCreateOpen(false)}
                     onCreated={() => { setCreateOpen(false); load(); }}
+                />
+            )}
+
+            {recurringOpen && (
+                <RecurringScheduleModal
+                    companyId={companyId}
+                    user={user!}
+                    onClose={() => setRecurringOpen(false)}
+                    onCreated={() => { setRecurringOpen(false); load(); }}
                 />
             )}
 

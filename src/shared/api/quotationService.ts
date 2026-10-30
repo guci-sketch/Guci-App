@@ -3,7 +3,7 @@
  * Mendukung:
  *   1. Pembuatan Draft Survey oleh Marketing/Surveyor dengan kode GP-DRF/AR/... atau GP-DRF/PCO/...
  *   2. Adjustment & Negosiasi oleh Admin (ubah garansi bulan/tahun, harga satuan, diskon upah) + Re-Save Draft
- *   3. Approval oleh Admin yang menerbitkan kode resmi GP-APR/AR/... atau GP-APR/PCO/... + Auto-Generate PDF
+ *   3. Approval oleh Admin yang menerbitkan nomor resmi GP/AR/... atau GP/PCO/... (tanpa kode APR) + Auto-Generate PDF
  */
 import { supabase } from '@/shared/lib/supabase';
 import { commitNomorSurat } from './nomorSuratService';
@@ -26,7 +26,7 @@ export function base64ToBlob(base64: string, type = "application/pdf"): Blob {
 function toQuotation(data: any): Quotation {
     const p = data.payload ?? {};
     const noSurat: string = p.noSurat ?? "";
-    const inferredStage = p.stage ?? ((data.status === "approved" || data.status === "sent_to_client" || data.status === "deal" || (!noSurat.includes("-DRF/") && noSurat.includes("/"))) ? "APR" : "DRF");
+    const inferredStage = p.stage ?? ((data.status === "approved" || data.status === "sent_to_client" || data.status === "deal" || (!noSurat.includes("-DRF/") && noSurat.includes("/"))) ? "OFFICIAL" : "DRF");
     return {
         id: data.id,
         ...p,
@@ -158,13 +158,13 @@ export async function updateQuotationStatus(
 }
 
 /**
- * Meng-approve Quotation dari fase Draft (GP-DRF) ke fase Approved (GP-APR):
- *   1. Menerbitkan nomor surat baru dengan kode GP-APR/<AR|PCO>/<TIPE>/<YYYY>/<MM>/<NNNN>
+ * Meng-approve Quotation dari fase Draft (GP-DRF) ke nomor surat resmi (GP/AR/... atau GP/PCO/...):
+ *   1. Menerbitkan/membersihkan nomor surat menjadi kode resmi (tanpa kode APR)
  *   2. Menyimpan nomor GP-DRF lama ke `draftNoSurat` sebagai jejak audit
- *   3. Meng-update `noSurat` utama menjadi nomor `GP-APR/...`
- *   4. Mengembalikan nomor `GP-APR/...` yang siap dicetak pada PDF resmi.
+ *   3. Meng-update `noSurat` utama menjadi nomor resmi
+ *   4. Mengembalikan nomor resmi yang siap dicetak pada PDF resmi.
  */
-export async function approveAndIssueAprNumber(params: {
+export async function approveAndIssueOfficialNumber(params: {
     quotation: Quotation;
     approvedByUid: string;
     approvedByName: string;
@@ -175,7 +175,7 @@ export async function approveAndIssueAprNumber(params: {
     const currentNo = quotation.noSurat;
     const draftNoSurat = quotation.draftNoSurat ?? currentNo;
 
-    // Hilangkan kode -DRF (maupun -APR lama) sehingga nomor surat resmi bersih (contoh: GP/AR/PH/2026/10/0001)
+    // Hilangkan kode -DRF maupun -APR sehingga nomor surat resmi bersih (contoh: GP/AR/PH/2026/10/0001)
     let approvedNoSurat = (quotation.approvedNoSurat || currentNo)
         .replace(/-DRF\//g, "/")
         .replace(/-APR\//g, "/");
@@ -189,18 +189,18 @@ export async function approveAndIssueAprNumber(params: {
             byUid: approvedByUid,
             byName: approvedByName,
             companyId: quotation.companyId,
-            stage: "APR",
+            stage: "OFFICIAL",
         });
         approvedNoSurat = aprLog.noSurat.replace(/-DRF\//g, "/").replace(/-APR\//g, "/");
         await supabase
             .from("nomor_surat_logs")
-            .update({ status: "approved", quoId: quotation.id, noSurat: approvedNoSurat, stage: "APR", draftNoSurat })
+            .update({ status: "approved", quoId: quotation.id, noSurat: approvedNoSurat, stage: "OFFICIAL", draftNoSurat })
             .eq("id", aprLog.id);
     } else {
         // Update log nomor surat yang sudah terkait dengan quotation ini agar bersih tanpa -DRF
         await supabase
             .from("nomor_surat_logs")
-            .update({ status: "approved", noSurat: approvedNoSurat, stage: "APR", draftNoSurat })
+            .update({ status: "approved", noSurat: approvedNoSurat, stage: "OFFICIAL", draftNoSurat })
             .eq("quoId", quotation.id);
     }
 
@@ -208,7 +208,7 @@ export async function approveAndIssueAprNumber(params: {
         noSurat: approvedNoSurat,
         draftNoSurat,
         approvedNoSurat,
-        stage: "APR",
+        stage: "OFFICIAL",
     };
     if (approvalSignatureBase64) {
         extra.approvalSignatureBase64 = approvalSignatureBase64;
@@ -229,6 +229,9 @@ export async function approveAndIssueAprNumber(params: {
 
     return { approvedNoSurat, draftNoSurat };
 }
+
+/** Alias kompatibilitas */
+export const approveAndIssueAprNumber = approveAndIssueOfficialNumber;
 
 export async function saveQuotationDraft(
     data: Omit<Quotation, "id" | "createdAt" | "pdfBase64" | "pdfUrl">,

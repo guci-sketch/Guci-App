@@ -2,7 +2,7 @@
  * Nomor Surat Service - Supabase PostgreSQL
  * Mendukung Penomoran 2 Tahap (Dual-Stage):
  *   - Fase Draft (Surveyor/Marketing submit): GP-DRF/AR/PH/YYYY/MM/NNNN atau GP-DRF/PCO/PH/YYYY/MM/NNNN
- *   - Fase Approved (Admin menyetujui):       GP-APR/AR/PH/YYYY/MM/NNNN atau GP-APR/PCO/PH/YYYY/MM/NNNN
+ *   - Fase Approved / Resmi (Admin menyetujui): Langsung GP/AR/PH/YYYY/MM/NNNN atau GP/PCO/PH/YYYY/MM/NNNN (tanpa kode APR)
  */
 import { supabase } from '@/shared/lib/supabase';
 import { TIPE_LABELS } from '@/shared/lib/quotationConfig';
@@ -31,13 +31,13 @@ function toLog(data: any): NomorSuratLog {
 }
 
 /**
- * Memastikan format nomor surat sesuai dengan stage ('DRF' | 'APR') bahkan jika database
- * belum menjalankan migrasi 05 (fallback transformasi prefix GP-AR/... -> GP-DRF/AR/... atau GP-APR/AR/...).
+ * Memastikan format nomor surat sesuai dengan stage ('DRF' | 'OFFICIAL' | 'APR').
+ * Untuk nomor resmi: hilangkan kode -DRF maupun -APR sehingga menjadi bersih (contoh: GP/AR/PH/2026/10/0001 atau GP/PCO/PH/2026/10/0001).
  */
 export function ensureStageInNomorSurat(noSurat: string, stage: NomorStage, kategori: KategoriSurat): string {
     if (!noSurat) return noSurat;
-    // Jika stage === 'APR' (Approved): hilangkan kode -DRF atau -APR sehingga menjadi bersih (contoh: GP/AR/PH/2026/10/0001)
-    if (stage === 'APR') {
+    // Jika stage === 'OFFICIAL' atau stage === 'APR' (Approved / Resmi): hilangkan kode -DRF atau -APR sehingga bersih
+    if (stage === 'OFFICIAL' || stage === 'APR') {
         const mStage = noSurat.match(/^([A-Z0-9]+)-(DRF|APR)\/(AR|PCO)\/(.*)$/);
         if (mStage) {
             return `${mStage[1]}/${kategori || mStage[3]}/${mStage[4]}`;
@@ -86,6 +86,8 @@ async function callGenerate(p: {
     dryRun: boolean;
 }): Promise<NomorSuratLog> {
     const stage: NomorStage = p.stage ?? 'DRF';
+    // Mapping stage untuk kompatibilitas RPC database (DRF / APR)
+    const rpcStage = (stage === 'OFFICIAL' || stage === 'APR') ? 'APR' : 'DRF';
     // Coba panggil RPC 8-argumen (dengan p_stage)
     const { data, error } = await supabase.rpc('generate_nomor_surat', {
         p_kategori: p.kategori,
@@ -95,13 +97,13 @@ async function callGenerate(p: {
         p_by_name: null,
         p_dry_run: p.dryRun,
         p_tz: 'Asia/Jakarta',
-        p_stage: stage,
+        p_stage: rpcStage,
     });
 
     if (!error && data) {
         const log = toLog(data);
         log.noSurat = ensureStageInNomorSurat(log.noSurat, stage, p.kategori);
-        log.stage = stage;
+        log.stage = (stage === 'APR' || stage === 'OFFICIAL') ? 'OFFICIAL' : 'DRF';
         return log;
     }
 
@@ -122,7 +124,7 @@ async function callGenerate(p: {
         await supabase.from('nomor_surat_logs').update({ noSurat: formattedNo }).eq('id', log.id);
     }
     log.noSurat = formattedNo;
-    log.stage = stage;
+    log.stage = (stage === 'APR' || stage === 'OFFICIAL') ? 'OFFICIAL' : 'DRF';
     return log;
 }
 

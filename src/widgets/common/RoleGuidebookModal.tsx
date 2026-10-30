@@ -41,7 +41,7 @@ const ROLE_GUIDES: Record<GuideRole, RoleGuideContent> = {
         accentColor: 'from-amber-600 to-amber-700',
         icon: <Crown size={20} className="text-amber-500" />,
         responsibilities: [
-            'Otoritas persetujuan penawaran resmi dari draft (GP-DRF menjadi GP-APR).',
+            'Otoritas persetujuan penawaran resmi dari draft (GP-DRF menjadi Nomor Surat Resmi).',
             'Hak akses eksklusif melihat nilai kontrak, HPP bahan kimia, dan margin untung rugi (%) per ID Proyek.',
             'Pemantauan laporan arus kas (Cashflow), piutang termin, dan performa MoM seluruh surveyor.',
         ],

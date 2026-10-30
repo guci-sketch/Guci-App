@@ -2,11 +2,11 @@
 -- 05_quotation_automation_drf_apr.sql — idempoten.
 -- Mendukung penomoran surat 2 tahap (Dual-Stage Numbering):
 --   1. Fase Draft (Surveyor/Marketing submit): <PREFIX>-DRF/<KATEGORI>/<TIPE>/<YYYY>/<MM>/<0001>
---      Contoh Anti Rayap (AR):   GP-DRF/AR/PH/2026/10/0001
+--      Contoh Anti Rayap (AR):    GP-DRF/AR/PH/2026/10/0001
 --      Contoh Pest Control (PCO): GP-DRF/PCO/PH/2026/10/0001
---   2. Fase Approved (Admin menyetujui):       <PREFIX>-APR/<KATEGORI>/<TIPE>/<YYYY>/<MM>/<0001>
---      Contoh Anti Rayap (AR):   GP-APR/AR/PH/2026/10/0001
---      Contoh Pest Control (PCO): GP-APR/PCO/PH/2026/10/0001
+--   2. Fase Approved / Resmi (Admin menyetujui): Langsung <PREFIX>/<KATEGORI>/<TIPE>/<YYYY>/<MM>/<0001> (tanpa APR)
+--      Contoh Anti Rayap (AR):    GP/AR/PH/2026/10/0001
+--      Contoh Pest Control (PCO): GP/PCO/PH/2026/10/0001
 --
 -- Kompatibilitas mundur: pemanggilan 7 argumen (tanpa p_stage) tetap berjalan dan
 -- otomatis memakai p_stage = 'DRF' atau sesuai status.
@@ -47,11 +47,11 @@ begin
   if not has_company_role(v_company, 'ADMIN', 'MARKETING') then
     raise exception 'Tidak berwenang membuat nomor surat' using errcode = '42501';
   end if;
-  if v_stage = 'APR' and not is_company_admin(v_company) then
-    raise exception 'Hanya Admin yang berwenang menerbitkan nomor surat Approved (APR)' using errcode = '42501';
+  if (v_stage = 'APR' or v_stage = 'OFFICIAL') and not is_company_admin(v_company) then
+    raise exception 'Hanya Admin yang berwenang menerbitkan nomor surat resmi' using errcode = '42501';
   end if;
-  if v_stage not in ('DRF', 'APR', 'LEGACY') then
-    raise exception 'Stage nomor surat tidak valid (gunakan DRF atau APR)';
+  if v_stage not in ('DRF', 'APR', 'OFFICIAL', 'LEGACY') then
+    raise exception 'Stage nomor surat tidak valid (gunakan DRF atau OFFICIAL)';
   end if;
   if p_kategori !~ '^[A-Z0-9]{1,10}$' or p_tipe !~ '^[A-Z0-9]{1,10}$' then
     raise exception 'Kategori/tipe nomor surat tidak valid';
@@ -72,10 +72,14 @@ begin
   v_year  := to_char(now() at time zone p_tz, 'YYYY');
   v_month := to_char(now() at time zone p_tz, 'MM');
 
-  if v_stage = 'LEGACY' then
+  if v_stage = 'DRF' then
+    -- Saat masih Draft memakai kode -DRF (contoh: GP-DRF/AR/PH/2026/10/0001)
+    v_stem := v_prefix || '-DRF/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
+  elsif v_stage = 'LEGACY' then
     v_stem := v_prefix || '-' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
   else
-    v_stem := v_prefix || '-' || v_stage || '/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
+    -- Saat Approved (Resmi / OFFICIAL / APR), kode DRF hilang langsung format kategori AR / PCO (contoh: GP/AR/PH/2026/10/0001)
+    v_stem := v_prefix || '/' || p_kategori || '/' || p_tipe || '/' || v_year || '/' || v_month || '/';
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(v_company::text || '|' || v_stem, 0));
@@ -87,7 +91,7 @@ begin
     and regexp_replace("noSurat", '^.*/', '') ~ '^\d+$';
 
   v_no := v_stem || lpad(v_next::text, 4, '0');
-  v_status := case when v_stage = 'APR' then 'approved' else 'pending' end;
+  v_status := case when (v_stage = 'APR' or v_stage = 'OFFICIAL') then 'approved' else 'pending' end;
 
   if p_dry_run then
     return jsonb_build_object(

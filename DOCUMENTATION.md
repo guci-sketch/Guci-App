@@ -20,7 +20,7 @@ Sistem menerapkan kontrol akses berbasis peran yang ketat (*Strict RBAC*) terver
    - Meninjau alokasi chemical gudang tanpa akses ke margin laba/rugi sensitif direktur.
 
 4. **MARKETING (Surveyor & Sales Specialist)**
-   - Membuat draft penawaran (*Quotation Dual-Stage* `GP-DRF` ke `GP-APR`).
+   - Membuat draft penawaran (*Quotation Dual-Stage* `GP-DRF` ke Nomor Surat Resmi `GP/AR/...` atau `GP/PCO/...`).
    - Akses **Visual Performa Bulanan (MoM) Terisolasi**: Staf marketing hanya dapat memantau rasio closing deal dan volume quotation miliknya sendiri (data staf lain tersembunyi), lengkap dengan breakdown kategori **Anti Rayap (Termite Control)** dan **Pest Control (PCO)**.
 
 5. **INVENTORY (Staf Gudang & Logistik Chemical)**
@@ -91,8 +91,8 @@ Guna melindungi integritas dan validitas komersial perusahaan:
    - Staf `MARKETING` **DILARANG MENGUNDUH (DOWNLOAD)** berkas PDF penawaran yang belum disetujui.
    - Dokumen draft hanya dapat dilihat melalui **Pratinjau Terbatas (Preview Saja)** dengan watermark diagonal: `DRAFT - BELUM DI-ACC DIREKTUR / ADMIN`.
    - Tindakan ini mencegah penawaran yang belum divalidasi harga/garansinya terkirim secara prematur ke klien.
-2. **Status Disetujui (`GP-APR` / Resmi):**
-   - Setelah Admin atau Direktur melakukan peninjauan dan menekan tombol **Setujui (Approve)**, kode `-DRF` otomatis dihapus menjadi nomor surat resmi.
+2. **Status Disetujui (Nomor Surat Resmi):**
+   - Setelah Admin atau Direktur melakukan peninjauan dan menekan tombol **Setujui (Approve)**, kode `-DRF` otomatis dihapus sehingga nomor surat langsung menjadi format resmi kategori (`GP/AR/PH/...` atau `GP/PCO/PH/...` tanpa kode `APR`).
    - Tombol **Unduh PDF Resmi** dan **Kirim WhatsApp** terbuka secara otomatis bagi Marketing dan Admin.
 
 ---
@@ -103,6 +103,32 @@ Guna melindungi integritas dan validitas komersial perusahaan:
 - **Single Outer Container:** Seluruh rincian finansial (Subtotal, Diskon Upah, PPN 12% DPP Nilai Lain, dan Total Final) tertata rapi tanpa tumpukan kotak ganda (*nested card clutter*).
 - **Integrasi Data Learning 64 Berkas PDF:**
   - Mengadopsi 5 template resmi dari folder `Data Penawaran/Contoh Penawaran`: Pra-Konstruksi Pipa (8 Hal), Pasca-Konstruksi Sloof & Plafon (4 Hal), Rodent Puskesmas (4 Hal), BOQ Korporat PLN (3 Hal), dan Jadwal Fogging 12 Bulan (1 Hal).
+
+---
+
+## 9. Fitur Efisiensi Operasional (Bulk Import & Penjadwalan Rutin)
+
+Untuk mendukung efektivitas dan efisiensi penginputan data massal:
+1. **Bulk Import Data Pelanggan (`CustomersPage`):**
+   - **Pratinjau Tabel Interaktif:** Pengguna dapat meninjau seluruh baris data sebelum disimpan ke database.
+   - **Deteksi Duplikat Cerdas:** Sistem memvalidasi nama pelanggan yang sudah ada di database dan menandainya dengan badge peringatan kuning agar tidak terjadi redundansi.
+   - **Template Excel Siap Pakai:** Dilengkapi contoh format pengisian yang valid.
+2. **Bulk Import Multi-Sheet Inventaris Gudang (`InventoryPage`):**
+   - **Struktur 5 Kategori:** Template Excel terdiri dari 5 sheet terpisah (*Obat & Chemical*, *Alat Proyek*, *Perangkap & Sanitation*, *Pipa & Aksesoris*, *Sparepart*).
+   - **Validasi Nilai & Stok:** Mencegah stok negatif dan format angka yang tidak valid.
+   - **Pratinjau Sebelum Simpan:** Tabel ringkasan menampilkan status baris (*OK*, *Duplikat*, atau *Error*).
+3. **Penjadwalan Rutin SPK / Work Order (`SPKPage`):**
+   - **Drafter & Admin Quick Setup:** Pengaturan jadwal pengerjaan berulang (harian, mingguan, bulanan) langsung dari sistem tanpa perlu import file manual.
+   - **Rotasi Teknisi Otomatis:** Mendukung penugasan multi-teknisi dengan pembagian tugas berurutan (*round-robin*) pada setiap tanggal kunjungan.
+   - **Pratinjau Jadwal:** Menampilkan tanggal pengerjaan dan teknisi penanggung jawab sebelum konfirmasi massal.
+
+---
+
+## 10. Standarisasi Format Nomor Surat Resmi (Peniadaan Kode APR)
+
+Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
+- **Saat Draft:** Memuat penanda draft `DRF`, contoh: `GP-DRF/AR/PH/YYYY/MM/NNNN` atau `GP-DRF/PCO/PH/YYYY/MM/NNNN`.
+- **Saat Disetujui (Approved):** Kode `-DRF` langsung dihilangkan dan langsung mengadopsi kode kategori penawaran, contoh: `GP/AR/PH/YYYY/MM/NNNN` (Anti Rayap) atau `GP/PCO/PH/YYYY/MM/NNNN` (Pest Control).
 
 ---
 *Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*

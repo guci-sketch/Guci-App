@@ -396,7 +396,7 @@ ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS project_id uuid REFER
 ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS tipe_catatan varchar NOT NULL DEFAULT 'REALISASI';
 ALTER TABLE public.inventory_logs ADD COLUMN IF NOT EXISTS biaya_total numeric NOT NULL DEFAULT 0;
 
--- 3.11. Tabel Quotations (Automation Quotation Engine: GP-DRF -> GP-APR, AR & PCO, Garansi Bulan/Tahun)
+-- 3.11. Tabel Quotations (Automation Quotation Engine: GP-DRF -> Nomor Resmi, AR & PCO, Garansi Bulan/Tahun)
 CREATE TABLE IF NOT EXISTS public.quotations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL REFERENCES public.companies(id),
@@ -642,7 +642,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 $$;
 
 -- ====================================================================================================
--- BAGIAN 8: RPC TRANSAKSI ATOMIK & PENOMORAN 2 TAHAP (`GP-DRF` -> `GP-APR`)
+-- BAGIAN 8: RPC TRANSAKSI ATOMIK & PENOMORAN 2 TAHAP (`GP-DRF` -> Nomor Resmi)
 -- ====================================================================================================
 
 -- 8.1. RPC Mutasi Stok Gudang Atomik
@@ -786,7 +786,7 @@ BEGIN
   RETURN (SELECT settings FROM public.company_settings WHERE company_id = p_company);
 END $$;
 
--- 8.5. RPC Penomoran Surat Atomik 2 Tahap (`GP-DRF` -> `GP-APR`) & Kategori (`AR` vs `PCO`)
+-- 8.5. RPC Penomoran Surat Atomik 2 Tahap (`GP-DRF` -> Nomor Resmi) & Kategori (`AR` vs `PCO`)
 DROP FUNCTION IF EXISTS public.generate_nomor_surat(text, text, text, text, text, boolean, text);
 DROP FUNCTION IF EXISTS public.generate_nomor_surat(text, text, text, text, text, boolean, text, text);
 
@@ -1945,7 +1945,7 @@ BEGIN
   )
   ON CONFLICT (id) DO NOTHING;
 
-  -- (C) DEMO QUOTATION 3: Penawaran Pest Control Approved (`GP-APR/PCO/PH/2026/10/0001` dari `GP-DRF/PCO/PH/2026/10/0001`)
+  -- (C) DEMO QUOTATION 3: Penawaran Pest Control Approved (`GP/PCO/PH/2026/10/0001` dari `GP-DRF/PCO/PH/2026/10/0001`)
   --     Mengikuti contoh nyata PDF 0003 (PLN UP3 Bulungan) dengan PPN DPP 11/12
   INSERT INTO public.quotations (id, company_id, marketing_uid, status, created_at, payload)
   VALUES (

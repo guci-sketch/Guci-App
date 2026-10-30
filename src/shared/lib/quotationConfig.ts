@@ -62,9 +62,9 @@ export const TIPE_LABELS: Record<string, string> = {
 };
 
 /**
- * Membangun nomor surat dengan dukungan stage 'DRF' (Draft) dan 'APR' (Approved) serta kategori 'AR' / 'PCO':
- *   - Stage DRF: GP-DRF/AR/PH/2026/10/0001 atau GP-DRF/PCO/PH/2026/10/0001
- *   - Stage APR: GP-APR/AR/PH/2026/10/0001 atau GP-APR/PCO/PH/2026/10/0001
+ * Membangun nomor surat:
+ *   - Stage DRF (Draft): GP-DRF/AR/PH/YYYY/MM/NNNN atau GP-DRF/PCO/PH/YYYY/MM/NNNN
+ *   - Stage OFFICIAL / Resmi: GP/AR/PH/YYYY/MM/NNNN atau GP/PCO/PH/YYYY/MM/NNNN (langsung AR atau PCO tanpa kode APR)
  */
 export function buildNomorSurat(
     kategori: KategoriSurat,
@@ -76,10 +76,11 @@ export function buildNomorSurat(
     prefix: string = "GP",
 ): string {
     const seqPad = String(seq).padStart(4, "0");
-    if (stage === "DRF" || stage === "APR") {
-        return `${prefix}-${stage}/${kategori}/${tipe}/${yyyy}/${mm}/${seqPad}`;
+    if (stage === "DRF") {
+        return `${prefix}-DRF/${kategori}/${tipe}/${yyyy}/${mm}/${seqPad}`;
     }
-    return `${prefix}-${kategori}/${tipe}/${yyyy}/${mm}/${seqPad}`;
+    // Nomor Resmi: langsung tanpa DRF/APR (contoh: GP/AR/PH/2026/10/0001)
+    return `${prefix}/${kategori}/${tipe}/${yyyy}/${mm}/${seqPad}`;
 }
 
 export const KATEGORI_LABELS: Record<string, string> = {

@@ -3,7 +3,7 @@ import {
     Package, FileText, Search, Plus, Download, UploadCloud,
     ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle,
     ClipboardList, Trash2, Briefcase, Calculator, TrendingUp, CheckCircle2,
-    Lock, ShieldAlert, ArrowRight, Check,
+    Lock, ShieldAlert, ArrowRight, Check, Eye, AlertCircle, CheckSquare,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuthStore } from '@/app/store/authStore';
@@ -25,7 +25,131 @@ const INVENTORY_PAGE_SIZE = 10;
 const fmt = (n: number) => n.toLocaleString("id-ID", { maximumFractionDigits: 3 });
 const monthStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
-type Mutation = { item: InventoryItem; type: "IN" | "OUT"; presetProjectId?: string; presetTipe?: "ESTIMASI" | "REALISASI" } | null;
+// ─── INVENTORY BULK IMPORT PREVIEW ───────────────────────────────────────────
+
+interface InventoryImportRow {
+    nama: string;
+    kategori: string;
+    satuan: string;
+    stokAwal: number;
+    minAlert: number;
+    hargaSatuan: number;
+    _status: "ok" | "duplicate" | "error";
+    _reason?: string;
+}
+
+function InventoryImportPreviewModal({
+    rows,
+    existingNames,
+    onConfirm,
+    onClose,
+    importing,
+}: {
+    rows: InventoryImportRow[];
+    existingNames: Set<string>;
+    onConfirm: (validRows: InventoryImportRow[]) => void;
+    onClose: () => void;
+    importing: boolean;
+}) {
+    const tagged = useMemo<InventoryImportRow[]>(() => rows.map(r => {
+        if (!r.nama.trim()) return { ...r, _status: "error", _reason: "Nama kosong" };
+        if (!Number.isFinite(r.stokAwal) || r.stokAwal < 0) return { ...r, _status: "error", _reason: "Stok tidak valid" };
+        if (existingNames.has(r.nama.trim().toLowerCase())) return { ...r, _status: "duplicate", _reason: "Sudah ada di gudang" };
+        return { ...r, _status: "ok" };
+    }), [rows, existingNames]);
+
+    const okRows = tagged.filter(r => r._status === "ok");
+    const dupRows = tagged.filter(r => r._status === "duplicate");
+    const errRows = tagged.filter(r => r._status === "error");
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[88vh]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <Eye size={16} className="text-emerald-600" /> Preview Import Stok Gudang
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Periksa data sebelum menyimpan ke inventaris</p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-4 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">
+                        <CheckSquare size={13} /> {okRows.length} siap import
+                    </span>
+                    {dupRows.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-700">
+                            <AlertTriangle size={13} /> {dupRows.length} duplikat (dilewati)
+                        </span>
+                    )}
+                    {errRows.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-700">
+                            <AlertCircle size={13} /> {errRows.length} error (dilewati)
+                        </span>
+                    )}
+                </div>
+
+                <div className="overflow-auto flex-1 px-6 py-3">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                        <thead className="sticky top-0 bg-white">
+                            <tr className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wide text-[10px]">
+                                <th className="px-3 py-2 rounded-l-lg">Status</th>
+                                <th className="px-3 py-2">Nama Item</th>
+                                <th className="px-3 py-2">Kategori</th>
+                                <th className="px-3 py-2">Satuan</th>
+                                <th className="px-3 py-2 text-right">Stok Awal</th>
+                                <th className="px-3 py-2 text-right">Min Alert</th>
+                                <th className="px-3 py-2 text-right rounded-r-lg">HPP/Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {tagged.map((r, i) => (
+                                <tr key={i} className={
+                                    r._status === "ok" ? "bg-white" :
+                                    r._status === "duplicate" ? "bg-amber-50/60" : "bg-red-50/60"
+                                }>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        {r._status === "ok" ? (
+                                            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold"><CheckCircle2 size={11} /> OK</span>
+                                        ) : r._status === "duplicate" ? (
+                                            <span className="inline-flex items-center gap-1 text-amber-700 font-semibold" title={r._reason}><AlertTriangle size={11} /> Duplikat</span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 text-red-700 font-semibold" title={r._reason}><AlertCircle size={11} /> Error</span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2 font-medium text-slate-800 max-w-[180px] truncate">{r.nama || "—"}</td>
+                                    <td className="px-3 py-2 text-slate-600">{r.kategori}</td>
+                                    <td className="px-3 py-2 text-slate-500">{r.satuan}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-slate-700">{fmt(r.stokAwal)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-slate-500">{fmt(r.minAlert)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-slate-700">Rp {r.hargaSatuan.toLocaleString("id-ID")}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200">
+                        Batal
+                    </button>
+                    <button
+                        onClick={() => onConfirm(okRows)}
+                        disabled={okRows.length === 0 || importing}
+                        className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {importing ? <><Loader2 size={13} className="animate-spin" /> Menyimpan...</> : <><CheckSquare size={13} /> Import {okRows.length} Item</>}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 type InvTab = "stok" | "proyek" | "rekap" | "log" | "alert";
 
 interface ProjectCostRow {
@@ -75,6 +199,7 @@ export function InventoryPage() {
     const [showNew, setShowNew] = useState(false);
     const [newItem, setNewItem] = useState({ nama: "", kategori: "Chemical", satuan: "Botol 500ml", stokAwal: "0", minAlert: "5", hargaSatuan: "185000" });
     const [isImporting, setIsImporting] = useState(false);
+    const [importPreviewRows, setImportPreviewRows] = useState<InventoryImportRow[] | null>(null);
 
     const itemName = useMemo(() => new Map(items.map(i => [i.id, i])), [items]);
 
@@ -219,8 +344,53 @@ export function InventoryPage() {
 
     const downloadTemplate = () => {
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet([["Nama Item", "Kategori (Chemical/Alat/Perangkap)", "Satuan", "Stok Awal", "Min Alert", "Harga Satuan HPP"]]);
-        XLSX.utils.book_append_sheet(wb, ws, "Master_Stok");
+        const header = ["Nama Item", "Kategori (Chemical/Alat/Perangkap)", "Satuan", "Stok Awal", "Min Alert", "Harga Satuan HPP"];
+        const sheets: { name: string; examples: (string | number)[][] }[] = [
+            {
+                name: "Obat & Chemical",
+                examples: [
+                    ["Termidor 25 WG", "Chemical", "Kg", 10, 2, 850000],
+                    ["Demand CS 50ml", "Chemical", "Botol 50ml", 20, 5, 185000],
+                    ["Solfac 50ml", "Chemical", "Botol 50ml", 15, 3, 210000],
+                ],
+            },
+            {
+                name: "Alat Proyek",
+                examples: [
+                    ["Mesin Pompa Injeksi", "Alat", "Unit", 3, 1, 2500000],
+                    ["Selang Pompa 10m", "Alat", "Pcs", 5, 2, 350000],
+                    ["Bor Listrik", "Alat", "Unit", 4, 1, 1200000],
+                ],
+            },
+            {
+                name: "Perangkap & Sanitation",
+                examples: [
+                    ["Perangkap Tikus Kotak", "Perangkap", "Pcs", 20, 5, 45000],
+                    ["Glue Board Tikus", "Perangkap", "Pcs", 50, 10, 12000],
+                    ["Bait Station Rayap", "Perangkap", "Pcs", 15, 5, 75000],
+                ],
+            },
+            {
+                name: "Pipa & Aksesoris",
+                examples: [
+                    ["Pipa PVC 1/2 inch 4m", "Pipa", "Batang", 30, 5, 35000],
+                    ["Elbow 1/2 inch", "Pipa", "Pcs", 100, 20, 3500],
+                    ["Konektor T 1/2 inch", "Pipa", "Pcs", 80, 20, 4000],
+                ],
+            },
+            {
+                name: "Sparepart",
+                examples: [
+                    ["Filter Pompa", "Sparepart", "Pcs", 10, 2, 85000],
+                    ["Seal Kit Pompa", "Sparepart", "Set", 5, 2, 150000],
+                    ["Nozzle Semprot", "Sparepart", "Pcs", 20, 5, 25000],
+                ],
+            },
+        ];
+        for (const s of sheets) {
+            const ws = XLSX.utils.aoa_to_sheet([header, ...s.examples]);
+            XLSX.utils.book_append_sheet(wb, ws, s.name);
+        }
         XLSX.writeFile(wb, "Template_Stok_Gudang.xlsx");
     };
 
@@ -251,46 +421,65 @@ export function InventoryPage() {
         e.target.value = "";
         if (!file || !companyId) return;
         if (file.size > MAX_IMPORT_BYTES) { alert("File terlalu besar (maksimal 2 MB)."); return; }
-        setIsImporting(true);
         const reader = new FileReader();
-        reader.onload = async evt => {
+        reader.onload = evt => {
             try {
-                let rows: Record<string, unknown>[] = [];
-                const isCsv = file.name.endsWith('.csv') || file.type.includes('csv');
-                if (isCsv) {
-                    const text = evt.target?.result as string;
-                    const wb = XLSX.read(text, { type: "string" });
-                    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
-                } else {
-                    const wb = XLSX.read(evt.target?.result, { type: "binary" });
-                    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]]);
+                const wb = XLSX.read(evt.target?.result, { type: file.name.endsWith('.csv') ? "string" : "binary" });
+                // Gabungkan semua sheet (multi-sheet template)
+                const allRows: InventoryImportRow[] = [];
+                for (const sheetName of wb.SheetNames) {
+                    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName]);
+                    for (const r of raw) {
+                        const nama = String(r["Nama Item"] || r["NAMA OBAT"] || r["NAMA ALAT"] || r["NAMA BARANG"] || "").trim();
+                        if (!nama) continue;
+                        allRows.push({
+                            nama,
+                            kategori: String(r["Kategori (Chemical/Alat/Perangkap)"] || r["Kategori"] || r["KATEGORI"] || "Lainnya"),
+                            satuan: String(r["Satuan"] || r["SATUAN"] || "Pcs"),
+                            stokAwal: Number(r["Stok Awal"] || r["JUMLAH"] || r["Jumlah"] || r["Stok"] || 0),
+                            minAlert: Number(r["Min Alert"] || r["Batas Minimum"] || 5),
+                            hargaSatuan: Number(r["Harga Satuan HPP"] || r["HARGA"] || r["Harga"] || 150000),
+                            _status: "ok",
+                        });
+                    }
                 }
-                if (rows.length === 0) throw new Error("File kosong atau format tidak sesuai.");
-                if (rows.length > MAX_IMPORT_ROWS) throw new Error(`Maksimal ${MAX_IMPORT_ROWS} baris per import.`);
-                let ok = 0; const bad: string[] = [];
-                for (const [i, r] of rows.entries()) {
-                    const nama = String(r["Nama Item"] || r["NAMA OBAT"] || r["NAMA ALAT"] || r["NAMA BARANG"] || "").trim();
-                    const kategori = String(r["Kategori (Chemical/Alat/Perangkap)"] || r["Kategori"] || r["KATEGORI"] || "Lainnya");
-                    const satuan = String(r["Satuan"] || r["SATUAN"] || "Pcs");
-                    const stokAwal = Number(r["Stok Awal"] || r["JUMLAH"] || r["Jumlah"] || r["Stok"] || 0);
-                    const minAlert = Number(r["Min Alert"] || r["Batas Minimum"] || 5);
-                    const hargaSatuan = Number(r["Harga Satuan HPP"] || r["HARGA"] || r["Harga"] || 150000);
-                    if (!nama || ![stokAwal, minAlert].every(n => Number.isFinite(n) && n >= 0)) { bad.push(`baris ${i + 2}`); continue; }
-                    await createInventoryItem(companyId, {
-                        nama, kategori, satuan, stokAwal, minAlert, hargaSatuan,
-                    });
-                    ok++;
-                }
-                await reload();
-                alert(`Berhasil mengimpor ${ok} item.${bad.length ? `\nDilewati: ${bad.slice(0, 15).join(", ")}` : ""}`);
+                if (allRows.length === 0) { alert("File kosong atau format tidak sesuai."); return; }
+                if (allRows.length > MAX_IMPORT_ROWS) { alert(`Maksimal ${MAX_IMPORT_ROWS} baris per import.`); return; }
+                setImportPreviewRows(allRows);
             } catch (err) {
-                alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
-            } finally { setIsImporting(false); }
+                alert(`Gagal membaca file: ${err instanceof Error ? err.message : String(err)}`);
+            }
         };
         if (file.name.endsWith('.csv') || file.type.includes('csv')) {
             reader.readAsText(file, 'utf-8');
         } else {
             reader.readAsBinaryString(file);
+        }
+    };
+
+    const handleConfirmInventoryImport = async (validRows: InventoryImportRow[]) => {
+        if (!companyId) return;
+        setIsImporting(true);
+        try {
+            let ok = 0;
+            for (const r of validRows) {
+                await createInventoryItem(companyId, {
+                    nama: r.nama,
+                    kategori: r.kategori,
+                    satuan: r.satuan,
+                    stokAwal: r.stokAwal,
+                    minAlert: r.minAlert,
+                    hargaSatuan: r.hargaSatuan,
+                });
+                ok++;
+            }
+            await reload();
+            setImportPreviewRows(null);
+            alert(`Berhasil mengimpor ${ok} item ke gudang.`);
+        } catch (err) {
+            alert(`Gagal import: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+            setIsImporting(false);
         }
     };
 
@@ -1133,6 +1322,16 @@ export function InventoryPage() {
                         <button onClick={submitNewItem} disabled={busy} className="w-full py-2 text-sm font-bold rounded-lg bg-[var(--accent)] text-white disabled:opacity-50">{busy ? "Menyimpan..." : "Tambah Item"}</button>
                     </div>
                 </div>
+            )}
+
+            {importPreviewRows && (
+                <InventoryImportPreviewModal
+                    rows={importPreviewRows}
+                    existingNames={new Set(items.map(i => i.nama.toLowerCase().trim()))}
+                    onConfirm={handleConfirmInventoryImport}
+                    onClose={() => setImportPreviewRows(null)}
+                    importing={isImporting}
+                />
             )}
         </div>
     );

@@ -184,7 +184,7 @@ export function CreateSPKModal({
                             <ClipboardList size={18} className="text-[var(--accent)]" /> Tugaskan Pekerjaan Baru (SPK)
                         </h3>
                         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            Pilih dokumen penawaran resmi (GP-APR) yang sudah disetujui untuk diteruskan ke aplikasi lapangan Teknisi.
+                            Pilih dokumen penawaran resmi yang sudah disetujui untuk diteruskan ke aplikasi lapangan Teknisi.
                         </p>
                     </div>
                     <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
@@ -200,12 +200,12 @@ export function CreateSPKModal({
                     ) : (
                         <>
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">1. Pilih Dokumen Penawaran (GP-APR) *</label>
+                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">1. Pilih Dokumen Penawaran Resmi *</label>
                                 <div className="relative mb-2">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
                                         className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                        placeholder="Cari nomor surat GP-APR atau nama klien..."
+                                        placeholder="Cari nomor surat atau nama klien..."
                                         value={quoSearch}
                                         onChange={e => setQuoSearch(e.target.value)}
                                     />
@@ -213,7 +213,7 @@ export function CreateSPKModal({
                                 {filteredQuos.length === 0 ? (
                                     <div className="text-center py-6 text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
                                         <FileText size={24} className="mx-auto mb-2 opacity-30" />
-                                        <p className="text-sm">{quotations.length === 0 ? "Saat ini belum ada penawaran GP-APR baru yang menunggu untuk dijadikan SPK." : "Penawaran yang Anda cari tidak ditemukan."}</p>
+                                        <p className="text-sm">{quotations.length === 0 ? "Saat ini belum ada penawaran disetujui yang menunggu untuk dijadikan SPK." : "Penawaran yang Anda cari tidak ditemukan."}</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">

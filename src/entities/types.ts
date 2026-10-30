@@ -69,7 +69,7 @@ export type KondisiBangunan = "pasca_konstruksi" | "pra_konstruksi" | "renovasi"
 
 export type TipeKontrak = "U" | "K" | "PH";
 export type KategoriSurat = "AR" | "PCO";
-export type NomorStage = "DRF" | "APR";
+export type NomorStage = "DRF" | "OFFICIAL" | "APR";
 export type GaransiUnit = "tahun" | "bulan";
 
 export type PdfTemplateVariant =

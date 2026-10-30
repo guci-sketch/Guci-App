@@ -839,7 +839,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             />
                         </Field>
 
-                        {/* Banner Preview Dual-Stage Numbering GP-DRF -> GP-APR */}
+                        {/* Banner Preview Dual-Stage Numbering GP-DRF -> Nomor Resmi (GP/AR/... atau GP/PCO/...) */}
                         <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
@@ -1545,7 +1545,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                                 <p className="font-bold">Konfirmasi Pengajuan Draft Hasil Survey (Kode GP-DRF)</p>
                                 <p>
                                     Data survey dan kalkulasi harga ini akan disimpan dengan nomor draft <strong>{noPreview}</strong>.
-                                    Admin dapat melakukan verifikasi, menyesuaikan garansi (dalam bulan/tahun) atau diskon bila ada negosiasi klien, lalu menerbitkan kode resmi <strong>{noPreview.replace("-DRF/", "-APR/")}</strong> saat <em>Approve</em>.
+                                    Admin dapat melakukan verifikasi, menyesuaikan garansi (dalam bulan/tahun) atau diskon bila ada negosiasi klien, lalu menerbitkan nomor surat resmi <strong>{noPreview.replace("-DRF/", "/")}</strong> saat <em>Approve</em>.
                                 </p>
                             </div>
                         </div>
