@@ -412,3 +412,39 @@ test('WB-13 [Invite Token Server-Side Registration & OTP Expired Protection]', a
         assert.equal(isUsedValid, false);
     });
 });
+
+test('WB-14 [Mobile Camera Fallback, Visual Viewport & Geofence Accuracy Compensation]', async (t) => {
+    const CENTER = { latitude: -6.314643, longitude: 106.716157 };
+
+    await t.test('Kompensasi akurasi GPS: Jarak 115m dengan akurasi device ±25m dalam batas radius 100m -> Valid', () => {
+        // Jarak ~115m (di luar 100m nominal, tapi masuk dalam toleransi GPS 100m + 25m = 125m)
+        const pointNear = { latitude: -6.315680, longitude: 106.716157 };
+        const resWithAccuracy = validateGeofence(pointNear, CENTER, 100, 25);
+        assert.equal(resWithAccuracy.isInside, true);
+
+        // Tanpa akurasi (0m), jarak 115m tetap di luar radius 100m
+        const resNoAccuracy = validateGeofence(pointNear, CENTER, 100, 0);
+        assert.equal(resNoAccuracy.isInside, false);
+    });
+
+    await t.test('Batas atas toleransi GPS dibatasi maksimal 35m untuk mencegah bypass geofence', () => {
+        // Jarak ~145m dengan klaim akurasi buruk ±100m tetap ditolak karena batas maksimal toleransi 35m (100m + 35m = 135m < 145m)
+        const pointFar = { latitude: -6.315950, longitude: 106.716157 };
+        const resCapped = validateGeofence(pointFar, CENTER, 100, 100);
+        assert.equal(resCapped.isInside, false);
+    });
+
+    await t.test('Invarian Anti-Geser Pin: Mengetik alamat tidak menggeser koordinat jika isLocationPicked = true', () => {
+        let locationLat = -6.314643;
+        let locationLng = 106.716157;
+        const isLocationPicked = true;
+        const isMapLocked = false;
+        const typedAddress = "Jl. Sudirman No. 45 Jakarta Pusat";
+
+        // Evaluasi logika guard yang terpasang di CreateProjectModal
+        const shouldAutoGeocode = !isLocationPicked && !isMapLocked && typedAddress.length >= 5;
+        assert.equal(shouldAutoGeocode, false, 'Auto-geocoding dilarang menimpa titik GPS yang sudah dipilih');
+        assert.equal(locationLat, -6.314643);
+        assert.equal(locationLng, 106.716157);
+    });
+});

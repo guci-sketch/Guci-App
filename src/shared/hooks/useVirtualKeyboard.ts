@@ -1,50 +1,97 @@
 import { useState, useEffect } from 'react';
 
+export interface VisualViewportMetrics {
+    isKeyboardOpen: boolean;
+    viewportHeight: number;
+    keyboardOffsetBottom: number;
+}
+
 /**
- * Hook untuk mendeteksi software keyboard di mobile (iOS/Android)
- * dan mengamankan posisi input agar tidak terhalang keyboard.
+ * Scroll elemen yang sedang difokuskan ke 1/4 - 1/3 bagian atas area yang terlihat
+ * pada parent container terdekat yang memiliki scrollable overflow (misalnya form modal).
  */
-export function useVirtualKeyboard() {
-    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+export function scrollInputIntoView(target: HTMLElement) {
+    let parent: HTMLElement | null = target.parentElement;
+    let scrollContainer: HTMLElement | null = null;
+    while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        const overflowY = style.overflowY;
+        if ((overflowY === 'auto' || overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight) {
+            scrollContainer = parent;
+            break;
+        }
+        parent = parent.parentElement;
+    }
+
+    if (scrollContainer) {
+        const targetRect = target.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const relativeTop = targetRect.top - containerRect.top;
+        const targetVisibleHeight = containerRect.height;
+        // Posisikan elemen di 1/4 bagian atas container agar leluasa di atas keyboard
+        const desiredOffset = targetVisibleHeight * 0.22;
+        scrollContainer.scrollBy({
+            top: relativeTop - desiredOffset,
+            behavior: 'smooth',
+        });
+    } else {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+/**
+ * Hook metrik visual viewport untuk mobile/tablet (iOS & Android).
+ */
+export function useVisualViewportMetrics(): VisualViewportMetrics {
+    const [metrics, setMetrics] = useState<VisualViewportMetrics>(() => {
+        if (typeof window === 'undefined') {
+            return { isKeyboardOpen: false, viewportHeight: 800, keyboardOffsetBottom: 0 };
+        }
+        const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const offset = window.innerHeight - vh;
+        const isKb = vh < window.innerHeight * 0.8;
+        return { isKeyboardOpen: isKb, viewportHeight: vh, keyboardOffsetBottom: Math.max(0, offset) };
+    });
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const checkKeyboard = () => {
-            if (window.visualViewport) {
-                // Keyboard terbuka jika visualViewport menyusut > 20% dari innerHeight
-                const isKb = window.visualViewport.height < window.innerHeight * 0.8;
-                setIsKeyboardOpen(isKb);
+        const updateMetrics = () => {
+            const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const offset = window.innerHeight - vh;
+            const isKb = vh < window.innerHeight * 0.8;
+            setMetrics({
+                isKeyboardOpen: isKb,
+                viewportHeight: vh,
+                keyboardOffsetBottom: Math.max(0, offset),
+            });
 
-                // Jika keyboard terbuka dan ada elemen aktif, pastikan berada di tengah pandangan
-                if (isKb && document.activeElement) {
-                    const el = document.activeElement as HTMLElement;
-                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
-                        setTimeout(() => {
-                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }, 150);
-                    }
+            // Jika keyboard terbuka dan ada elemen input aktif, posisikan di atas keyboard
+            if (isKb && document.activeElement) {
+                const el = document.activeElement as HTMLElement;
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                    setTimeout(() => {
+                        scrollInputIntoView(el);
+                    }, 120);
                 }
-            } else {
-                setIsKeyboardOpen(window.innerHeight < 520);
             }
         };
 
         const viewport = window.visualViewport;
         if (viewport) {
-            viewport.addEventListener('resize', checkKeyboard);
-            viewport.addEventListener('scroll', checkKeyboard);
+            viewport.addEventListener('resize', updateMetrics);
+            viewport.addEventListener('scroll', updateMetrics);
         } else {
-            window.addEventListener('resize', checkKeyboard);
+            window.addEventListener('resize', updateMetrics);
         }
 
-        // Listener global untuk auto-scroll elemen input ke tengah viewport saat fokus
+        // Listener global untuk auto-scroll elemen input saat fokus
         const handleFocusIn = (e: FocusEvent) => {
             const target = e.target as HTMLElement | null;
             if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
                 setTimeout(() => {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
+                    scrollInputIntoView(target);
+                }, 220);
             }
         };
 
@@ -52,14 +99,22 @@ export function useVirtualKeyboard() {
 
         return () => {
             if (viewport) {
-                viewport.removeEventListener('resize', checkKeyboard);
-                viewport.removeEventListener('scroll', checkKeyboard);
+                viewport.removeEventListener('resize', updateMetrics);
+                viewport.removeEventListener('scroll', updateMetrics);
             } else {
-                window.removeEventListener('resize', checkKeyboard);
+                window.removeEventListener('resize', updateMetrics);
             }
             document.removeEventListener('focusin', handleFocusIn);
         };
     }, []);
 
+    return metrics;
+}
+
+/**
+ * Hook boolean backward-compatible untuk mendeteksi software keyboard di mobile (iOS/Android).
+ */
+export function useVirtualKeyboard(): boolean {
+    const { isKeyboardOpen } = useVisualViewportMetrics();
     return isKeyboardOpen;
 }

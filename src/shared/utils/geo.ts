@@ -8,9 +8,11 @@ export interface LatLng {
 }
 export type Coordinates = LatLng;
 export const calculateHaversineDistance = calculateDistanceMeters;
-export function validateGeofence(userLocation: LatLng, projectLocation: LatLng, radiusMeters: number) {
+export function validateGeofence(userLocation: LatLng, projectLocation: LatLng, radiusMeters: number, accuracyMeters = 0) {
   const distanceMeters = calculateDistanceMeters(userLocation, projectLocation);
-  const isInside = distanceMeters <= radiusMeters;
+  const tolerance = Math.min(Math.max(0, accuracyMeters || 0), 35);
+  const effectiveRadius = radiusMeters + tolerance;
+  const isInside = distanceMeters <= effectiveRadius;
   return {
     isInside,
     distanceMeters,
@@ -50,11 +52,13 @@ export function calculateDistanceMeters(
 export function isLocationWithinRadius(
   userLocation: LatLng,
   projectLocation: LatLng,
-  radiusMeters: number
+  radiusMeters: number,
+  accuracyMeters = 0
 ): { isWithin: boolean; distance: number } {
   const distance = calculateDistanceMeters(userLocation, projectLocation);
+  const tolerance = Math.min(Math.max(0, accuracyMeters || 0), 35);
   return {
-    isWithin: distance <= radiusMeters,
+    isWithin: distance <= (radiusMeters + tolerance),
     distance,
   };
 }
@@ -69,14 +73,17 @@ export function isWithinRadius(
   b: LatLng | number,
   c: number,
   d?: number,
-  radiusMeters?: number
+  radiusMeters?: number,
+  accuracyMeters = 0
 ): boolean {
   if (typeof a === "number") {
     const dist = calculateDistanceMeters(a, b as number, c, d ?? 0);
-    return dist <= (radiusMeters ?? 100);
+    const tolerance = Math.min(Math.max(0, accuracyMeters || 0), 35);
+    return dist <= ((radiusMeters ?? 100) + tolerance);
   }
   const dist = calculateDistanceMeters(a, b as LatLng);
-  return dist <= c;
+  const tolerance = Math.min(Math.max(0, accuracyMeters || (typeof d === "number" ? d : 0)), 35);
+  return dist <= (c + tolerance);
 }
 
 /**

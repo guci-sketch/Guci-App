@@ -43,7 +43,9 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [retryCount, setRetryCount] = useState(0);
   const [camera, setCamera] = useState<CameraState>({ status: 'starting' });
   const [gps, setGps] = useState<GpsState>({ status: 'idle' });
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
@@ -55,25 +57,63 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setGps({ status: 'locating' });
     
     if (!navigator.geolocation) {
-
       setGps({ status: 'denied', message: 'Perangkat ini tidak mendukung layanan lokasi.' });
       return;
     }
+
+    let isResolved = false;
+    let bestPos: GeolocationPosition | null = null;
+    let watchId: number | null = null;
+
+    const commitPos = (pos: GeolocationPosition) => {
+      if (isResolved) return;
+      isResolved = true;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (pos.coords.accuracy === 0) {
+        setGps({ status: 'denied', message: 'Sistem mendeteksi penggunaan Fake GPS / Lokasi Palsu. Mohon matikan aplikasi Fake GPS dan coba lagi.' });
+        return;
+      }
+      setGps({
+        status: 'ready',
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy || 15,
+      });
+    };
+
     navigator.geolocation.getCurrentPosition(
       pos => {
-        // ANTI-SPOOFING / FAKE LOCATION CHECK (Mocked location detection)
-        // Note: Full prevention requires native app APIs, but we can do a heuristic check
-        // Often, mocked locations on Android report exactly 0.0 or very perfectly rounded accuracy/altitude, 
-        // or lack altitude entirely when high accuracy is requested. 
-        // We reject if it looks suspicious.
-        const isSuspicious = pos.coords.accuracy === 0; // Impossible in real-world GPS
-        
-        if (isSuspicious) {
-           setGps({ status: 'denied', message: 'Sistem mendeteksi penggunaan Fake GPS / Lokasi Palsu. Mohon matikan aplikasi Fake GPS dan coba lagi.' });
-           return;
+        bestPos = pos;
+        if (pos.coords.accuracy > 0 && pos.coords.accuracy <= 30) {
+          commitPos(pos);
+          return;
         }
 
-        setGps({ status: 'ready', latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy || 15 });
+        // Pemanasan sinyal GPS singkat untuk mendapatkan akurasi terbaik
+        if (navigator.geolocation.watchPosition) {
+          watchId = navigator.geolocation.watchPosition(
+            p => {
+              if (p.coords.accuracy > 0) {
+                if (!bestPos || p.coords.accuracy < bestPos.coords.accuracy) {
+                  bestPos = p;
+                }
+                if (p.coords.accuracy <= 20) {
+                  commitPos(p);
+                }
+              }
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 0 }
+          );
+
+          window.setTimeout(() => {
+            if (bestPos) commitPos(bestPos);
+          }, 3200);
+        } else {
+          commitPos(pos);
+        }
       },
       err => {
         console.warn('High accuracy GPS failed, falling back to low accuracy...', err);
@@ -86,10 +126,10 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             setGps({ status: 'ready', latitude: pos2.coords.latitude, longitude: pos2.coords.longitude, accuracy: pos2.coords.accuracy || 50 });
           },
           err2 => setGps({ status: 'denied', message: err2.code === err2.PERMISSION_DENIED ? 'Izin lokasi ditolak. Aktifkan GPS peramban.' : 'Sinyal GPS lemah atau tidak tersedia. Pastikan fitur Lokasi HP menyala.' }),
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 0 }
         );
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, []);
 
@@ -98,27 +138,51 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
     const start = async () => {
       setCamera({ status: 'starting' });
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      // Jeda singkat agar driver kamera mobile Android/iOS melepaskan hardware lock
+      const { promise: delayPromise, resolve: resolveDelay } = Promise.withResolvers<void>();
+      setTimeout(resolveDelay, 60);
+      await delayPromise;
+      if (cancelled) return;
+
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('Kamera tidak didukung oleh peramban ini.');
         }
-        let stream: MediaStream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: false,
-          });
-        } catch (initialErr) {
-          console.warn('Initial camera constraints failed, falling back:', initialErr);
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facingMode } },
-            audio: false,
-          });
+
+        let stream: MediaStream | null = null;
+        let lastErr: unknown = null;
+
+        // Fallback bertahap 4 tier
+        const constraintsList: MediaStreamConstraints[] = [
+          { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+          { video: { facingMode: { ideal: facingMode } }, audio: false },
+          { video: { facingMode: facingMode }, audio: false },
+          { video: true, audio: false },
+        ];
+
+        for (const constraints of constraintsList) {
+          if (cancelled) break;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (stream) break;
+          } catch (e) {
+            lastErr = e;
+          }
         }
+
         if (cancelled) {
-          stream.getTracks().forEach(t => t.stop());
+          stream?.getTracks().forEach(t => t.stop());
           return;
         }
+
+        if (!stream) {
+          throw lastErr || new Error('Kamera tidak dapat diakses.');
+        }
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -128,7 +192,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       } catch (err) {
         const message = err instanceof Error && err.name === 'NotAllowedError'
           ? 'Izin kamera ditolak. Aktifkan akses kamera pada pengaturan peramban untuk melanjutkan.'
-          : 'Kamera tidak dapat diakses. Pastikan tidak digunakan aplikasi lain dan coba lagi.';
+          : 'Kamera tidak dapat diakses. Pastikan tidak digunakan aplikasi lain, atau gunakan opsi Kamera HP di bawah.';
         setCamera({ status: 'blocked', message });
       }
     };
@@ -138,20 +202,77 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       cancelled = true;
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
-  }, [facingMode]);
+  }, [facingMode, retryCount]);
 
   const toggleFacingMode = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
     setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
   };
 
+  const gpsTolerance = gps.status === 'ready' ? Math.min(Math.max(0, gps.accuracy), 35) : 0;
   const distance = gps.status === 'ready'
     ? calculateDistanceMeters({ latitude: gps.latitude, longitude: gps.longitude }, { latitude: projectLat, longitude: projectLng })
     : null;
-  const isWithinRadius = distance !== null && distance <= projectRadius;
+  const isWithinRadius = distance !== null && distance <= (projectRadius + gpsTolerance);
 
   const canCapture = camera.status === 'ready' && gps.status === 'ready';
 
+  const handleNativeFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      const { promise: imgPromise, resolve: resolveImg, reject: rejectImg } = Promise.withResolvers<void>();
+      img.onload = () => resolveImg();
+      img.onerror = () => rejectImg(new Error('Gagal memuat file gambar dari kamera HP.'));
+      img.src = objectUrl;
+      await imgPromise;
+
+      const effectiveLat = gps.status === 'ready' ? gps.latitude : projectLat;
+      const effectiveLng = gps.status === 'ready' ? gps.longitude : projectLng;
+      const effectiveAccuracy = gps.status === 'ready' ? gps.accuracy : 15;
+      const effectiveDistance = gps.status === 'ready'
+        ? calculateDistanceMeters({ latitude: effectiveLat, longitude: effectiveLng }, { latitude: projectLat, longitude: projectLng })
+        : 0;
+      const effectiveTolerance = Math.min(Math.max(0, effectiveAccuracy), 35);
+      const withinRad = effectiveDistance <= (projectRadius + effectiveTolerance);
+
+      const canvas = applyWatermarkToCanvas(img, {
+        projectName,
+        executorName,
+        photoType,
+        latitude: effectiveLat,
+        longitude: effectiveLng,
+        accuracy: effectiveAccuracy,
+        timestamp: new Date(),
+        isWithinRadius: withinRad,
+        distanceMeters: effectiveDistance,
+      });
+
+      URL.revokeObjectURL(objectUrl);
+      const blob = await canvasToJpegBlob(canvas);
+      setCapturedBlob(blob);
+      setCapturedPreviewUrl(URL.createObjectURL(blob));
+
+      if (gps.status !== 'ready') {
+        setGps({
+          status: 'ready',
+          latitude: effectiveLat,
+          longitude: effectiveLng,
+          accuracy: effectiveAccuracy,
+        });
+      }
+    } catch (err) {
+      console.error('Gagal memproses foto kamera native:', err);
+      alert('Gagal memproses foto dari kamera HP. Silakan coba lagi.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   const handleShutter = async () => {
     if (!canCapture || isProcessing || gps.status !== 'ready' || !videoRef.current) return;
     setIsProcessing(true);
@@ -239,14 +360,24 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 <div className="w-16 h-16 rounded-full bg-slate-800/80 flex items-center justify-center text-rose-400 mb-3 border border-slate-700">
                   <Camera size={30} />
                 </div>
-                <p className="text-sm font-semibold text-slate-100 mb-1">Kamera Tidak Tersedia</p>
+                <p className="text-sm font-semibold text-slate-100 mb-1">Kamera WebRTC Tidak Tersedia</p>
                 <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">{camera.message}</p>
-                <button
-                  onClick={() => setFacingMode(f => f)}
-                  className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2 rounded-lg"
-                >
-                  Coba Lagi
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setRetryCount(r => r + 1)}
+                    className="flex-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2.5 rounded-xl cursor-pointer"
+                  >
+                    Coba Lagi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Camera size={14} /> Buka Kamera HP
+                  </button>
+                </div>
               </div>
             )}
 
@@ -258,7 +389,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
             {/* GPS HUD (PRD Section 44) */}
             <div className="absolute top-4 inset-x-4 z-20 pointer-events-none">
-              <div className="bg-[var(--accent)]/85  border border-slate-700/80 rounded-xl p-3 shadow-lg flex flex-col gap-1.5">
+              <div className="bg-[var(--accent)]/85 border border-slate-700/80 rounded-xl p-3 shadow-lg flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-xs gap-2">
                   <span className="flex items-center gap-1.5 font-bold text-slate-200 min-w-0 truncate">
                     <MapPin size={14} className="text-sky-400 shrink-0" />
@@ -281,8 +412,13 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 </div>
                 {gps.status === 'ready' && (
                   <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-slate-800/80 pt-1">
-                    <span>Radius Proyek: {projectRadius}m</span>
-                    <span>Akurasi GPS: ±{Math.round(gps.accuracy)}m</span>
+                    <span>Radius Proyek: {projectRadius}m (Toleransi: +{Math.round(gpsTolerance)}m)</span>
+                    <span className="flex items-center gap-1">
+                      <span>Akurasi GPS: ±{Math.round(gps.accuracy)}m</span>
+                      <button type="button" onClick={requestGps} className="pointer-events-auto text-[10px] text-sky-300 hover:text-sky-200 underline ml-1 cursor-pointer">
+                        Kalibrasi Ulang
+                      </button>
+                    </span>
                   </div>
                 )}
               </div>
@@ -380,7 +516,23 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               </span>
             </div>
 
-            <div className="w-12" />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-200 active:scale-90 transition-all border border-slate-700 cursor-pointer"
+              title="Gunakan Kamera Bawaan HP (Mode Kompatibilitas)"
+            >
+              <Camera size={22} />
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleNativeFileChange}
+            />
           </>
         ) : (
           <div className="w-full flex items-center justify-between gap-4 max-w-md mx-auto">

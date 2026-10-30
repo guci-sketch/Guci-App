@@ -35,7 +35,7 @@ export function formatWIBDate(date: Date): { dateStr: string; timeStr: string } 
 
 /** Draws the base frame + tamper-evident overlay onto a fresh canvas sized to the source. */
 export function applyWatermarkToCanvas(
-  imageSource: HTMLVideoElement,
+  imageSource: HTMLVideoElement | HTMLImageElement | ImageBitmap | HTMLCanvasElement,
   payload: WatermarkPayload
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -43,8 +43,18 @@ export function applyWatermarkToCanvas(
   if (!ctx) throw new Error('Canvas context not available');
 
   // [OPTIMASI RAM] Batasi resolusi max 1024px
-  let width = imageSource.videoWidth || 1280;
-  let height = imageSource.videoHeight || 720;
+  let width = 1280;
+  let height = 720;
+  if ('videoWidth' in imageSource && imageSource.videoWidth > 0) {
+    width = imageSource.videoWidth;
+    height = imageSource.videoHeight;
+  } else if ('naturalWidth' in imageSource && imageSource.naturalWidth > 0) {
+    width = imageSource.naturalWidth;
+    height = imageSource.naturalHeight;
+  } else if ('width' in imageSource && typeof imageSource.width === 'number' && imageSource.width > 0) {
+    width = imageSource.width;
+    height = imageSource.height;
+  }
   const MAX_DIM = 1024;
   if (width > MAX_DIM || height > MAX_DIM) {
     const ratio = width / height;

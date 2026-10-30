@@ -221,7 +221,8 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
     evidence.longitude,
     current.projectLatitude,
     current.projectLongitude,
-    current.projectRadius
+    current.projectRadius,
+    evidence.accuracy
   );
   const nowIso = evidence.capturedAt || new Date().toISOString();
   const dataUrl = await blobToDataUrl(evidence.photoBlob);
@@ -270,7 +271,8 @@ export async function addProgressPhoto(reportId: string, evidence: EvidencePaylo
     evidence.longitude,
     current.projectLatitude,
     current.projectLongitude,
-    current.projectRadius
+    current.projectRadius,
+    evidence.accuracy
   );
   const nowIso = evidence.capturedAt || new Date().toISOString();
   const dataUrl = await blobToDataUrl(evidence.photoBlob);
@@ -303,7 +305,8 @@ export async function checkOut(reportId: string, evidence: EvidencePayload): Pro
     evidence.longitude,
     current.projectLatitude,
     current.projectLongitude,
-    current.projectRadius
+    current.projectRadius,
+    evidence.accuracy
   );
   const nowIso = evidence.capturedAt || new Date().toISOString();
   const checkInMs = current.checkInAt ? new Date(current.checkInAt).getTime() : Date.now() - 3600_000;

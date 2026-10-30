@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { X, MapPin, Calendar, Building, FileText, CheckCircle2, Crosshair, Sparkles, Clock, Loader2, Ruler, Bug, ShieldCheck, Repeat } from 'lucide-react';
+import { X, MapPin, Calendar, Building, FileText, CheckCircle2, Crosshair, Sparkles, Clock, Loader2, Ruler, Bug, ShieldCheck, Repeat, Search, Lock } from 'lucide-react';
 import { PRESET_PROJECT_LOCATIONS } from '@/shared/utils/geo';
 import { SERVICE_TYPE_META } from '@/shared/utils/serviceMeta';
 import { ContractType, ServiceType } from '@/entities/types';
 import { MapPicker } from '../common/MapPicker';
 import { CreateProjectInput } from '@/shared/api/projects';
 import { geocodeAddress, reverseGeocode } from '@/shared/utils/geocoding';
-
+import { useVisualViewportMetrics } from '@/shared/hooks/useVirtualKeyboard';
 interface CreateProjectModalProps {
   onClose: () => void;
   onSubmit: (data: CreateProjectInput) => Promise<void>;
@@ -35,12 +35,18 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [isLocationPicked, setIsLocationPicked] = useState(false);
 
   // Try to get user's location initially for the map center
+  // Pengambilan GPS awal saat modal dibuka memakai akurasi tinggi dan tanpa cache lama
   React.useEffect(() => {
     if (navigator.geolocation && !isLocationPicked) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        setLocationLat(pos.coords.latitude);
-        setLocationLng(pos.coords.longitude);
-      }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          setLocationLat(pos.coords.latitude);
+          setLocationLng(pos.coords.longitude);
+          setIsLocationPicked(true);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
     }
   }, []);
 
@@ -56,15 +62,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const prevIsMapLocked = React.useRef(isMapLocked);
 
   // Debounce for geocoding
+  // JANGAN PERNAH menimpa otomatis jika pengguna sudah memiliki titik GPS atau sudah menggeser pin (isLocationPicked)
   React.useEffect(() => {
     let isActive = true;
     
     const justUnlocked = prevIsMapLocked.current === true && isMapLocked === false;
     prevIsMapLocked.current = isMapLocked;
 
-    // Only auto-pan if the map is NOT locked, the address has some content, 
-    // AND it wasn't just unlocked
-    if (isMapLocked || !address || address.length < 5 || justUnlocked) {
+    if (isLocationPicked || isMapLocked || !address || address.length < 5 || justUnlocked) {
       setIsGeocoding(false);
       return;
     }
@@ -72,7 +77,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     const timer = setTimeout(async () => {
       setIsGeocoding(true);
       const coords = await geocodeAddress(address);
-      if (isActive) {
+      if (isActive && !isLocationPicked) {
         if (coords) {
           setLocationLat(coords.lat);
           setLocationLng(coords.lng);
@@ -85,7 +90,59 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       isActive = false;
       clearTimeout(timer);
     };
-  }, [address, isMapLocked]);
+  }, [address, isMapLocked, isLocationPicked]);
+
+  const handleSearchAddressCoords = async () => {
+    if (!address || address.trim().length < 3) {
+      alert('Ketik alamat terlebih dahulu pada kolom Alamat Lengkap Lokasi.');
+      return;
+    }
+    setIsGeocoding(true);
+    try {
+      const coords = await geocodeAddress(address);
+      if (coords) {
+        setLocationLat(coords.lat);
+        setLocationLng(coords.lng);
+        setIsLocationPicked(true);
+      } else {
+        alert('Titik koordinat tidak ditemukan untuk teks alamat tersebut. Silakan geser pin peta secara manual.');
+      }
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleUseCurrentGps = () => {
+    if (!navigator.geolocation) {
+      alert('Perangkat ini tidak mendukung sensor GPS.');
+      return;
+    }
+    setIsGeocoding(true);
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setLocationLat(lat);
+        setLocationLng(lng);
+        setIsLocationPicked(true);
+        setIsMapLocked(false);
+        setIsGeocoding(false);
+
+        if (!address.trim()) {
+          const revAddr = await reverseGeocode(lat, lng);
+          if (revAddr) {
+            setAddress(revAddr);
+            if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+          }
+        }
+      },
+      err => {
+        setIsGeocoding(false);
+        alert(err.code === err.PERMISSION_DENIED ? 'Izin GPS ditolak oleh peramban HP.' : 'Sinyal GPS lemah atau tidak tersedia. Pastikan fitur Lokasi HP menyala.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const handleLockLocation = async () => {
     setIsGeocoding(true);
@@ -174,15 +231,21 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const isFumigation = serviceType === 'FUMIGATION';
   const isTermite = serviceType === 'TERMITE_CONTROL';
 
+  const { isKeyboardOpen, viewportHeight } = useVisualViewportMetrics();
+
   return (
     <div
       id="create-project-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-end sm:items-center  justify-center pt-10 sm:pt-0 pb-10 sm:pb-0  bg-[var(--accent)]/60 p-4 sm:p-6 "
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-[var(--accent)]/60"
       onClick={onClose}
     >
       <div
         id="create-project-modal-card"
-        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-t-2xl sm:rounded-b-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[95dvh] sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
+        style={{
+          maxHeight: viewportHeight ? `${Math.min(viewportHeight, window.innerHeight)}px` : undefined,
+          height: isKeyboardOpen && viewportHeight ? `${viewportHeight}px` : undefined,
+        }}
+        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[95dvh] sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -202,7 +265,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto pb-32 sm:pb-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto pb-56 sm:pb-6">
           {/* Service Type Selector */}
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
@@ -253,7 +316,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   setProjectName(e.target.value);
                   if (errors.projectName) setErrors(prev => ({ ...prev, projectName: '' }));
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs bg-white scroll-mt-24 scroll-mb-48"
               />
               {errors.projectName && (
                 <p className="text-xs text-red-600 mt-1 font-medium">{errors.projectName}</p>
@@ -271,7 +334,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   placeholder="PT Medika Lestari"
                   value={clientName}
                   onChange={handleClientNameChange}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs bg-white scroll-mt-24 scroll-mb-48"
                 />
               </div>
             </div>
@@ -320,7 +383,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   type="date"
                   value={workDate}
                   onChange={e => setWorkDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs scroll-mt-24 scroll-mb-48"
                 />
               </div>
             </div>
@@ -335,7 +398,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                   type="time"
                   value={scheduledStartTime}
                   onChange={e => setScheduledStartTime(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs scroll-mt-24 scroll-mb-48"
                 />
               </div>
             </div>
@@ -353,13 +416,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               id="input-address"
               rows={2}
               placeholder="Jl. Pahlawan Seribu Kav. 1, BSD City, Serpong..."
-              
               value={address}
               onChange={e => {
                 setAddress(e.target.value);
                 if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
               }}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none "
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs resize-none scroll-mt-24 scroll-mb-48"
             />
             {errors.address && (
               <p className="text-xs text-red-600 mt-0.5 font-medium">{errors.address}</p>
@@ -368,45 +430,65 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           
           {/* Map Location Picker */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
               <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-                Titik Kordinat Proyek (Geser Pin)
+                Titik Koordinat Proyek (Pusat Radius Check-In)
               </label>
-              <button
-                type="button"
-                onClick={() => {
-                  if (isMapLocked) {
-                    setIsMapLocked(false);
-                  } else {
-                    handleLockLocation();
-                  }
-                }}
-                className={`text-[10px] px-2 py-1 rounded border flex items-center gap-1 font-bold ${
-                  isMapLocked 
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                    : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {isMapLocked ? (
-                  <>
-                    <CheckCircle2 size={12} />
-                    Titik &amp; Alamat Terkunci
-                  </>
-                ) : (
-                  <>
-                    <MapPin size={12} />
-                    Lock Titik Peta &amp; Auto Alamat
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleUseCurrentGps}
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  title="Gunakan posisi GPS saya saat ini secara akurat"
+                >
+                  <Crosshair size={13} className="text-emerald-700" />
+                  Posisi GPS Saya (Akurat)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSearchAddressCoords}
+                  disabled={isGeocoding || !address.trim()}
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-bold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                  title="Cari titik peta berdasarkan teks alamat"
+                >
+                  <Search size={13} />
+                  Cari dari Alamat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isMapLocked) {
+                      setIsMapLocked(false);
+                    } else {
+                      handleLockLocation();
+                    }
+                  }}
+                  className={`text-[11px] px-2.5 py-1.5 rounded-lg border flex items-center gap-1 font-bold cursor-pointer transition-colors ${
+                    isMapLocked 
+                      ? 'bg-emerald-600 border-emerald-600 text-white' 
+                      : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {isMapLocked ? (
+                    <>
+                      <CheckCircle2 size={12} />
+                      Terkunci
+                    </>
+                  ) : (
+                    <>
+                      <MapPin size={12} />
+                      Kunci Titik
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <div className={`h-48 w-full rounded-xl overflow-hidden border ${isMapLocked ? 'border-emerald-300 ring-2 ring-emerald-500/20' : 'border-slate-300'}`}>
-              
               <MapPicker 
                 latitude={locationLat} 
                 longitude={locationLng} 
                 onChange={(lat, lng) => {
-                  if(!isMapLocked) {
+                  if (!isMapLocked) {
                      setLocationLat(lat);
                      setLocationLng(lng);
                      setIsLocationPicked(true);
@@ -414,13 +496,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 }}
                 readOnly={isMapLocked}
               />
-
             </div>
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              {isMapLocked 
-                ? 'Titik peta telah dikunci. Buka kunci untuk menggeser pin kembali.'
-                : 'Geser peta untuk menentukan titik akurat yang akan menjadi pusat radius check-in teknisi.'}
-            </p>
+            <div className="flex items-center justify-between text-[10.5px] mt-1.5">
+              <span className="font-mono text-slate-600">
+                Titik: {locationLat.toFixed(6)}, {locationLng.toFixed(6)} {isLocationPicked ? '• (Titik Terpilih)' : ''}
+              </span>
+              <span className="text-[var(--text-muted)]">
+                {isMapLocked ? 'Titik terkunci' : 'Geser pin untuk menentukan titik akurat'}
+              </span>
+            </div>
           </div>
 
           {/* Notes */}
@@ -436,7 +520,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 placeholder="Instruksi safety, akses masuk, riwayat infestasi sebelumnya..."
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs resize-none scroll-mt-24 scroll-mb-48"
               />
             </div>
           </div>

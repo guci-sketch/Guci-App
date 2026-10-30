@@ -166,7 +166,8 @@ workReportRouter.post(
       ? isWithinRadius(
           { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
           { latitude: projectLat, longitude: projectLng },
-          report.project_radius
+          report.project_radius,
+          parsed.data.accuracy
         )
       : { isWithin: true, distance: 0 };
 
@@ -255,7 +256,8 @@ workReportRouter.post(
     const geo = isWithinRadius(
       { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
       { latitude: Number(report.project_latitude), longitude: Number(report.project_longitude) },
-      report.project_radius
+      report.project_radius,
+      parsed.data.accuracy
     );
     const storagePath = await savePhoto(req.file.buffer, 'jpg');
 
@@ -373,7 +375,8 @@ workReportRouter.post(
     const geo = isWithinRadius(
       { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
       { latitude: Number(report.project_latitude), longitude: Number(report.project_longitude) },
-      report.project_radius
+      report.project_radius,
+      parsed.data.accuracy
     );
     const durationSeconds = Math.max(0, Math.round((eventAt.getTime() - checkInAt.getTime()) / 1000));
     const config = await getRiskConfig(req.user!.companyId!);

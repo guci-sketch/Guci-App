@@ -17,9 +17,10 @@ export function calculateDistanceMeters(a: LatLng, b: LatLng): number {
   return Math.round(R * c);
 }
 
-export function isWithinRadius(user: LatLng, project: LatLng, radiusMeters: number) {
+export function isWithinRadius(user: LatLng, project: LatLng, radiusMeters: number, accuracyMeters = 0) {
   const distance = calculateDistanceMeters(user, project);
-  return { isWithin: distance <= radiusMeters, distance };
+  const tolerance = Math.min(Math.max(0, accuracyMeters || 0), 35);
+  return { isWithin: distance <= (radiusMeters + tolerance), distance };
 }
 
 /**
