@@ -154,4 +154,20 @@ Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
 - **Fleksibilitas Pengguna:** Tombol toggle cepat pada navigasi atas (*Header*) dan panel Pengaturan Profil tetap menyediakan kebebasan penuh bagi pengguna untuk beralih ke tema **Gelap (Dark)** atau **Ikuti Sistem (System)** dengan penyimpanan persisten di `localStorage`.
 
 ---
+
+## 13. Manajemen Profil Pelanggan & Rekomendasi Peta Interaktif (Map Autocomplete)
+
+1. **Edit Profil Pelanggan & Titik Lokasi (`CustomersPage`):**
+   - Pengguna dapat memperbarui nama klien, nomor WhatsApp, PIC / U.P., wilayah operasional, alamat lengkap, dan titik koordinat GPS lokasi klien.
+   - Perubahan otomatis disinkronkan ke seluruh dokumen penawaran terkait di database Supabase.
+2. **Pencarian Alamat Instan (Autocomplete ala Google Maps):**
+   - Kolom pencarian di modal edit profil mendukung rekomendasi otomatis (*debounced 350ms*) berbasis OpenStreetMap Nominatim & Photon API.
+   - Hasil pencarian menampilkan nama tempat/gedung (*mainText*) dan rincian jalan/kota (*secondaryText*).
+   - Memilih rekomendasi otomatis mengisi alamat, mendeteksi wilayah, mengunci koordinat `lat` & `lng`, dan menggeser peta (*flyTo*) seketika.
+3. **Peta Interaktif Geser Pin & GPS Cepat:**
+   - Komponen `MapPicker` terintegrasi memungkinkan pengguna menggeser pin peta secara manual untuk menunjuk gerbang/pintu masuk gedung dengan presisi tinggi.
+   - Tombol *"Posisi GPS Saya Saat Ini"* langsung membaca sensor GPS perangkat dengan akurasi maksimal saat survei di lokasi klien.
+   - Kolom numerik Latitude & Longitude mendukung salin-tempel koordinat langsung dari Google Maps.
+
+---
 *Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*

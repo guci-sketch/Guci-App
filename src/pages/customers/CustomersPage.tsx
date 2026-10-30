@@ -7,17 +7,20 @@ import {
     Shield, Clock, AlertTriangle, CalendarCheck,
     MapPin, ClipboardCheck, Phone, Building2, Wrench,
     Navigation, ExternalLink, Eye, AlertCircle, CheckSquare,
+    Edit3, Crosshair, Compass, Map,
 } from "lucide-react";
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from '@/shared/lib/firebase';
 import { db } from '@/shared/lib/firebase';
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
-import { getQuotations } from '@/shared/api/quotationService';
+import { getQuotations, updateCustomerProfileQuotations } from '@/shared/api/quotationService';
 import * as XLSX from "xlsx";
 import { UploadCloud, Download } from "lucide-react";
 import { formatDate } from '@/shared/lib/utils';
 import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
 import type { Quotation } from '@/entities/types';
+import { MapPicker } from '@/widgets/common/MapPicker';
+import { searchAddressSuggestions, type AddressSuggestion } from '@/shared/utils/geocoding';
 
 interface ControlChecklist {
     id: string; tanggal: Date; teknisi: string; catatan: string;
@@ -63,6 +66,8 @@ interface DerivedCustomer {
     id: string; name: string; address: string; addressFull: string[];
     up?: string; wa: string;
     wilayah: string;
+    latitude?: number;
+    longitude?: number;
     services: ServiceRecord[]; totalQuotations: number; totalDeal: number;
     lastServiceDate: Date | null; jasaDigunakan: string[];
     warranties: WarrantyInfo[]; activeWarranty: WarrantyInfo | null;
@@ -174,8 +179,382 @@ function ChecklistModal({ customer, onClose, onSaved }: {
     );
 }
 
-function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
-    customer: DerivedCustomer; expanded: boolean; onToggle: () => void; onAddChecklist: () => void;
+function EditCustomerProfileModal({
+    customer,
+    companyId,
+    onClose,
+    onSaved,
+}: {
+    customer: DerivedCustomer;
+    companyId: string;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [name, setName] = useState(customer.name);
+    const [wa, setWa] = useState(customer.wa || "");
+    const [up, setUp] = useState(customer.up || "");
+    const [address, setAddress] = useState(customer.address || "");
+    const [wilayah, setWilayah] = useState(
+        customer.wilayah && customer.wilayah !== "Tidak Diketahui"
+            ? customer.wilayah
+            : extractWilayah(customer.address || "")
+    );
+    const [lat, setLat] = useState<number>(customer.latitude || -6.200000);
+    const [lng, setLng] = useState<number>(customer.longitude || 106.816666);
+    const [hasCoords, setHasCoords] = useState<boolean>(Boolean(customer.latitude && customer.longitude));
+
+    // Address search state (Google Maps style autocomplete)
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
+    const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState("");
+
+    const debouncedSearchQ = useDebouncedValue(searchQuery, 350);
+
+    useEffect(() => {
+        if (!debouncedSearchQ || debouncedSearchQ.trim().length < 3) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        let active = true;
+        setIsSearching(true);
+        searchAddressSuggestions(debouncedSearchQ)
+            .then(res => {
+                if (active) {
+                    setSuggestions(res);
+                    setShowSuggestions(res.length > 0);
+                }
+            })
+            .catch(() => {
+                if (active) setSuggestions([]);
+            })
+            .finally(() => {
+                if (active) setIsSearching(false);
+            });
+
+        return () => { active = false; };
+    }, [debouncedSearchQ]);
+
+    const handleSelectSuggestion = (s: AddressSuggestion) => {
+        setAddress(s.displayName);
+        setLat(s.lat);
+        setLng(s.lng);
+        setHasCoords(true);
+        const detectedWil = extractWilayah(s.displayName);
+        if (detectedWil && detectedWil !== "Tidak Diketahui") {
+            setWilayah(detectedWil);
+        }
+        setShowSuggestions(false);
+        setSearchQuery("");
+    };
+
+    const handleUseCurrentGPS = () => {
+        if (!navigator.geolocation) {
+            alert("Perangkat ini tidak mendukung sensor GPS.");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                setLat(pos.coords.latitude);
+                setLng(pos.coords.longitude);
+                setHasCoords(true);
+            },
+            err => {
+                alert(err.code === err.PERMISSION_DENIED ? "Izin GPS ditolak oleh peramban." : "Gagal membaca posisi GPS.");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
+
+    const handleSave = async () => {
+        if (!name.trim()) {
+            setSaveError("Nama pelanggan wajib diisi.");
+            return;
+        }
+        setSaving(true);
+        setSaveError("");
+        try {
+            await updateCustomerProfileQuotations({
+                companyId,
+                originalName: customer.name,
+                newName: name.trim(),
+                wa: wa.trim(),
+                up: up.trim(),
+                address: address.trim(),
+                addressFull: address.trim() ? [address.trim()] : [],
+                latitude: hasCoords ? lat : undefined,
+                longitude: hasCoords ? lng : undefined,
+            });
+            onSaved();
+            onClose();
+        } catch (e) {
+            setSaveError(e instanceof Error ? e.message : "Gagal menyimpan perubahan profil klien.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-slate-800">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70 shrink-0">
+                    <div>
+                        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <MapPin size={18} className="text-blue-600" /> Edit Profil &amp; Titik Lokasi Klien
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Perbarui kontak, alamat, serta koordinat peta untuk penugasan dan presisi geofencing teknisi
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Form Content */}
+                <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                    {saveError && (
+                        <div className="flex items-center gap-2 p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl">
+                            <AlertCircle size={14} className="shrink-0" /> {saveError}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Kolom Kiri: Data Klien */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                <Building2 size={13} className="text-slate-500" /> Informasi Utama
+                            </h4>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Klien / Perusahaan *</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    placeholder="Contoh: PT Bank Victoria Tbk"
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Kontak WhatsApp</label>
+                                    <input
+                                        type="text"
+                                        value={wa}
+                                        onChange={e => setWa(e.target.value)}
+                                        placeholder="0812-3456-7890"
+                                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">U.P. / PIC</label>
+                                    <input
+                                        type="text"
+                                        value={up}
+                                        onChange={e => setUp(e.target.value)}
+                                        placeholder="Bpk. Hendra"
+                                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Wilayah Operasional</label>
+                                <input
+                                    type="text"
+                                    value={wilayah}
+                                    onChange={e => setWilayah(e.target.value)}
+                                    placeholder="Jakarta Selatan, Tangerang, dll"
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Alamat Lengkap Lokasi</label>
+                                <textarea
+                                    rows={3}
+                                    value={address}
+                                    onChange={e => {
+                                        setAddress(e.target.value);
+                                        const autoW = extractWilayah(e.target.value);
+                                        if (autoW && autoW !== "Tidak Diketahui") setWilayah(autoW);
+                                    }}
+                                    placeholder="Jl. RS Fatmawati No. 85, Cilandak, Jakarta Selatan..."
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none leading-relaxed"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Kolom Kanan: Rekomendasi Alamat & Peta Interaktif */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                <Compass size={13} className="text-slate-500" /> Peta &amp; Rekomendasi Lokasi
+                            </h4>
+
+                            {/* Autocomplete Search Bar ala Google Maps */}
+                            <div className="relative">
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={e => {
+                                            setSearchQuery(e.target.value);
+                                            setShowSuggestions(true);
+                                        }}
+                                        onFocus={() => {
+                                            if (suggestions.length > 0) setShowSuggestions(true);
+                                        }}
+                                        placeholder="Cari gedung / tempat (ala Google Maps)..."
+                                        className="w-full pl-9 pr-8 py-2 text-xs border border-blue-200 rounded-xl bg-blue-50/30 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    />
+                                    {isSearching && (
+                                        <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" />
+                                    )}
+                                    {searchQuery && !isSearching && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Dropdown Rekomendasi Alamat */}
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-[500] max-h-52 overflow-y-auto divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-150">
+                                        {suggestions.map((item, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleSelectSuggestion(item)}
+                                                className="w-full px-3.5 py-2.5 text-left hover:bg-blue-50/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                                            >
+                                                <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
+                                                    <MapPin size={13} />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs font-bold text-slate-900 truncate">{item.mainText}</p>
+                                                    <p className="text-[10.5px] text-slate-500 line-clamp-1">{item.secondaryText}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Peta Interaktif Leaflet MapPicker */}
+                            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
+                                <MapPicker
+                                    latitude={lat}
+                                    longitude={lng}
+                                    onChange={(newLat, newLng) => {
+                                        setLat(newLat);
+                                        setLng(newLng);
+                                        setHasCoords(true);
+                                    }}
+                                    className="h-44 w-full"
+                                />
+                            </div>
+
+                            {/* Quick Tools & Koordinat */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleUseCurrentGPS}
+                                        className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                        title="Gunakan posisi GPS perangkat saat ini"
+                                    >
+                                        <Crosshair size={13} className="text-emerald-700" />
+                                        Posisi GPS Saya Saat Ini
+                                    </button>
+
+                                    {hasCoords && (
+                                        <a
+                                            href={`https://www.google.com/maps?q=${lat},${lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[11px] text-blue-600 hover:underline font-semibold flex items-center gap-1"
+                                        >
+                                            <ExternalLink size={11} /> Cek di Google Maps
+                                        </a>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                        <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Latitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={lat}
+                                            onChange={e => {
+                                                const v = parseFloat(e.target.value);
+                                                if (!isNaN(v)) { setLat(v); setHasCoords(true); }
+                                            }}
+                                            className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10.5px] font-semibold text-slate-500 mb-0.5">Longitude</label>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            value={lng}
+                                            onChange={e => {
+                                                const v = parseFloat(e.target.value);
+                                                if (!isNaN(v)) { setLng(v); setHasCoords(true); }
+                                            }}
+                                            className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                    <p className="text-[11px] text-slate-500">
+                        {hasCoords ? `Koordinat aktif: ${lat.toFixed(6)}, ${lng.toFixed(6)}` : "Belum ada koordinat tersimpan"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
+                        >
+                            {saving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                            Simpan Perubahan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CustomerCard({ customer, expanded, onToggle, onAddChecklist, onEditProfile }: {
+    customer: DerivedCustomer; expanded: boolean; onToggle: () => void; onAddChecklist: () => void; onEditProfile: () => void;
 }) {
     const lastCl = [...customer.checklists].sort((a, b) => b.tanggal.getTime() - a.tanggal.getTime())[0];
     const latestW = customer.activeWarranty ?? customer.warranties[0] ?? null;
@@ -225,6 +604,15 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
                                 <CheckCircle2 size={9} /> {customer.totalDeal}x deal
                             </span>
                         )}
+                        {customer.latitude && customer.longitude ? (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1" title={`GPS: ${customer.latitude.toFixed(6)}, ${customer.longitude.toFixed(6)}`}>
+                                <MapPin size={9} /> GPS Terdata
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1" title="Titik GPS belum diatur">
+                                <MapPin size={9} className="opacity-50" /> Belum Ada Pin
+                            </span>
+                        )}
                         {lastCl && (
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5
                                 ${lastCl.hasilKontrol === "baik" ? "bg-emerald-100 text-emerald-700"
@@ -236,11 +624,19 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
                     </div>
                 </div>
                 <div className="shrink-0 flex items-center gap-2 mt-1">
+                    <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); onEditProfile(); }}
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10.5px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Edit profil pelanggan & titik koordinat GPS"
+                    >
+                        <Edit3 size={11} /> Edit Profil &amp; Peta
+                    </button>
                     <span
                         role="button"
                         tabIndex={0}
                         onClick={e => { e.stopPropagation(); onAddChecklist(); }}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-bold flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10.5px] font-bold flex items-center gap-1 cursor-pointer"
                         title="Catat / Handle Jadwal Kontrol Pelanggan"
                     >
                         <ClipboardCheck size={11} /> Handle Kontrol
@@ -279,6 +675,38 @@ function CustomerCard({ customer, expanded, onToggle, onAddChecklist }: {
                                         <Navigation size={10}/> Navigasi
                                     </a>
                                 </div>
+                            </div>
+                        )}
+                        {customer.latitude && customer.longitude ? (
+                            <div className="flex items-center gap-2 text-xs">
+                                <Crosshair size={12} className="text-emerald-600 shrink-0" />
+                                <span className="text-slate-600">
+                                    Titik Koordinat: <strong className="font-mono text-emerald-700">{customer.latitude.toFixed(6)}, {customer.longitude.toFixed(6)}</strong>
+                                </span>
+                                <a href={`https://www.google.com/maps?q=${customer.latitude},${customer.longitude}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="text-emerald-600 hover:underline font-semibold text-[10px] flex items-center gap-0.5 ml-1">
+                                    <ExternalLink size={10} /> Google Maps
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); onEditProfile(); }}
+                                    className="text-blue-600 hover:underline font-semibold text-[10px] flex items-center gap-0.5 ml-1 cursor-pointer"
+                                >
+                                    <Edit3 size={10} /> Ubah Pin
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-xs">
+                                <Crosshair size={12} className="text-amber-500 shrink-0" />
+                                <span className="text-slate-400 italic">Titik GPS belum ditandai</span>
+                                <button
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); onEditProfile(); }}
+                                    className="text-blue-600 hover:underline font-semibold text-[10px] flex items-center gap-0.5 ml-1 cursor-pointer"
+                                >
+                                    + Tandai di Peta
+                                </button>
                             </div>
                         )}
                         {customer.addressFull.filter(Boolean).length > 0 && (
@@ -560,6 +988,7 @@ export function CustomersPage() {
     const [sortBy, setSortBy] = useState<"date" | "name" | "deal" | "area">("date");
     const [filterWarranty, setFilterWarranty] = useState(false);
     const [checklistTarget, setChecklistTarget] = useState<DerivedCustomer | null>(null);
+    const [editCustomerTarget, setEditCustomerTarget] = useState<DerivedCustomer | null>(null);
     const [importPreviewRows, setImportPreviewRows] = useState<ImportRow[] | null>(null);
     const [isImporting, setIsImporting] = useState(false);
 
@@ -691,6 +1120,8 @@ export function CustomersPage() {
                     addressFull: q.kepadaAlamatLines ?? [],
                     up: q.kepadaUp, wa: q.kepadaWa ?? "",
                     wilayah: extractWilayah(addr0),
+                    latitude: q.latitude,
+                    longitude: q.longitude,
                     services: [], totalQuotations: 0, totalDeal: 0,
                     lastServiceDate: null, jasaDigunakan: [],
                     warranties: [], activeWarranty: null, checklists: [],
@@ -698,6 +1129,8 @@ export function CustomersPage() {
             }
             const c = map.get(key)!;
             c.totalQuotations++;
+            if (!c.latitude && q.latitude) c.latitude = q.latitude;
+            if (!c.longitude && q.longitude) c.longitude = q.longitude;
 
             const jasa = LAYANAN_CONFIG[q.jenisLayanan]?.label.split("—")[1]?.trim() ?? q.jenisLayanan;
             c.services.push({
@@ -919,7 +1352,8 @@ export function CustomersPage() {
                         <CustomerCard key={c.id} customer={c}
                             expanded={expandedId === c.id}
                             onToggle={() => setExpandedId(prev => prev === c.id ? null : c.id)}
-                            onAddChecklist={() => setChecklistTarget(c)} />
+                            onAddChecklist={() => setChecklistTarget(c)}
+                            onEditProfile={() => setEditCustomerTarget(c)} />
                     ))}
                     <p className="text-xs text-slate-400 text-center pt-1">
                         {customers.length} hasil filter dari {totalCustomers} klien
@@ -936,6 +1370,17 @@ export function CustomersPage() {
                         setChecklists(prev => [...prev, { ...entry, customerId: checklistTarget.id }]);
                         setChecklistTarget(null);
                     }} />
+            )}
+
+            {editCustomerTarget && user?.companyId && (
+                <EditCustomerProfileModal
+                    customer={editCustomerTarget}
+                    companyId={user.companyId}
+                    onClose={() => setEditCustomerTarget(null)}
+                    onSaved={() => {
+                        load();
+                    }}
+                />
             )}
 
             {importPreviewRows && (

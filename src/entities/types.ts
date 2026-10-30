@@ -226,6 +226,8 @@ export interface Quotation {
     kepadaWa?: string;      // Nomor WhatsApp klien
     objekPekerjaan?: string; // Contoh: "bangunan rumah tinggal pra konstruksi" / "Bank Victoria Cabang Fatmawati"
     lokasiPekerjaan?: string;// Alamat lokasi kerja bila berbeda dengan alamat surat klien
+    latitude?: number;       // Titik koordinat GPS lintang lokasi klien
+    longitude?: number;      // Titik koordinat GPS bujur lokasi klien
     tanggal: Date;
     items: QuotationItem[];
     biayaTambahan: BiayaTambahan[];

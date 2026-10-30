@@ -74,18 +74,27 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
 
 ---
 
-## 7. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
+## 7. Manajemen Profil Pelanggan & Rekomendasi Peta Interaktif (Map Autocomplete)
+
+* **Edit Profil Lengkap:** Pengguna dapat memperbarui nama klien, kontak WhatsApp, U.P. / PIC, wilayah operasional, alamat lengkap, dan titik koordinat GPS.
+* **Pencarian Autocomplete ala Google Maps:** Tersedia input pencarian otomatis berbasis OpenStreetMap Nominatim & Photon API. Memilih saran tempat/gedung otomatis mengisi alamat, mendeteksi wilayah, dan mengarahkan peta ke koordinat akurat.
+* **Peta Interaktif & Geser Pin:** Dilengkapi Leaflet `MapPicker` yang mendukung penggeseran pin secara bebas untuk ketepatan pintu masuk/gerbang klien, tombol cepat *"Posisi GPS Saya Saat Ini"*, dan input angka latitude/longitude manual.
+* **Sinkronisasi Otomatis:** Perubahan profil tersinkronisasi ke seluruh penawaran dan SPK penugasan kerja lapangan.
+
+---
+
+## 8. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
 
 1. **Vite Production Build:**
-   * Status: **SUCCESS** (2545 modules transformed, 0 error, build in ~65s).
+   * Status: **SUCCESS** (2545 modules transformed, 0 error, build in ~63s).
 2. **Whitebox Unit Tests (`npm run test:whitebox`):**
-   * Status: **65 / 65 PASS (100%)**
-   * Mencakup **WB-01 s.d. WB-18** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import multi-sheet validator, jadwal SPK modulo math, dan default light theme invariants).
+   * Status: **68 / 68 PASS (100%)**
+   * Mencakup **WB-01 s.d. WB-19** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import multi-sheet validator, jadwal SPK modulo math, default light theme, dan autocomplete rekomendasi alamat).
 3. **Blackbox Integration Tests (`npm run test:blackbox`):**
-   * Status: **31 / 31 PASS (100%)**
-   * Mencakup **BB-01 s.d. BB-10** (RBAC 6 role, alur SPK & laporan kerja, System Usability Scale, antrean offline idempotency, tanda tangan digital, bulk customer import, SPK recurring dispatch, penomoran resmi bersih tanpa APR, dan geofence auto-anchor).
+   * Status: **34 / 34 PASS (100%)**
+   * Mencakup **BB-01 s.d. BB-11** (RBAC 6 role, alur SPK & laporan kerja, System Usability Scale, antrean offline idempotency, tanda tangan digital, bulk customer import, SPK recurring dispatch, penomoran resmi bersih tanpa APR, geofence auto-anchor, dan sinkronisasi geser pin peta pelanggan).
 4. **Automated QA Test Suite (`python scripts/run-qa-whitebox-blackbox.py`):**
-   * Status: **19 / 19 SUITES PASS (100%)**
-   * Memvalidasi seluruh gerbang arsitektur Izumi (Gate 1 - 4), Operational Bento, Bulk Import, SPK Schedule, dan Geofence Anchor.
+   * Status: **20 / 20 SUITES PASS (100%)**
+   * Memvalidasi seluruh gerbang arsitektur Izumi (Gate 1 - 4), Operational Bento, Bulk Import, SPK Schedule, Geofence Anchor, dan Customer Profile Autocomplete Map.
 5. **Riwayat Git:**
    * Branch: `origin/main`.

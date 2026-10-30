@@ -154,9 +154,9 @@ export function CreateSPKModal({
 
             // Jembatan otomatis ke sistem Fieldwork Teknisi (tabel projects + work_reports READY)
             try {
-                let initLat = 0;
-                let initLng = 0;
-                if (alamatLengkap && alamatLengkap.length >= 5) {
+                let initLat = selectedQuo.latitude || 0;
+                let initLng = selectedQuo.longitude || 0;
+                if ((!initLat || !initLng) && alamatLengkap && alamatLengkap.length >= 5) {
                     try {
                         const geo = await geocodeAddress(alamatLengkap);
                         if (geo) {

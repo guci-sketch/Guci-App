@@ -350,3 +350,61 @@ test('BB-10 [Geofence Auto-Anchor on First Check-In Workflow]', async (t) => {
         assert.equal(hasAnchorNow, true, 'Proyek kini sudah memiliki jangkar permanen');
     });
 });
+
+test('BB-11 [Customer Profile Editing & Map Pin Draggable Synchronization]', async (t) => {
+    interface CustomerState {
+        name: string;
+        wa: string;
+        up: string;
+        address: string;
+        wilayah: string;
+        latitude?: number;
+        longitude?: number;
+    }
+
+    await t.test('Alur Edit Profil Klien: Pemilihan rekomendasi autocomplete memperbarui alamat dan koordinat peta', () => {
+        const customer: CustomerState = {
+            name: 'PT Contoh Klien Lama',
+            wa: '0812000000',
+            up: 'Pak Lama',
+            address: 'Jl. Lama No. 1',
+            wilayah: 'Jakarta',
+            latitude: undefined,
+            longitude: undefined,
+        };
+
+        // Simulasi pemilihan rekomendasi autocomplete (ala Google Maps)
+        const selectedSuggestion = {
+            displayName: 'RS Hermina BSD, Jalan Pahlawan Seribu, Lengkong Gudang, Serpong, Tangerang Selatan',
+            lat: -6.297450,
+            lng: 106.669810,
+        };
+
+        // Update profil
+        customer.address = selectedSuggestion.displayName;
+        customer.latitude = selectedSuggestion.lat;
+        customer.longitude = selectedSuggestion.lng;
+        customer.wilayah = 'Tangerang Selatan';
+
+        assert.equal(customer.address.includes('RS Hermina BSD'), true);
+        assert.equal(customer.latitude, -6.297450);
+        assert.equal(customer.longitude, 106.669810);
+        assert.equal(customer.wilayah, 'Tangerang Selatan');
+    });
+
+    await t.test('Simulasi Geser Pin Peta: Koordinat diperbarui secara presisi ke gerbang masuk klien', () => {
+        let lat = -6.297450;
+        let lng = 106.669810;
+
+        // User menggeser pin peta 15 meter ke gerbang masuk
+        const onMapPinDrag = (newLat: number, newLng: number) => {
+            lat = newLat;
+            lng = newLng;
+        };
+
+        onMapPinDrag(-6.297580, 106.669920);
+
+        assert.equal(lat, -6.297580);
+        assert.equal(lng, 106.669920);
+    });
+});

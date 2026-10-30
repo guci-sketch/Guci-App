@@ -289,3 +289,60 @@ export async function deleteQuotation(id: string): Promise<void> {
     const { error } = await supabase.from("quotations").delete().eq("id", id);
     if (error) throw error;
 }
+
+export interface UpdateCustomerProfileInput {
+    companyId: string;
+    originalName: string;
+    newName: string;
+    wa?: string;
+    up?: string;
+    address: string;
+    addressFull?: string[];
+    latitude?: number;
+    longitude?: number;
+}
+
+/**
+ * Menyimpan pembaruan profil pelanggan (nama, WA, PIC, alamat, dan koordinat GPS)
+ * ke seluruh penawaran yang terhubung di database.
+ */
+export async function updateCustomerProfileQuotations(input: UpdateCustomerProfileInput): Promise<number> {
+    const { companyId, originalName, newName, wa, up, address, addressFull, latitude, longitude } = input;
+
+    const { data, error } = await supabase
+        .from("quotations")
+        .select("id, payload")
+        .eq("company_id", companyId);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return 0;
+
+    const origKey = originalName.trim().toLowerCase();
+    const matched = data.filter(row => {
+        const p = row.payload || {};
+        const qName = String(p.kepadaNama || '').trim().toLowerCase();
+        return qName === origKey;
+    });
+
+    for (const item of matched) {
+        const p = item.payload || {};
+        const updatedPayload = {
+            ...p,
+            kepadaNama: newName.trim(),
+            kepadaWa: wa !== undefined ? wa.trim() : p.kepadaWa,
+            kepadaUp: up !== undefined ? up.trim() : p.kepadaUp,
+            kepadaAlamatLines: addressFull && addressFull.length > 0 ? addressFull : [address.trim()],
+            kepadaAlamat: address.trim(),
+            lokasiPekerjaan: address.trim(),
+            latitude: latitude !== undefined ? latitude : p.latitude,
+            longitude: longitude !== undefined ? longitude : p.longitude,
+        };
+
+        await supabase
+            .from("quotations")
+            .update({ payload: updatedPayload })
+            .eq("id", item.id);
+    }
+
+    return matched.length;
+}

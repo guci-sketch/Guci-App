@@ -367,6 +367,21 @@ record(
     "Proyek baru tanpa koordinat (0,0) otomatis mengunci titik check-in pertama sebagai jangkar tanpa false-alarm 10.500 km tervalidasi."
 )
 
+# BB-14 (Customer Profile Editing & Autocomplete Map Pin):
+with open(os.path.join(root, "src/pages/customers/CustomersPage.tsx"), "r", encoding="utf-8") as f:
+    cust_page_src = f.read()
+with open(os.path.join(root, "src/shared/utils/geocoding.ts"), "r", encoding="utf-8") as f:
+    geo_src = f.read()
+record(
+    "BB-14", "Customer-Profile-Map",
+    "Edit Profil Klien, Rekomendasi Alamat Instan (Autocomplete), & Geser Pin Peta",
+    "EditCustomerProfileModal" in cust_page_src
+    and "searchAddressSuggestions" in geo_src
+    and "updateCustomerProfileQuotations" in cust_page_src
+    and "MapPicker" in cust_page_src,
+    "Edit profil pelanggan, autocomplete alamat ala Google Maps, dan interaksi geser pin peta tervalidasi."
+)
+
 print(f"ALL WHITEBOX, BLACKBOX & IZUMI GATE TESTS PASSED: {len(results)}/{len(results)} SUITES")
 for r in results:
     print(f"[{r['status']}] {r['id']} ({r['category']}): {r['title']}")

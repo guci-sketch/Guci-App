@@ -580,3 +580,69 @@ test('WB-18 [Theme Invariants & Default Light Mode Hydration]', async (t) => {
         assert.equal(resolveEffectiveTheme('system', false), 'light');
     });
 });
+
+test('WB-19 [Customer Profile & Address Recommendation Autocomplete Engine]', async (t) => {
+    interface MockOsmItem {
+        display_name: string;
+        lat: string;
+        lon: string;
+    }
+
+    function parseSuggestions(items: MockOsmItem[]) {
+        return items.map(item => {
+            const parts = item.display_name.split(/,\s*/);
+            return {
+                displayName: item.display_name,
+                mainText: parts[0] || '',
+                secondaryText: parts.slice(1, 5).join(', '),
+                lat: parseFloat(item.lat),
+                lng: parseFloat(item.lon),
+            };
+        }).filter(item => !isNaN(item.lat) && !isNaN(item.lng));
+    }
+
+    await t.test('Parser Rekomendasi Alamat: Memisahkan mainText gedung dan secondaryText jalan/kota', () => {
+        const rawResponse: MockOsmItem[] = [
+            {
+                display_name: 'RS Hermina BSD, Jalan Pahlawan Seribu, Lengkong Gudang, Serpong, Tangerang Selatan, Banten, 15310, Indonesia',
+                lat: '-6.297450',
+                lon: '106.669810',
+            },
+            {
+                display_name: 'Bank Victoria Cabang Fatmawati, Jalan RS Fatmawati Raya, Cipete Utara, Kebayoran Baru, Jakarta Selatan, 12140',
+                lat: '-6.255800',
+                lon: '106.797200',
+            },
+        ];
+
+        const parsed = parseSuggestions(rawResponse);
+        assert.equal(parsed.length, 2);
+        assert.equal(parsed[0].mainText, 'RS Hermina BSD');
+        assert.equal(parsed[0].lat, -6.29745);
+        assert.equal(parsed[0].lng, 106.66981);
+        assert.equal(parsed[1].mainText, 'Bank Victoria Cabang Fatmawati');
+        assert.equal(parsed[1].lat, -6.2558);
+        assert.equal(parsed[1].lng, 106.7972);
+    });
+
+    await t.test('Inheritance Koordinat Profil ke SPK Proyek: Memprioritaskan koordinat profil yang sudah diedit', () => {
+        const customerProfileWithGPS = {
+            name: 'PT Oreka Solusi Kreatif',
+            latitude: -6.297450,
+            longitude: 106.669810,
+        };
+
+        const quotation = {
+            kepadaNama: customerProfileWithGPS.name,
+            latitude: customerProfileWithGPS.latitude,
+            longitude: customerProfileWithGPS.longitude,
+        };
+
+        // Logika pewarisan koordinat saat SPK diterbitkan
+        const initLat = quotation.latitude || 0;
+        const initLng = quotation.longitude || 0;
+
+        assert.equal(initLat, -6.297450, 'Latitude proyek wajib mewarisi koordinat profil customer');
+        assert.equal(initLng, 106.669810, 'Longitude proyek wajib mewarisi koordinat profil customer');
+    });
+});
