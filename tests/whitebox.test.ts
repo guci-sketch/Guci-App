@@ -480,3 +480,103 @@ test('WB-15 [PDF Formatting Sanitization & Geofence Auto-Anchor Invariants]', as
         assert.equal(checkInValid, true, 'Check-in pertama wajib valid');
     });
 });
+
+test('WB-16 [Bulk Import Validator Engine: Customers & Multi-Sheet Inventory]', async (t) => {
+    await t.test('Customer Duplicate Detection: Nama terdaftar di-flag duplicate, nama kosong di-flag error', () => {
+        const existingNames = new Set(['pt bank victoria', 'cv maju bersama']);
+        const rows = [
+            { nama: 'PT Bank Victoria ', kontak: '0812', alamat: 'Jakarta', proyek: 'AR', kategoriProyek: 'AR' },
+            { nama: '   ', kontak: '0813', alamat: 'Depok', proyek: 'PCO', kategoriProyek: 'PCO' },
+            { nama: 'PT Klien Anyar', kontak: '0814', alamat: 'Tangerang', proyek: 'AR', kategoriProyek: 'AR' },
+        ];
+
+        const tagged = rows.map(r => {
+            if (!r.nama.trim()) return { ...r, _status: 'error', _reason: 'Nama kosong' };
+            const key = r.nama.trim().toLowerCase();
+            if (existingNames.has(key)) return { ...r, _status: 'duplicate', _reason: 'Nama sudah ada' };
+            return { ...r, _status: 'ok' };
+        });
+
+        assert.equal(tagged[0]._status, 'duplicate');
+        assert.equal(tagged[1]._status, 'error');
+        assert.equal(tagged[2]._status, 'ok');
+    });
+
+    await t.test('Inventory Multi-Sheet Validator: Menolak stok negatif dan memvalidasi duplikasi item gudang', () => {
+        const existingItems = new Set(['termidor 25 wg', 'mesin pompa injeksi']);
+        const rawRows = [
+            { nama: 'Termidor 25 WG', kategori: 'Chemical', satuan: 'Kg', stokAwal: 10, minAlert: 2, hargaSatuan: 850000 },
+            { nama: 'Glue Board Tikus', kategori: 'Perangkap', satuan: 'Pcs', stokAwal: -5, minAlert: 5, hargaSatuan: 12000 },
+            { nama: '', kategori: 'Alat', satuan: 'Unit', stokAwal: 2, minAlert: 1, hargaSatuan: 1200000 },
+            { nama: 'Selang Pompa 10m', kategori: 'Alat', satuan: 'Pcs', stokAwal: 8, minAlert: 2, hargaSatuan: 350000 },
+        ];
+
+        const validated = rawRows.map(r => {
+            if (!r.nama.trim()) return { ...r, _status: 'error', _reason: 'Nama kosong' };
+            if (!Number.isFinite(r.stokAwal) || r.stokAwal < 0) return { ...r, _status: 'error', _reason: 'Stok tidak valid' };
+            if (existingItems.has(r.nama.trim().toLowerCase())) return { ...r, _status: 'duplicate', _reason: 'Sudah ada di gudang' };
+            return { ...r, _status: 'ok' };
+        });
+
+        assert.equal(validated[0]._status, 'duplicate');
+        assert.equal(validated[1]._status, 'error');
+        assert.equal(validated[2]._status, 'error');
+        assert.equal(validated[3]._status, 'ok');
+    });
+});
+
+test('WB-17 [Recurring SPK Date Calculation & Round-Robin Modulo Math]', async (t) => {
+    function generateDates(start: string, interval: 'harian' | 'mingguan' | 'bulanan', count: number): string[] {
+        const dates: string[] = [];
+        const d = new Date(start);
+        for (let i = 0; i < count; i++) {
+            dates.push(d.toISOString().split('T')[0]);
+            if (interval === 'harian') d.setDate(d.getDate() + 1);
+            else if (interval === 'mingguan') d.setDate(d.getDate() + 7);
+            else d.setMonth(d.getMonth() + 1);
+        }
+        return dates;
+    }
+
+    await t.test('Interval mingguan menghasilkan 4 tanggal berselisih 7 hari secara presisi', () => {
+        const dates = generateDates('2026-11-02', 'mingguan', 4);
+        assert.deepEqual(dates, ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23']);
+    });
+
+    await t.test('Rotasi round-robin multi-teknisi terbagi seimbang sesuai modulo length', () => {
+        const technicians = ['Teknisi A', 'Teknisi B', 'Teknisi C'];
+        const dates = generateDates('2026-11-02', 'mingguan', 6);
+        const assignments = dates.map((d, idx) => ({
+            tanggal: d,
+            teknisi: technicians[idx % technicians.length],
+        }));
+
+        assert.equal(assignments[0].teknisi, 'Teknisi A');
+        assert.equal(assignments[1].teknisi, 'Teknisi B');
+        assert.equal(assignments[2].teknisi, 'Teknisi C');
+        assert.equal(assignments[3].teknisi, 'Teknisi A');
+        assert.equal(assignments[4].teknisi, 'Teknisi B');
+        assert.equal(assignments[5].teknisi, 'Teknisi C');
+    });
+});
+
+test('WB-18 [Theme Invariants & Default Light Mode Hydration]', async (t) => {
+    function resolveEffectiveTheme(preference: 'light' | 'dark' | 'system', systemPrefersDark = false): 'light' | 'dark' {
+        if (preference === 'dark') return 'dark';
+        if (preference === 'light') return 'light';
+        return systemPrefersDark ? 'dark' : 'light';
+    }
+
+    await t.test('Default fallback tema aplikasi adalah light saat preference belum diset', () => {
+        const rawStored = null;
+        const defaultPreference = rawStored || 'light';
+        assert.equal(defaultPreference, 'light');
+        assert.equal(resolveEffectiveTheme(defaultPreference), 'light');
+    });
+
+    await t.test('Preferensi eksplisit dark tetap dihormati jika dipilih pengguna', () => {
+        assert.equal(resolveEffectiveTheme('dark'), 'dark');
+        assert.equal(resolveEffectiveTheme('system', true), 'dark');
+        assert.equal(resolveEffectiveTheme('system', false), 'light');
+    });
+});

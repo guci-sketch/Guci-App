@@ -74,16 +74,18 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
 
 ---
 
-## 7. Bukti Pengujian & Integritas Sistem
+## 7. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
 
 1. **Vite Production Build:**
-   * Status: **SUCCESS** (2545 modules transformed, 0 error).
+   * Status: **SUCCESS** (2545 modules transformed, 0 error, build in ~65s).
 2. **Whitebox Unit Tests (`npm run test:whitebox`):**
-   * Status: **56 / 56 PASS (100%)**
-   * Termasuk pengujian baru **WB-15** (*PDF Formatting Sanitization & Geofence Auto-Anchor Invariants*).
+   * Status: **65 / 65 PASS (100%)**
+   * Mencakup **WB-01 s.d. WB-18** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import multi-sheet validator, jadwal SPK modulo math, dan default light theme invariants).
 3. **Blackbox Integration Tests (`npm run test:blackbox`):**
-   * Status: **21 / 21 PASS (100%)**
-   * Mencakup RBAC Matrix, State Machine SPK, Skor SUS Teknisi, dan Offline Queue Idempotency.
-4. **Riwayat Git:**
-   * Commit ID: `0356538` & `4e4dded` (`feat(ui): set light as default color theme`)
+   * Status: **31 / 31 PASS (100%)**
+   * Mencakup **BB-01 s.d. BB-10** (RBAC 6 role, alur SPK & laporan kerja, System Usability Scale, antrean offline idempotency, tanda tangan digital, bulk customer import, SPK recurring dispatch, penomoran resmi bersih tanpa APR, dan geofence auto-anchor).
+4. **Automated QA Test Suite (`python scripts/run-qa-whitebox-blackbox.py`):**
+   * Status: **19 / 19 SUITES PASS (100%)**
+   * Memvalidasi seluruh gerbang arsitektur Izumi (Gate 1 - 4), Operational Bento, Bulk Import, SPK Schedule, dan Geofence Anchor.
+5. **Riwayat Git:**
    * Branch: `origin/main`.

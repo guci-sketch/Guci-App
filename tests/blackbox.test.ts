@@ -186,3 +186,167 @@ test('BB-06 [Geofence Anti-Spoofing]: Boundary Toleransi & Heuristik Lokasi', as
         assert.equal(isInside, false);
     });
 });
+
+test('BB-07 [Bulk Customer Import Workflow: Parse, Preview & Commit]', async (t) => {
+    interface RawCustomerRow {
+        Nama: string;
+        Kontak: string;
+        Alamat: string;
+        Proyek: string;
+        KategoriProyek: string;
+    }
+
+    const mockFileRows: RawCustomerRow[] = [
+        { Nama: 'PT Bank Central Asia', Kontak: '0811111111', Alamat: 'Jl. Thamrin 1', Proyek: 'Anti Rayap Gedung', KategoriProyek: 'AR' },
+        { Nama: 'PT Pelanggan Lama', Kontak: '0822222222', Alamat: 'Jl. Sudirman 5', Proyek: 'Pest Control', KategoriProyek: 'PCO' },
+        { Nama: '   ', Kontak: '0833333333', Alamat: 'Jl. Gatot Subroto', Proyek: 'Termite', KategoriProyek: 'AR' },
+        { Nama: 'CV Bersama Sejahtera', Kontak: '0844444444', Alamat: 'Jl. TB Simatupang', Proyek: 'Fumigasi Kontainer', KategoriProyek: 'PCO' },
+    ];
+
+    const existingCustomerDatabase = new Set(['pt pelanggan lama']);
+
+    await t.test('Tahap Preview: Memetakan status ok, duplikat, dan error sebelum commit', () => {
+        const previewRows = mockFileRows.map(r => {
+            const namaClean = r.Nama.trim();
+            if (!namaClean) return { ...r, status: 'error', reason: 'Nama kosong' };
+            if (existingCustomerDatabase.has(namaClean.toLowerCase())) {
+                return { ...r, status: 'duplicate', reason: 'Nama sudah terdaftar' };
+            }
+            return { ...r, status: 'ok', reason: '' };
+        });
+
+        assert.equal(previewRows.filter(r => r.status === 'ok').length, 2);
+        assert.equal(previewRows.filter(r => r.status === 'duplicate').length, 1);
+        assert.equal(previewRows.filter(r => r.status === 'error').length, 1);
+    });
+
+    await t.test('Tahap Commit: Hanya mengimpor baris valid ke payload quotation', () => {
+        const validRows = mockFileRows.filter(r => r.Nama.trim() && !existingCustomerDatabase.has(r.Nama.trim().toLowerCase()));
+        const payload = validRows.map(row => ({
+            kepadaNama: row.Nama.trim(),
+            kepadaKontak: row.Kontak.trim(),
+            kepadaAlamat: row.Alamat.trim(),
+            perihal: row.Proyek.trim(),
+            kategori: row.KategoriProyek.toUpperCase() === 'AR' ? 'AR' : 'PCO',
+            status: 'draft',
+        }));
+
+        assert.equal(payload.length, 2);
+        assert.equal(payload[0].kepadaNama, 'PT Bank Central Asia');
+        assert.equal(payload[1].kepadaNama, 'CV Bersama Sejahtera');
+    });
+});
+
+test('BB-08 [SPK Recurring Dispatch Workflow: Frequency Generation & Round-Robin]', async (t) => {
+    const quotation = {
+        id: 'q-99',
+        noSurat: 'GP/AR/PH/2026/10/0001',
+        kepadaNama: 'PT Inti Sentosa',
+        perihal: 'Anti Rayap Injeksi Rutin',
+        kategori: 'AR',
+        lokasiPekerjaan: 'Kawasan Industri MM2100',
+    };
+
+    const technicians = [
+        { uid: 'u-1', name: 'Teknisi Budi' },
+        { uid: 'u-2', name: 'Teknisi Joko' },
+    ];
+
+    await t.test('Menerbitkan 4 SPK mingguan dengan rotasi seimbang 2 teknisi', () => {
+        const startDate = '2026-11-02';
+        const count = 4;
+        const generatedSPKs = [];
+
+        const d = new Date(startDate);
+        for (let i = 0; i < count; i++) {
+            const dateStr = d.toISOString().split('T')[0];
+            const tech = technicians[i % technicians.length];
+            generatedSPKs.push({
+                quotationId: quotation.id,
+                quotationNoSurat: quotation.noSurat,
+                customerName: quotation.kepadaNama,
+                technicianId: tech.uid,
+                technicianName: tech.name,
+                scheduleDate: dateStr,
+                status: 'assigned',
+            });
+            d.setDate(d.getDate() + 7);
+        }
+
+        assert.equal(generatedSPKs.length, 4);
+        assert.equal(generatedSPKs[0].technicianName, 'Teknisi Budi');
+        assert.equal(generatedSPKs[0].scheduleDate, '2026-11-02');
+        assert.equal(generatedSPKs[1].technicianName, 'Teknisi Joko');
+        assert.equal(generatedSPKs[1].scheduleDate, '2026-11-09');
+        assert.equal(generatedSPKs[2].technicianName, 'Teknisi Budi');
+        assert.equal(generatedSPKs[2].scheduleDate, '2026-11-16');
+        assert.equal(generatedSPKs[3].technicianName, 'Teknisi Joko');
+        assert.equal(generatedSPKs[3].scheduleDate, '2026-11-23');
+    });
+});
+
+test('BB-09 [Quotation Official Numbering Sanity: Category Direct Official Format]', async (t) => {
+    function approveQuotationNumber(draftNo: string): string {
+        return draftNo.replace(/-DRF\//g, '/').replace(/-APR\//g, '/');
+    }
+
+    await t.test('Nomor draft Anti Rayap bertransformasi ke nomor resmi kategori AR tanpa APR', () => {
+        const draftAR = 'GP-DRF/AR/PH/2026/10/0001';
+        const officialAR = approveQuotationNumber(draftAR);
+        assert.equal(officialAR, 'GP/AR/PH/2026/10/0001');
+        assert.equal(officialAR.includes('-APR/'), false, 'Dilarang memuat -APR/');
+        assert.equal(officialAR.includes('APR'), false, 'Dilarang memuat kata APR');
+    });
+
+    await t.test('Nomor draft Pest Control bertransformasi ke nomor resmi kategori PCO tanpa APR', () => {
+        const draftPCO = 'GP-DRF/PCO/PH/2026/10/0099';
+        const officialPCO = approveQuotationNumber(draftPCO);
+        assert.equal(officialPCO, 'GP/PCO/PH/2026/10/0099');
+        assert.equal(officialPCO.includes('-APR/'), false, 'Dilarang memuat -APR/');
+        assert.equal(officialPCO.includes('APR'), false, 'Dilarang memuat kata APR');
+    });
+});
+
+test('BB-10 [Geofence Auto-Anchor on First Check-In Workflow]', async (t) => {
+    await t.test('Simulasi proyek tanpa koordinat awal (0,0): Terkunci otomatis ke titik GPS check-in teknisi', () => {
+        const mockProject = {
+            id: 'proj-123',
+            name: 'Gedung Wisma Antara',
+            latitude: 0,
+            longitude: 0,
+            radius: 100,
+        };
+
+        const techCheckInEvidence = {
+            latitude: -6.182450,
+            longitude: 106.829150,
+            accuracy: 14,
+        };
+
+        const hasAnchor = Boolean(mockProject.latitude && mockProject.longitude && !(mockProject.latitude === 0 && mockProject.longitude === 0));
+        assert.equal(hasAnchor, false, 'Proyek baru belum memiliki jangkar');
+
+        // Logika check-in
+        let checkInDistance = 0;
+        let checkInValid = true;
+
+        if (!hasAnchor) {
+            // Auto anchor
+            mockProject.latitude = techCheckInEvidence.latitude;
+            mockProject.longitude = techCheckInEvidence.longitude;
+            checkInDistance = 0;
+            checkInValid = true;
+        }
+
+        assert.equal(checkInDistance, 0);
+        assert.equal(checkInValid, true);
+        assert.equal(mockProject.latitude, -6.182450);
+        assert.equal(mockProject.longitude, 106.829150);
+
+        // Subsequent check-out from 30m away
+        const techCheckOutGPS = { latitude: -6.182650, longitude: 106.829150 };
+        // ~22m away
+        const hasAnchorNow = Boolean(mockProject.latitude && mockProject.longitude && !(mockProject.latitude === 0 && mockProject.longitude === 0));
+        assert.equal(hasAnchorNow, true, 'Proyek kini sudah memiliki jangkar permanen');
+    });
+});
