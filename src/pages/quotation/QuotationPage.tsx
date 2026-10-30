@@ -189,7 +189,7 @@ export function QuotationPage() {
         const dateStr = new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="130" viewBox="0 0 420 130">
             <rect width="416" height="126" x="2" y="2" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" stroke-dasharray="6,4"/>
-            <text x="20" y="28" font-family="monospace" font-size="10" font-weight="bold" fill="#15803d">BUKTI APPROVAL INTERNAL FIELDWORK (NON-DOWNLOAD)</text>
+            <text x="20" y="28" font-family="monospace" font-size="10" font-weight="bold" fill="#15803d">BUKTI APPROVAL INTERNAL VERLIE (NON-DOWNLOAD)</text>
             <path d="M35 82 C 75 38, 115 95, 160 54 C 195 25, 225 88, 275 48 C 305 32, 340 68, 380 45" fill="none" stroke="#1a5c38" stroke-width="3.2" stroke-linecap="round"/>
             <text x="20" y="102" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0f172a">${signerName.replace(/[<>&"']/g, "")} (${signerRole})</text>
             <text x="20" y="118" font-family="monospace" font-size="10" fill="#475569">Disetujui: ${dateStr} WIB</text>

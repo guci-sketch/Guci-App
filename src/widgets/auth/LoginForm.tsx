@@ -137,13 +137,13 @@ export function LoginPage() {
     return (
         <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-[var(--accent-glow)]">
             <div className="w-full max-w-[400px] mx-auto space-y-4">
-                {/* FieldWork Brand Wordmark */}
+                {/* Verlie Brand Wordmark */}
                 <div className="text-center space-y-1">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[var(--accent)] text-[11px] font-bold">
                         <ShieldCheck size={13} /> Sistem Operasional &amp; Penawaran Terpadu
                     </div>
                     <h1 className="font-sans text-2xl sm:text-3xl font-black tracking-tight text-[#2d2a26] select-none pt-1">
-                        Field<span className="text-[var(--accent)]">Work</span>
+                        Ver<span className="text-[var(--accent)]">lie</span>
                     </h1>
                     <p className="text-xs text-[#5a554f]">
                         Penawaran Harga, Garansi Rayap, Stok Gudang &amp; Laporan Teknisi
@@ -214,7 +214,7 @@ export function LoginPage() {
                                 </>
                             ) : (
                                 <>
-                                    Masuk ke FieldWork <ArrowRight size={15} />
+                                    Masuk ke Verlie <ArrowRight size={15} />
                                 </>
                             )}
                         </button>
@@ -263,7 +263,7 @@ export function LoginPage() {
                 </div>
 
                 <p className="text-center text-[11px] text-[#8a8580]">
-                    &copy; {new Date().getFullYear()} FieldWork App. All rights reserved.
+                    &copy; {new Date().getFullYear()} Verlie App. All rights reserved.
                 </p>
             </div>
         </div>

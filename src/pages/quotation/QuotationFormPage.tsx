@@ -685,7 +685,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
                             Input Hasil Survey & Automation Quotation
                         </h2>
                         <p className="text-xs text-[var(--text-muted)]">
-                            FieldWork — Alur Draft Survey <span className="font-mono font-bold text-amber-700">GP-DRF/...</span> → Approved Resmi <span className="font-mono font-bold text-emerald-700">GP/...</span>
+                            Verlie — Alur Draft Survey <span className="font-mono font-bold text-amber-700">GP-DRF/...</span> → Approved Resmi <span className="font-mono font-bold text-emerald-700">GP/...</span>
                         </p>
                     </div>
                 </div>

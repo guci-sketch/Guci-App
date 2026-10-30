@@ -993,7 +993,7 @@ export const AdminDashboard: React.FC = () => {
       sidebarHeader={
         <div>
           <h2 className="text-xs font-black tracking-tight text-[var(--text-primary)] leading-tight mb-0.5">
-            Field<span className="text-[var(--accent-text)]">Work</span>
+            Ver<span className="text-[var(--accent-text)]">lie</span>
           </h2>
           <p className="text-[11px] text-[var(--text-muted)]">
             {new Date().toLocaleDateString('id-ID', {

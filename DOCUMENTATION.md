@@ -1,4 +1,4 @@
-# Dokumentasi Fungsional — FieldWork App V2
+# Dokumentasi Fungsional — Verlie Platform
 
 Dokumen ini memuat panduan fungsional fitur utama dalam sistem yang dapat digunakan oleh pengguna tanpa memaparkan data sensitif terkait kredensial maupun rahasia koneksi basis data.
 
@@ -177,4 +177,4 @@ Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
 - **Pengelolaan Eksklusif Internal:** Data kontak ini disimpan murni untuk kebutuhan pengelolaan dan pelacakan internal oleh Direktur dan Admin (terintegrasi langsung pada modul Tracking pesanan & termin pembayaran), bukan untuk pengiriman otomatis pesan penawaran komersial via WhatsApp.
 
 ---
-*Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*
+*Dokumentasi Sistem — Diperbarui pada rilis Verlie Platform (Phase 7).*

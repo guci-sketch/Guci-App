@@ -27,11 +27,11 @@ export function FieldLayout() {
             <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between shadow-2xs">
                 <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-black text-xs tracking-tight shadow-xs">
-                        FW
+                        VL
                     </div>
                     <div>
                         <h1 className="text-sm font-bold text-[var(--text-primary)] leading-tight tracking-tight">
-                            FieldWork
+                            Verlie
                         </h1>
                         <p className="text-[10px] text-[var(--text-muted)] font-medium">
                             Teknisi Lapangan

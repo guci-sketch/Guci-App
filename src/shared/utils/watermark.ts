@@ -152,7 +152,7 @@ export function applyWatermarkToCanvas(
   ctx.textAlign = 'right';
   ctx.fillStyle = '#64748b';
   ctx.font = `500 ${11 * scale}px monospace`;
-  ctx.fillText('FIELDWORK SECURE TAMPER-EVIDENT EVIDENCE', boxX + boxWidth - 16 * scale, boxY + 152 * scale);
+  ctx.fillText('VERLIE SECURE TAMPER-EVIDENT EVIDENCE', boxX + boxWidth - 16 * scale, boxY + 152 * scale);
 
   return canvas;
 }
