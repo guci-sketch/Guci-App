@@ -78,7 +78,7 @@ function ARTerminSection({
                 <div className="flex items-center justify-between mb-3">
                     <div>
                         <p className="text-sm font-bold text-slate-800">Termin 1 — DP</p>
-                        <p className="text-xs text-slate-500">{Math.round(termin.nominalDP / total * 100)}% dari total kontrak</p>
+                        <p className="text-xs text-slate-500">{total > 0 ? Math.round(termin.nominalDP / total * 100) : 0}% dari total kontrak</p>
                     </div>
                     <p className="text-base font-bold text-slate-800 font-mono">{fmtIDR(termin.nominalDP)}</p>
                 </div>
@@ -118,7 +118,7 @@ function ARTerminSection({
                 <div className="flex items-center justify-between mb-3">
                     <div>
                         <p className="text-sm font-bold text-slate-800">Termin 2 — Pelunasan</p>
-                        <p className="text-xs text-slate-500">Sisa {Math.round(termin.nominalPelunasan / total * 100)}% setelah pekerjaan selesai</p>
+                        <p className="text-xs text-slate-500">Sisa {total > 0 ? Math.round(termin.nominalPelunasan / total * 100) : 0}% setelah pekerjaan selesai</p>
                     </div>
                     <p className="text-base font-bold text-slate-800 font-mono">{fmtIDR(termin.nominalPelunasan)}</p>
                 </div>

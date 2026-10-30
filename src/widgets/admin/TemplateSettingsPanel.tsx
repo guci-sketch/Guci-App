@@ -52,7 +52,7 @@ const PEST_HELP = `Sintaks: "# Judul" · "#_ Judul bergaris bawah" · "## Sub-ju
 export function TemplateSettingsPanel() {
   const { user } = useAuth();
   const activeCompanyId = useAuthStore(s => s.activeCompanyId);
-  const companyId = (user?.role === 'MASTER_SUPER_ADMIN' || (user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN')) ? activeCompanyId : user?.companyId ?? null;
+  const companyId = (user?.role === 'MASTER_SUPER_ADMIN' || user?.role === 'SUPERADMIN') ? activeCompanyId : user?.companyId ?? null;
 
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(false);

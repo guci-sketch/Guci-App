@@ -1,5 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import React, { useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -35,64 +34,6 @@ interface MapPickerProps {
   className?: string;
 }
 
-function MapResizer() {
-  const map = useMap();
-  useEffect(() => {
-    const safeInvalidate = () => {
-      try {
-        if ((map as any)._loaded && (map as any)._mapPane) {
-          map.invalidateSize({ animate: false });
-        }
-      } catch {
-        // ignore if map is unmounting
-      }
-    };
-
-    const timeout = setTimeout(safeInvalidate, 200);
-    const resizeObserver = new ResizeObserver(safeInvalidate);
-
-    const container = map.getContainer();
-    if (container) {
-      resizeObserver.observe(container);
-    }
-
-    return () => {
-      clearTimeout(timeout);
-      resizeObserver.disconnect();
-    };
-  }, [map]);
-  return null;
-}
-
-function MapCenterTracker({ onCenterChanged, readOnly }: { onCenterChanged: (lat: number, lng: number) => void; readOnly: boolean }) {
-  const map = useMapEvents({
-    moveend: () => {
-      if (!readOnly && (map as any)._loaded && (map as any)._mapPane) {
-        const center = map.getCenter();
-        onCenterChanged(center.lat, center.lng);
-      }
-    },
-  });
-  return null;
-}
-
-function MapPanner({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  useEffect(() => {
-    try {
-      if (!(map as any)._loaded || !(map as any)._mapPane) return;
-      const currentCenter = map.getCenter();
-      const distance = map.distance(currentCenter, [lat, lng]);
-      if (distance > 10) {
-        map.setView([lat, lng], 16, { animate: false });
-      }
-    } catch {
-      // ignore if map is unmounted
-    }
-  }, [map, lat, lng]);
-  return null;
-}
-
 export const MapPicker: React.FC<MapPickerProps> = ({
   latitude,
   longitude,
@@ -100,13 +41,96 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   readOnly = false,
   className = 'h-56 w-full rounded-xl overflow-hidden z-10',
 }) => {
-  const center = [latitude || -6.200000, longitude || 106.816666] as [number, number];
+  const safeLat = typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : -6.200000;
+  const safeLng = typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : 106.816666;
 
-  const handleCenterChanged = useCallback((lat: number, lng: number) => {
-    if (onChange) {
-      onChange(lat, lng);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const isInternalMove = useRef(false);
+
+  // Inisialisasi peta Leaflet murni sekali pada saat mount
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.off();
+        mapInstanceRef.current.remove();
+      } catch {
+        // ignore
+      }
+      mapInstanceRef.current = null;
     }
-  }, [onChange]);
+
+    try {
+      const map = L.map(mapContainerRef.current, {
+        center: [safeLat, safeLng],
+        zoom: 15,
+        zoomControl: false,
+        dragging: !readOnly,
+        scrollWheelZoom: true,
+        attributionControl: false,
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
+      });
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap',
+      }).addTo(map);
+
+      if (!readOnly && onChange) {
+        map.on('moveend', () => {
+          if (!isInternalMove.current) {
+            const center = map.getCenter();
+            onChange(center.lat, center.lng);
+          }
+        });
+      }
+
+      mapInstanceRef.current = map;
+
+      // Invalidate size to ensure proper tile layout in modals
+      const t = setTimeout(() => {
+        try {
+          map.invalidateSize({ animate: false });
+        } catch {}
+      }, 150);
+
+      return () => {
+        clearTimeout(t);
+        if (mapInstanceRef.current) {
+          try {
+            mapInstanceRef.current.off();
+            mapInstanceRef.current.remove();
+          } catch {}
+          mapInstanceRef.current = null;
+        }
+      };
+    } catch (e) {
+      console.error('Failed to initialize Leaflet MapPicker:', e);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sinkronisasi view peta saat koordinat berubah dari luar (mis. pilihan alamat autocomplete)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    try {
+      const current = map.getCenter();
+      const distance = map.distance(current, [safeLat, safeLng]);
+      if (distance > 10) {
+        isInternalMove.current = true;
+        map.setView([safeLat, safeLng], 16, { animate: false });
+        setTimeout(() => {
+          isInternalMove.current = false;
+        }, 60);
+      }
+    } catch {}
+  }, [safeLat, safeLng]);
 
   const handleGetMyLocation = useCallback(() => {
     if (!navigator.geolocation || readOnly) return;
@@ -122,24 +146,12 @@ export const MapPicker: React.FC<MapPickerProps> = ({
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, [onChange, readOnly]);
+
   return (
     <div className={`relative ${className} bg-slate-100`}>
-      <MapContainer
-        center={center}
-        zoom={15}
-        scrollWheelZoom={true}
-        zoomAnimation={false}
-        fadeAnimation={false}
-        markerZoomAnimation={false}
-        style={{ height: '100%', width: '100%' }}
-        attributionControl={false}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <MapResizer />
-        <MapCenterTracker onCenterChanged={handleCenterChanged} readOnly={readOnly} />
-        <MapPanner lat={latitude || -6.200000} lng={longitude || 106.816666} />
-      </MapContainer>
+      <div ref={mapContainerRef} className="w-full h-full" />
 
+      {/* Center Pin Indicator */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-[400] pb-7">
         <MapPin
           size={30}
@@ -161,7 +173,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
             <span className="hidden sm:inline text-[11px]">GPS Saya</span>
           </button>
           <div className="absolute bottom-2 left-2 z-[400] bg-slate-900/80 backdrop-blur text-white px-2.5 py-1 rounded-md text-[10px] font-mono pointer-events-none">
-            {latitude.toFixed(6)}, {longitude.toFixed(6)}
+            {safeLat.toFixed(6)}, {safeLng.toFixed(6)}
           </div>
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[400] bg-slate-900/90 backdrop-blur text-white px-3 py-1.5 rounded-full shadow-md text-[10px] font-bold tracking-wide pointer-events-none whitespace-nowrap border border-white/10">
             GESER PETA KE TITIK LOKASI

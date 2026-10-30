@@ -7,7 +7,7 @@ import {
     Shield, Clock, AlertTriangle, CalendarCheck,
     MapPin, ClipboardCheck, Phone, Building2, Wrench,
     Navigation, ExternalLink, Eye, AlertCircle, CheckSquare,
-    Edit3, Crosshair, Compass, Map,
+    Edit3, Crosshair, Compass, Map as MapIcon,
 } from "lucide-react";
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from '@/shared/lib/firebase';
 import { db } from '@/shared/lib/firebase';

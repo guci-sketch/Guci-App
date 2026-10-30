@@ -120,6 +120,8 @@ export function QuotationPage() {
             if (!b64) {
                 const full = (await getQuotationById(q.id)) ?? q;
                 const blob = await generateCompanyQuotationPDF({
+                    noSurat: full.noSurat,
+                    tanggal: full.tanggal instanceof Date ? full.tanggal : new Date(full.tanggal),
                     isDraft: !isApproved,
                     isApproved: isApproved,
                     kepadaNama: full.kepadaNama,
@@ -263,8 +265,8 @@ export function QuotationPage() {
                     project_name: `${full.kepadaNama} - ${full.perihal || approvedNoSurat}`,
                     client_name: full.kepadaNama,
                     address: full.lokasiPekerjaan || (full.kepadaAlamatLines || []).join(", ") || "-",
-                    latitude: -6.283812,
-                    longitude: 106.796641,
+                    latitude: (typeof full.latitude === 'number' && Number.isFinite(full.latitude)) ? full.latitude : -6.283812,
+                    longitude: (typeof full.longitude === 'number' && Number.isFinite(full.longitude)) ? full.longitude : 106.796641,
                     radius: 120,
                     work_date: new Date().toISOString().slice(0, 10),
                     work_type: full.perihal || "Layanan Pest / Termite Control",

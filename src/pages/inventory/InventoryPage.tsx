@@ -19,6 +19,7 @@ import { Pagination } from '@/shared/ui/Pagination';
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { isDirectorUser } from '@/shared/lib/roles';
 import { GUCI_WAREHOUSE_CATALOG } from '@/shared/data/warehouseCatalog';
+import type { Quotation } from '@/entities/types';
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 const INVENTORY_PAGE_SIZE = 10;
@@ -150,6 +151,7 @@ function InventoryImportPreviewModal({
         </div>
     );
 }
+type Mutation = { item: InventoryItem; type: "IN" | "OUT"; presetProjectId?: string; presetTipe?: "ESTIMASI" | "REALISASI" } | null;
 type InvTab = "stok" | "proyek" | "rekap" | "log" | "alert";
 
 interface ProjectCostRow {
@@ -211,7 +213,7 @@ export function InventoryPage() {
                 getInventoryItems(companyId),
                 getInventoryLogs(companyId),
                 supabase.from("projects").select("*").eq("company_id", companyId).order("created_at", { ascending: false }),
-                getQuotations({ companyId }).catch(() => []),
+                getQuotations({ companyId }).catch((): Quotation[] => []),
             ]);
             setItems(it);
             setLogs(lg);

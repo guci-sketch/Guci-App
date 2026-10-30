@@ -60,7 +60,9 @@ export const LocationMap: React.FC<LocationMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const hasExecutorLoc = typeof executorLat === 'number' && typeof executorLng === 'number';
+  const hasExecutorLoc = typeof executorLat === 'number' && Number.isFinite(executorLat) && typeof executorLng === 'number' && Number.isFinite(executorLng);
+  const safeProjectLat = typeof projectLat === 'number' && Number.isFinite(projectLat) ? projectLat : -6.200000;
+  const safeProjectLng = typeof projectLng === 'number' && Number.isFinite(projectLng) ? projectLng : 106.816666;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -76,9 +78,13 @@ export const LocationMap: React.FC<LocationMapProps> = ({
       mapInstanceRef.current = null;
     }
 
+    if (mapContainerRef.current) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
+
     try {
-      const centerLat = hasExecutorLoc ? (projectLat + executorLat!) / 2 : projectLat;
-      const centerLng = hasExecutorLoc ? (projectLng + executorLng!) / 2 : projectLng;
+      const centerLat = hasExecutorLoc ? (safeProjectLat + executorLat!) / 2 : safeProjectLat;
+      const centerLng = hasExecutorLoc ? (safeProjectLng + executorLng!) / 2 : safeProjectLng;
 
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
@@ -105,7 +111,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
       }).addTo(map);
 
       const circleColor = isWithinRadius === false ? '#ef4444' : '#10b981';
-      L.circle([projectLat, projectLng], {
+      L.circle([safeProjectLat, safeProjectLng], {
         radius: projectRadius,
         color: circleColor,
         fillColor: circleColor,
@@ -125,7 +131,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
         iconAnchor: [15, 15],
       });
 
-      L.marker([projectLat, projectLng], { icon: projectIcon })
+      L.marker([safeProjectLat, safeProjectLng], { icon: projectIcon })
         .addTo(map)
         .bindPopup(`<b>Titik Proyek:</b> ${projectName}<br/>Radius: ${projectRadius}m`);
 

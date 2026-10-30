@@ -83,10 +83,27 @@ Sesuai arahan operasional manajemen, format penomoran surat dibersihkan dari imb
 
 ---
 
-## 8. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
+## 8. Migrasi MapPicker ke Native Leaflet & Resolusi Defek Lintas Modul
+
+1. **Resolusi Crash `fE is not a constructor`:**
+   * Komponen `src/widgets/common/MapPicker.tsx` dimigrasikan sepenuhnya dari wrapper `react-leaflet` ke **Native Leaflet murni (`import L from 'leaflet'`)**, menyamakan arsitektur yang sudah terbukti stabil pada `LocationMap.tsx` dan `AllProjectsMap.tsx`.
+   * Bundle `vendor-maps` terpangkas 35 kB lebih ringan dan bebas dari konflik ESM / React 19 constructor.
+   * Koordinat yang masuk diproteksi dengan guard numerik `safeLat` & `safeLng` sehingga tidak ada lagi `TypeError toFixed`.
+2. **Penyelesaian Favicon 404:**
+   * Ditambahkan `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />` dan `<link rel="alternate icon" href="/favicon.svg" />` di `index.html`.
+3. **Penyelesaian Celah Rute & Data Safety:**
+   * Rute `/quotations/new` dan `/quotations/:id/edit` dikunci dari akses URL ilegal peran teknisi dan inventori.
+   * Sinkronisasi koordinat riil survey saat approval quotation menggantikan koordinat statis Cilandak.
+   * Format mata uang `formatRupiah` dan tanggal `formatDate` diproteksi dari nilai `NaN` dan invalid string.
+   * Properti `prevDealPct` dipulihkan pada return object `categoryStats` di `PerformaPage`.
+   * Pengecekan akun aktif `isSelf` di `AdminDashboard` diperbaiki menggunakan properti `user.uid`.
+
+---
+
+## 9. Bukti Pengujian & Integritas Sistem (Dimonitor oleh Izumi Gatekeeper)
 
 1. **Vite Production Build:**
-   * Status: **SUCCESS** (2545 modules transformed, 0 error, build in ~63s).
+   * Status: **SUCCESS** (2505 modules transformed, 0 error, build in ~66s).
 2. **Whitebox Unit Tests (`npm run test:whitebox`):**
    * Status: **68 / 68 PASS (100%)**
    * Mencakup **WB-01 s.d. WB-19** (termasuk validasi formula ukuran, SNI 2404, sanitasi PDF, auto-anchor GPS, bulk import multi-sheet validator, jadwal SPK modulo math, default light theme, dan autocomplete rekomendasi alamat).

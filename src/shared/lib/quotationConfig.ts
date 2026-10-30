@@ -95,8 +95,11 @@ export function fmtIDR(amount: number): string {
 /** Zona waktu bisnis untuk seluruh tanggal pada dokumen (bukan zona waktu perangkat/server). */
 export const DOC_TIMEZONE = "Asia/Jakarta";
 
-export function fmtDateID(d: Date): string {
-    return d.toLocaleDateString("id-ID", {
+export function fmtDateID(d?: Date | string | null): string {
+    if (!d) return "-";
+    const dateObj = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(dateObj.getTime())) return "-";
+    return dateObj.toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",

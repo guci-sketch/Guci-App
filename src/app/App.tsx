@@ -70,8 +70,8 @@ export default function App() {
                 <Routes>
                     <Route path="/login" element={<AuthRoute component={LoginForm} />} />
                     <Route path="/signup" element={<AuthRoute component={SignupPage} />} />
-                    <Route path="/quotations/new" element={<ProtectedPage disallowRoles={['SUPERADMIN']}><QuotationFormPage /></ProtectedPage>} />
-                    <Route path="/quotations/:id/edit" element={<ProtectedPage><QuotationEditPage /></ProtectedPage>} />
+                    <Route path="/quotations/new" element={<ProtectedPage disallowRoles={['SUPERADMIN', 'TEKNISI_LAPANGAN', 'INVENTORY']}><QuotationFormPage /></ProtectedPage>} />
+                    <Route path="/quotations/:id/edit" element={<ProtectedPage disallowRoles={['TEKNISI_LAPANGAN', 'INVENTORY']}><QuotationEditPage /></ProtectedPage>} />
                     <Route path="/*" element={<Shell />} />
                 </Routes>
             </AuthProvider>

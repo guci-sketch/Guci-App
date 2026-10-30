@@ -5,16 +5,17 @@ import { supabase } from '@/shared/lib/supabase';
 import type { SPK } from '@/entities/types';
 
 function toSPK(data: any): SPK {
+    const p = data.payload || {};
     return {
         id: data.id,
-        ...data.payload,
+        ...p,
         companyId: data.company_id,
         status: data.status,
         technicianId: data.technician_id,
         scheduleDate: new Date(data.schedule_date),
         createdAt: new Date(data.created_at),
-        actualStart: data.payload.actualStart ? new Date(data.payload.actualStart) : undefined,
-        actualEnd: data.payload.actualEnd ? new Date(data.payload.actualEnd) : undefined,
+        actualStart: p.actualStart ? new Date(p.actualStart) : undefined,
+        actualEnd: p.actualEnd ? new Date(p.actualEnd) : undefined,
     };
 }
 

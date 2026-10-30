@@ -2045,14 +2045,6 @@ export const AdminDashboard: React.FC = () => {
 
               {activeTab === 'audit' && (
                 <div className="clean-card bg-[var(--bg-card)] rounded-xl border border-[var(--border-subtle)] overflow-hidden p-4">
-                  <div className="mb-6 rounded-xl overflow-hidden border border-[var(--border-subtle)] shadow-sm">
-                    <AllProjectsMap
-                      projects={projects.filter(p => !p.lockedAt)}
-                      userLocations={userLocations}
-                      height="400px"
-                    />
-                  </div>
-
                   <h3 className="font-bold text-sm text-[var(--text-primary)] mb-3">
                     Histori &amp; Rekam Jejak Audit Sistem
                   </h3>
@@ -2314,7 +2306,7 @@ export const AdminDashboard: React.FC = () => {
                             return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.nip || '').toLowerCase().includes(q);
                           })
                           .map(u => {
-                            const isSelf = u.id === user?.id;
+                            const isSelf = u.id === user?.uid || u.id === (user as any)?.id;
                             const isTargetAdmin = u.role === 'ADMIN';
                             const cannotManage = !isDirector && isTargetAdmin;
 
