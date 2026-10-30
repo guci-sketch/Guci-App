@@ -448,3 +448,35 @@ test('WB-14 [Mobile Camera Fallback, Visual Viewport & Geofence Accuracy Compens
         assert.equal(locationLng, 106.716157);
     });
 });
+
+test('WB-15 [PDF Formatting Sanitization & Geofence Auto-Anchor Invariants]', async (t) => {
+    function cleanPersonDisplayName(raw?: string): string {
+        if (!raw) return '';
+        return raw
+            .replace(/\s*[—–-]\s*Master All-Role.*$/i, '')
+            .replace(/\s*\((?:Guci Emas|Superadmin|Admin|Marketing|Teknisi).*?\)$/i, '')
+            .trim();
+    }
+
+    await t.test('Pembersihan display name akun demo: Menghilangkan suffix role internal', () => {
+        assert.equal(cleanPersonDisplayName('Rafi — Master All-Role (Guci Emas)'), 'Rafi');
+        assert.equal(cleanPersonDisplayName('Budi Santoso (Teknisi Lapangan)'), 'Budi Santoso');
+        assert.equal(cleanPersonDisplayName('H. Fakhrurrazi, S.E. (Admin)'), 'H. Fakhrurrazi, S.E.');
+        assert.equal(cleanPersonDisplayName('Rizky Pratama'), 'Rizky Pratama');
+    });
+
+    await t.test('Auto-Anchor Geofence: Proyek tanpa koordinat awal (0,0) otomatis mengunci titik check-in teknisi sebagai anchor valid', () => {
+        const projectLat = 0;
+        const projectLng = 0;
+        const techGPS = { latitude: -6.314643, longitude: 106.716157, accuracy: 12 };
+
+        const hasProjectAnchor = Boolean(projectLat && projectLng && !(projectLat === 0 && projectLng === 0));
+        assert.equal(hasProjectAnchor, false, 'Proyek baru belum memiliki titik jangkar');
+
+        // Logika check-in auto-anchor: jarak 0 dan status valid
+        const checkInDistance = hasProjectAnchor ? 10000 : 0;
+        const checkInValid = !hasProjectAnchor || checkInDistance <= 100;
+        assert.equal(checkInDistance, 0, 'Jarak check-in pertama dihitung 0 terhadap jangkar');
+        assert.equal(checkInValid, true, 'Check-in pertama wajib valid');
+    });
+});

@@ -94,7 +94,19 @@ const BODY = 10;
 const LH = 5;
 
 type FontStyle = 'normal' | 'bold' | 'italic' | 'bolditalic';
-interface Tok { w: string; st: FontStyle; u: boolean; sp: boolean }
+interface Tok { w: string; st: FontStyle; u: boolean; sp: boolean; br?: boolean }
+
+function stripRichTags(src: string): string {
+    return src.replace(/<\/?[biu]>/g, '');
+}
+
+function cleanPersonDisplayName(raw?: string): string {
+    if (!raw) return '';
+    return raw
+        .replace(/\s*[—–-]\s*Master All-Role.*$/i, '')
+        .replace(/\s*\((?:Guci Emas|Superadmin|Admin|Marketing|Teknisi).*?\)$/i, '')
+        .trim();
+}
 
 function tokenize(src: string): Tok[] {
     const out: Tok[] = [];
@@ -104,9 +116,14 @@ function tokenize(src: string): Tok[] {
         else if (part === '<i>') i = true; else if (part === '</i>') i = false;
         else if (part === '<u>') u = true; else if (part === '</u>') u = false;
         else if (part) {
-            for (const piece of part.split(/(\s+)/)) {
+            for (const piece of part.split(/(\r?\n|[ \t]+)/)) {
                 if (!piece) continue;
-                if (/^\s+$/.test(piece)) { space = true; continue; }
+                if (/^\r?\n$/.test(piece)) {
+                    out.push({ w: '', st: 'normal', u: false, sp: false, br: true });
+                    space = false;
+                    continue;
+                }
+                if (/^[ \t]+$/.test(piece)) { space = true; continue; }
                 out.push({ w: piece, st: b && i ? 'bolditalic' : b ? 'bold' : i ? 'italic' : 'normal', u, sp: space });
                 space = false;
             }
@@ -199,13 +216,18 @@ class Renderer {
         const lines: { toks: Tok[]; ws: number[]; width: number }[] = [];
         let cur: { toks: Tok[]; ws: number[]; width: number } = { toks: [], ws: [], width: 0 };
         for (const t of toks) {
+            if (t.br) {
+                lines.push(cur);
+                cur = { toks: [], ws: [], width: 0 };
+                continue;
+            }
             const w = wOf(t);
             const add = (cur.toks.length && t.sp ? sw : 0) + w;
             if (cur.toks.length && cur.width + add > W) { lines.push(cur); cur = { toks: [], ws: [], width: 0 }; }
             cur.width += (cur.toks.length && t.sp ? sw : 0) + w;
             cur.toks.push(t); cur.ws.push(w);
         }
-        if (cur.toks.length) lines.push(cur);
+        if (cur.toks.length || lines.length === 0) lines.push(cur);
         if (o.measureOnly) return lines.length;
 
         lines.forEach((ln, li) => {
@@ -227,6 +249,12 @@ class Renderer {
                     doc.line(x, baseline + 0.7, x + ln.ws[k] + (nextU ? sw + extra : 0), baseline + 0.7);
                 }
                 x += ln.ws[k];
+                // Kompensasi italic overhang kerning (+0.65mm) saat transisi ke teks normal/tegak
+                const prevWasItalic = t.st === 'italic' || t.st === 'bolditalic';
+                const nextIsNormal = ln.toks[k + 1] && (ln.toks[k + 1].st === 'normal' || ln.toks[k + 1].st === 'bold');
+                if (prevWasItalic && nextIsNormal) {
+                    x += 0.65;
+                }
             });
             this.y += lh;
         });
@@ -259,17 +287,35 @@ class Renderer {
     }
 
     private kv(rows: [string, string][], o: { labelW?: number; marker?: string; indent?: number; boldAll?: boolean } = {}) {
-        const indent = o.indent ?? 6, lw = o.labelW ?? 24, mk = o.marker ?? '-';
+        const indent = o.indent ?? 6, mk = o.marker ?? '-';
+        const doc = this.doc;
+        doc.setFont('helvetica', o.boldAll ? 'bold' : 'normal');
+        doc.setFontSize(BODY);
+        const maxMeasuredKeyW = rows.length > 0
+            ? Math.max(...rows.map(([k]) => doc.getTextWidth(stripRichTags(k))))
+            : 24;
+        const lw = Math.max(o.labelW ?? 24, Math.min(78, Math.ceil(maxMeasuredKeyW) + 4));
+
         for (const [k, v] of rows) {
             const vx = ML + indent + 5 + lw + 4;
-            const n = this.rich(v, { x: vx, w: PW - MR - vx, measureOnly: true });
+            const nV = this.rich(v, { x: vx, w: PW - MR - vx, measureOnly: true });
+            const nK = this.rich(k, { x: ML + indent + 5, w: lw - 1, base: o.boldAll ? 'bold' : 'normal', measureOnly: true });
+            const n = Math.max(nV, nK);
             this.ensure(n * LH);
             const base = this.y + LH * 0.72;
             this.font(o.boldAll ? 'bold' : 'normal');
             if (mk) this.doc.text(mk, ML + indent, base);
-            this.doc.text(k, ML + indent + 5, base);
+
+            // Render label kiri menggunakan rich text agar tag <i>, <b>, <u> terurai
+            const savedY = this.y;
+            this.rich(k, { x: ML + indent + 5, w: lw - 1, base: o.boldAll ? 'bold' : 'normal', align: 'left' });
+            const afterKeyY = this.y;
+            this.y = savedY;
+
+            this.font(o.boldAll ? 'bold' : 'normal');
             this.doc.text(':', ML + indent + 5 + lw, base);
             this.rich(v, { x: vx, w: PW - MR - vx, base: o.boldAll ? 'bold' : 'normal', align: 'left' });
+            this.y = Math.max(this.y, afterKeyY);
         }
         this.gap(1.5);
     }
@@ -448,7 +494,7 @@ class Renderer {
             } catch { /* lewati */ }
         }
         this.y += sigH;
-        if (d.marketingNama) this.rich(`<b><u>${d.marketingNama}</u></b>`, { align: 'left' });
+        if (d.marketingNama) this.rich(`<b><u>${cleanPersonDisplayName(d.marketingNama)}</u></b>`, { align: 'left' });
     }
 
     // ─── Cover Letter Standar ────────────────────────────────────────────────
@@ -544,7 +590,7 @@ class Renderer {
         }
         if (!isAR && d.pdfVariant !== 'pco_rodent_survey_4p' && d.marketingNama) {
             this.y += sigH;
-            this.rich(`<b><u>${d.marketingNama}</u></b>`, { align: 'left' });
+            this.rich(`<b><u>${cleanPersonDisplayName(d.marketingNama)}</u></b>`, { align: 'left' });
         }
     }
 
@@ -581,7 +627,8 @@ class Renderer {
         if (d.surveyor || d.tanggalSurvey || d.hasilSurvey) {
             this.heading('HASIL SURVEY');
             const rows: [string, string][] = [];
-            if (d.surveyor) rows.push(['Surveyor', d.surveyor]);
+            if (d.tanggalSurvey) rows.push(['Tanggal Survey', fmtDateID(d.tanggalSurvey)]);
+            if (d.surveyor) rows.push(['Surveyor', cleanPersonDisplayName(d.surveyor)]);
             if (d.tanggalSurvey) {
                 rows.push(['Hari/Tanggal', `${title(d.tanggalSurvey.toLocaleDateString('id-ID', { weekday: 'long', timeZone: DOC_TIMEZONE }))} / ${fmtDateID(d.tanggalSurvey)}`]);
             }
@@ -751,13 +798,15 @@ class Renderer {
         this.ensure(34);
         this.heading('PENUTUP');
         this.para('Demikian proposal penawaran harga dan lampiran ini kami sampaikan. Apabila informasi yang kami berikan belum memuaskan, kami siap memberikan presentasi di hadapan Bapak/Ibu. Untuk selanjutnya dapat menghubungi kami :');
-        const contactName = d.surveyor || d.marketingNama || 'Whatsapp Kantor';
+        const rawName = d.surveyor || d.marketingNama || '';
+        const cleanedName = cleanPersonDisplayName(rawName);
+        const contactName = cleanedName || 'Whatsapp Kantor';
         const contactPhone = d.marketingWa || d.kontakWa || COMPANY.wa.replace(/ /g, '-');
         const rows: [string, string][] = [
             ['Kantor', d.kontakKantor ?? COMPANY.telp],
             [d.marketingWa && (d.surveyor || d.marketingNama) ? contactName : 'Whatsapp Kantor', contactPhone],
         ];
-        this.kv(rows, { labelW: 32, marker: '•', boldAll: true });
+        this.kv(rows, { marker: '•', boldAll: true });
         this.para('Atas perhatian dan kerja sama yang diberikan kami ucapkan terima kasih.', { justify: false });
     }
 
@@ -773,7 +822,7 @@ class Renderer {
         if (d.tanggalSurvey) {
             sRows.push(['Hari/Tanggal', `${title(d.tanggalSurvey.toLocaleDateString('id-ID', { weekday: 'long', timeZone: DOC_TIMEZONE }))} / ${fmtDateID(d.tanggalSurvey)}`]);
         }
-        if (d.surveyor) sRows.push(['Surveyor', d.surveyor]);
+        if (d.surveyor) sRows.push(['Surveyor', cleanPersonDisplayName(d.surveyor)]);
         sRows.push(['Hasil Survey', d.hasilSurvey || 'Kami menemukan indikasi kendala tikus.']);
         this.kv(sRows, { labelW: 26, marker: '', indent: 0 });
 

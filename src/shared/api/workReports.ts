@@ -213,17 +213,46 @@ export async function fetchWorkReport(id: string): Promise<WorkReport> {
 
 export async function checkIn(reportId: string, evidence: EvidencePayload): Promise<WorkReport> {
   const current = await fetchWorkReport(reportId);
-  const dist = Math.round(
-    calculateDistanceMeters(evidence.latitude, evidence.longitude, current.projectLatitude, current.projectLongitude)
+
+  // Periksa apakah proyek sudah memiliki titik jangkar koordinat valid
+  const hasProjectAnchor = Boolean(
+    current.projectLatitude &&
+    current.projectLongitude &&
+    !(current.projectLatitude === 0 && current.projectLongitude === 0)
   );
-  const valid = isWithinRadius(
-    evidence.latitude,
-    evidence.longitude,
-    current.projectLatitude,
-    current.projectLongitude,
-    current.projectRadius,
-    evidence.accuracy
-  );
+
+  let dist = 0;
+  let valid = true;
+
+  if (hasProjectAnchor) {
+    dist = Math.round(
+      calculateDistanceMeters(evidence.latitude, evidence.longitude, current.projectLatitude, current.projectLongitude)
+    );
+    valid = isWithinRadius(
+      evidence.latitude,
+      evidence.longitude,
+      current.projectLatitude,
+      current.projectLongitude,
+      current.projectRadius,
+      evidence.accuracy
+    );
+  } else {
+    // Proyek belum memiliki koordinat (mis. dibuat dari SPK tanpa pin peta):
+    // Titik check-in teknisi pertama otomatis ditetapkan sebagai TITIK JANGKAR RESMI proyek!
+    dist = 0;
+    valid = true;
+    if (current.projectId) {
+      await supabase
+        .from('projects')
+        .update({
+          latitude: evidence.latitude,
+          longitude: evidence.longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', current.projectId);
+    }
+  }
+
   const nowIso = evidence.capturedAt || new Date().toISOString();
   const dataUrl = await blobToDataUrl(evidence.photoBlob);
 
@@ -263,14 +292,22 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
 
 export async function addProgressPhoto(reportId: string, evidence: EvidencePayload): Promise<WorkReport> {
   const current = await fetchWorkReport(reportId);
+  const hasAnchor = Boolean(
+    current.projectLatitude &&
+    current.projectLongitude &&
+    !(current.projectLatitude === 0 && current.projectLongitude === 0)
+  );
+  const targetLat = hasAnchor ? current.projectLatitude : (current.checkInLatitude ?? evidence.latitude);
+  const targetLng = hasAnchor ? current.projectLongitude : (current.checkInLongitude ?? evidence.longitude);
+
   const dist = Math.round(
-    calculateDistanceMeters(evidence.latitude, evidence.longitude, current.projectLatitude, current.projectLongitude)
+    calculateDistanceMeters(evidence.latitude, evidence.longitude, targetLat, targetLng)
   );
   const valid = isWithinRadius(
     evidence.latitude,
     evidence.longitude,
-    current.projectLatitude,
-    current.projectLongitude,
+    targetLat,
+    targetLng,
     current.projectRadius,
     evidence.accuracy
   );
@@ -297,14 +334,22 @@ export async function addProgressPhoto(reportId: string, evidence: EvidencePaylo
 
 export async function checkOut(reportId: string, evidence: EvidencePayload): Promise<WorkReport> {
   const current = await fetchWorkReport(reportId);
+  const hasAnchor = Boolean(
+    current.projectLatitude &&
+    current.projectLongitude &&
+    !(current.projectLatitude === 0 && current.projectLongitude === 0)
+  );
+  const targetLat = hasAnchor ? current.projectLatitude : (current.checkInLatitude ?? evidence.latitude);
+  const targetLng = hasAnchor ? current.projectLongitude : (current.checkInLongitude ?? evidence.longitude);
+
   const dist = Math.round(
-    calculateDistanceMeters(evidence.latitude, evidence.longitude, current.projectLatitude, current.projectLongitude)
+    calculateDistanceMeters(evidence.latitude, evidence.longitude, targetLat, targetLng)
   );
   const valid = isWithinRadius(
     evidence.latitude,
     evidence.longitude,
-    current.projectLatitude,
-    current.projectLongitude,
+    targetLat,
+    targetLng,
     current.projectRadius,
     evidence.accuracy
   );

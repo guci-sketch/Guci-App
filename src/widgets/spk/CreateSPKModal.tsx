@@ -7,6 +7,7 @@ import { db } from '@/shared/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
 import { createSPK } from '@/shared/api/spkService';
 import { createProject } from '@/shared/api/projects';
+import { geocodeAddress } from '@/shared/utils/geocoding';
 import { warrantyToTotalMonths } from '@/shared/lib/warrantyPricingEngine';
 import { formatRupiah, cn, formatDate as fmt } from '@/shared/lib/utils';
 import type { Quotation, AppUser } from '@/entities/types';
@@ -153,10 +154,27 @@ export function CreateSPKModal({
 
             // Jembatan otomatis ke sistem Fieldwork Teknisi (tabel projects + work_reports READY)
             try {
+                let initLat = 0;
+                let initLng = 0;
+                if (alamatLengkap && alamatLengkap.length >= 5) {
+                    try {
+                        const geo = await geocodeAddress(alamatLengkap);
+                        if (geo) {
+                            initLat = geo.lat;
+                            initLng = geo.lng;
+                        }
+                    } catch {
+                        // Jika offline / gagal, koordinat 0,0 akan di-anchor otomatis saat teknisi check-in pertama
+                    }
+                }
+
                 await createProject({
                     projectName: `${selectedQuo.kepadaNama} — ${selectedQuo.noSurat}`,
                     clientName: selectedQuo.kepadaNama,
                     address: alamatLengkap || "Lokasi Pelanggan",
+                    latitude: initLat,
+                    longitude: initLng,
+                    radius: 100,
                     workDate: data.scheduleDate,
                     workType: selectedQuo.perihal,
                     serviceType: svcType,

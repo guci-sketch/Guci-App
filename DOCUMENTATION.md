@@ -131,4 +131,20 @@ Format nomor surat diatur secara ketat tanpa kode sementara `APR`:
 - **Saat Disetujui (Approved):** Kode `-DRF` langsung dihilangkan dan langsung mengadopsi kode kategori penawaran, contoh: `GP/AR/PH/YYYY/MM/NNNN` (Anti Rayap) atau `GP/PCO/PH/YYYY/MM/NNNN` (Pest Control).
 
 ---
+
+## 11. Integritas Geofencing Lapangan & Standardisasi Tipografi PDF
+
+1. **Auto-Anchor Geofence Check-In Pertama:**
+   - Proyek yang dibuat dari SPK tanpa koordinat peta tidak lagi terkena penalti anomali (10.500 km). Saat teknisi melakukan check-in pertama di lokasi, titik GPS fisik teknisi otomatis ditetapkan sebagai titik jangkar resmi proyek (`projects.latitude` & `longitude`), jarak dihitung `0m`, dan status geofence langsung valid (`check_in_valid: true`).
+2. **Proteksi Anti-Geser Pin GPS (`CreateProjectModal`):**
+   - Pengetikan alamat jalan tidak lagi memicu auto-geocoding di latar belakang yang dapat menimpa koordinat riil dengan titik tengah kelurahan. Koordinat hanya diperbarui secara manual via tombol *"Posisi GPS Saya"* atau *"Cari dari Alamat"*.
+3. **Optimasi Viewport & Keyboard Virtual (60 FPS):**
+   - Event resize & scroll pada `window.visualViewport` di-throttle menggunakan `requestAnimationFrame` dan delta threshold 3px untuk mengeliminasi *layout thrashing* saat keyboard Android/iOS muncul.
+4. **Pembersihan Tipografi & Layout PDF Penawaran:**
+   - Nama penandatangan/surveyor dibersihkan dari suffix role demo (`cleanPersonDisplayName`).
+   - Kolom label pada bagian PENUTUP dan ringkasan dihitung dinamis (*auto-fit*) untuk mencegah teks bertumpuk.
+   - Tag HTML `<i>` pada kolom label diparsing sebagai huruf miring resmi.
+   - Penambahan kompensasi jarak (*italic overhang kerning* +0.65mm) setelah teks miring dan dukungan pemotongan baris baru eksplisit (`\n`) di dalam sel tabel biaya.
+
+---
 *Dokumentasi Sistem — Diperbarui pada rilis Phase 7 FieldWork V2.*

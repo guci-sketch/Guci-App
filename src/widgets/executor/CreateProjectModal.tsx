@@ -6,7 +6,7 @@ import { ContractType, ServiceType } from '@/entities/types';
 import { MapPicker } from '../common/MapPicker';
 import { CreateProjectInput } from '@/shared/api/projects';
 import { geocodeAddress, reverseGeocode } from '@/shared/utils/geocoding';
-import { useVisualViewportMetrics } from '@/shared/hooks/useVirtualKeyboard';
+import { useVisualViewportMetrics, scrollInputIntoView } from '@/shared/hooks/useVirtualKeyboard';
 interface CreateProjectModalProps {
   onClose: () => void;
   onSubmit: (data: CreateProjectInput) => Promise<void>;
@@ -58,39 +58,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [isMapLocked, setIsMapLocked] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
-  // Prevent geocoding immediately upon unlocking
+  // Koordinat hanya diupdate saat pengguna klik tombol "Posisi GPS Saya", geser pin di peta,
+  // atau klik eksplisit tombol "Cari dari Alamat" — dilarang auto-geocoding di latar belakang
+  // agar koordinat riil teknisi di lapangan tidak tergeser oleh centroid kelurahan OpenStreetMap.
   const prevIsMapLocked = React.useRef(isMapLocked);
-
-  // Debounce for geocoding
-  // JANGAN PERNAH menimpa otomatis jika pengguna sudah memiliki titik GPS atau sudah menggeser pin (isLocationPicked)
-  React.useEffect(() => {
-    let isActive = true;
-    
-    const justUnlocked = prevIsMapLocked.current === true && isMapLocked === false;
-    prevIsMapLocked.current = isMapLocked;
-
-    if (isLocationPicked || isMapLocked || !address || address.length < 5 || justUnlocked) {
-      setIsGeocoding(false);
-      return;
-    }
-    
-    const timer = setTimeout(async () => {
-      setIsGeocoding(true);
-      const coords = await geocodeAddress(address);
-      if (isActive && !isLocationPicked) {
-        if (coords) {
-          setLocationLat(coords.lat);
-          setLocationLng(coords.lng);
-        }
-        setIsGeocoding(false);
-      }
-    }, 1500);
-
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
-  }, [address, isMapLocked, isLocationPicked]);
 
   const handleSearchAddressCoords = async () => {
     if (!address || address.trim().length < 3) {
@@ -245,7 +216,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           maxHeight: viewportHeight ? `${Math.min(viewportHeight, window.innerHeight)}px` : undefined,
           height: isKeyboardOpen && viewportHeight ? `${viewportHeight}px` : undefined,
         }}
-        className="relative w-full max-w-xl bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[95dvh] sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200"
+        className={`relative w-full max-w-xl bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col ${
+          isKeyboardOpen ? 'h-full' : 'h-[95dvh]'
+        } sm:h-auto sm:max-h-[85dvh] overflow-hidden text-[var(--text-primary)] animate-in fade-in zoom-in-95 duration-200`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -420,6 +393,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               onChange={e => {
                 setAddress(e.target.value);
                 if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+              }}
+              onFocus={e => {
+                const target = e.currentTarget;
+                setTimeout(() => scrollInputIntoView(target), 100);
               }}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs resize-none scroll-mt-24 scroll-mb-48"
             />

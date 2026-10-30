@@ -209,11 +209,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
   };
 
+  const hasProjectAnchor = Boolean(projectLat && projectLng && !(projectLat === 0 && projectLng === 0));
   const gpsTolerance = gps.status === 'ready' ? Math.min(Math.max(0, gps.accuracy), 35) : 0;
   const distance = gps.status === 'ready'
-    ? calculateDistanceMeters({ latitude: gps.latitude, longitude: gps.longitude }, { latitude: projectLat, longitude: projectLng })
+    ? (hasProjectAnchor
+        ? calculateDistanceMeters({ latitude: gps.latitude, longitude: gps.longitude }, { latitude: projectLat, longitude: projectLng })
+        : 0)
     : null;
-  const isWithinRadius = distance !== null && distance <= (projectRadius + gpsTolerance);
+  const isWithinRadius = !hasProjectAnchor || (distance !== null && distance <= (projectRadius + gpsTolerance));
 
   const canCapture = camera.status === 'ready' && gps.status === 'ready';
 
@@ -232,14 +235,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       img.src = objectUrl;
       await imgPromise;
 
-      const effectiveLat = gps.status === 'ready' ? gps.latitude : projectLat;
-      const effectiveLng = gps.status === 'ready' ? gps.longitude : projectLng;
+      const effectiveLat = gps.status === 'ready' ? gps.latitude : (hasProjectAnchor ? projectLat : -6.200000);
+      const effectiveLng = gps.status === 'ready' ? gps.longitude : (hasProjectAnchor ? projectLng : 106.816666);
       const effectiveAccuracy = gps.status === 'ready' ? gps.accuracy : 15;
-      const effectiveDistance = gps.status === 'ready'
+      const effectiveDistance = gps.status === 'ready' && hasProjectAnchor
         ? calculateDistanceMeters({ latitude: effectiveLat, longitude: effectiveLng }, { latitude: projectLat, longitude: projectLng })
         : 0;
       const effectiveTolerance = Math.min(Math.max(0, effectiveAccuracy), 35);
-      const withinRad = effectiveDistance <= (projectRadius + effectiveTolerance);
+      const withinRad = !hasProjectAnchor || effectiveDistance <= (projectRadius + effectiveTolerance);
 
       const canvas = applyWatermarkToCanvas(img, {
         projectName,
@@ -365,7 +368,10 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 <div className="flex flex-col sm:flex-row gap-2 w-full">
                   <button
                     type="button"
-                    onClick={() => setRetryCount(r => r + 1)}
+                    onClick={() => {
+                      setCamera({ status: 'starting' });
+                      setRetryCount(r => r + 1);
+                    }}
                     className="flex-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-4 py-2.5 rounded-xl cursor-pointer"
                   >
                     Coba Lagi
@@ -400,7 +406,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   </span>
                   {gps.status === 'locating' && <span className="text-[11px] text-amber-400 animate-pulse shrink-0">Mencari sinyal...</span>}
                   {gps.status === 'ready' &&
-                    (isWithinRadius ? (
+                    (!hasProjectAnchor ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40 shrink-0">
+                        <ShieldCheck size={12} /> Titik Jangkar Baru (Valid)
+                      </span>
+                    ) : isWithinRadius ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40 shrink-0">
                         <ShieldCheck size={12} /> Valid ({formatDistance(distance!)})
                       </span>
@@ -412,7 +422,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 </div>
                 {gps.status === 'ready' && (
                   <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-slate-800/80 pt-1">
-                    <span>Radius Proyek: {projectRadius}m (Toleransi: +{Math.round(gpsTolerance)}m)</span>
+                    <span>
+                      {!hasProjectAnchor
+                        ? 'Jangkar Lokasi Proyek Baru (Otomatis Dikunci saat Check-In)'
+                        : `Radius Proyek: ${projectRadius}m (Toleransi: +${Math.round(gpsTolerance)}m)`}
+                    </span>
                     <span className="flex items-center gap-1">
                       <span>Akurasi GPS: ±{Math.round(gps.accuracy)}m</span>
                       <button type="button" onClick={requestGps} className="pointer-events-auto text-[10px] text-sky-300 hover:text-sky-200 underline ml-1 cursor-pointer">
@@ -450,8 +464,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               <div className="absolute inset-0 z-50 flex flex-col bg-slate-950 p-4">
                 <div className="flex-1 rounded-xl overflow-hidden relative border border-slate-700">
                   <MapPicker 
-                    latitude={projectLat} 
-                    longitude={projectLng} 
+                    latitude={hasProjectAnchor ? projectLat : -6.200000} 
+                    longitude={hasProjectAnchor ? projectLng : 106.816666} 
                     onChange={(lat, lng) => {
                       // Silently update the GPS state to ready using the map's pinned location
                       setGps({ status: 'ready', latitude: lat, longitude: lng, accuracy: 50 });

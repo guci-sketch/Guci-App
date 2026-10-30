@@ -56,25 +56,34 @@ export function useVisualViewportMetrics(): VisualViewportMetrics {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const updateMetrics = () => {
-            const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const offset = window.innerHeight - vh;
-            const isKb = vh < window.innerHeight * 0.8;
-            setMetrics({
-                isKeyboardOpen: isKb,
-                viewportHeight: vh,
-                keyboardOffsetBottom: Math.max(0, offset),
-            });
+        let rafId: number | null = null;
+        let lastVh = 0;
 
-            // Jika keyboard terbuka dan ada elemen input aktif, posisikan di atas keyboard
-            if (isKb && document.activeElement) {
-                const el = document.activeElement as HTMLElement;
-                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
-                    setTimeout(() => {
-                        scrollInputIntoView(el);
-                    }, 120);
+        const updateMetrics = () => {
+            if (rafId !== null) return;
+            rafId = window.requestAnimationFrame(() => {
+                rafId = null;
+                const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                if (Math.abs(vh - lastVh) < 3 && lastVh > 0) return;
+                lastVh = vh;
+                const offset = window.innerHeight - vh;
+                const isKb = vh < window.innerHeight * 0.8;
+                setMetrics({
+                    isKeyboardOpen: isKb,
+                    viewportHeight: vh,
+                    keyboardOffsetBottom: Math.max(0, offset),
+                });
+
+                // Jika keyboard terbuka dan ada elemen input aktif, posisikan di atas keyboard
+                if (isKb && document.activeElement) {
+                    const el = document.activeElement as HTMLElement;
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                        setTimeout(() => {
+                            scrollInputIntoView(el);
+                        }, 80);
+                    }
                 }
-            }
+            });
         };
 
         const viewport = window.visualViewport;
@@ -91,13 +100,14 @@ export function useVisualViewportMetrics(): VisualViewportMetrics {
             if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
                 setTimeout(() => {
                     scrollInputIntoView(target);
-                }, 220);
+                }, 150);
             }
         };
 
         document.addEventListener('focusin', handleFocusIn);
 
         return () => {
+            if (rafId !== null) cancelAnimationFrame(rafId);
             if (viewport) {
                 viewport.removeEventListener('resize', updateMetrics);
                 viewport.removeEventListener('scroll', updateMetrics);
