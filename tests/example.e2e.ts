@@ -1,9 +1,9 @@
 import { test } from '@e2e-dev/web';
 import { expect } from 'e2e';
 
-test('Memuat halaman utama Verlie Enterprise dan verifikasi judul', async ({ app, screen }) => {
+test('Memuat halaman utama Fieldwork Enterprise dan verifikasi judul', async ({ app, screen }) => {
   await app.open('/');
-  await expect(screen.getByRole('heading', { name: 'Verlie Enterprise' })).toBeVisible();
+  await expect(screen.getByRole('heading', { name: 'Fieldwork Enterprise' })).toBeVisible();
 });
 
 test('Verifikasi role switcher dan tab navigasi Barventis', async ({ screen }) => {

@@ -1,9 +1,12 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { SignJWT, generateKeyPair, exportJWK } from 'jose';
 // Jalankan terhadap database KOSONG hasil `npm run db:migrate` + `npm run db:seed`:
 //   DATABASE_URL=... DB_SSL=false CRON_SECRET=rahasia-cron npm run test:integration
 const ROOT = process.env.ROOT ?? process.cwd();
+const toUrl = (p: string) => pathToFileURL(path.resolve(ROOT, p)).href;
 
 // ── Supabase tiruan (Auth Admin API + JWKS) — kode produksi memakai klien supabase-js yang asli ──
 const SECRET = 'test-supabase-jwt-secret-0123456789abcdef';
@@ -33,8 +36,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'svc-test-key';
 process.env.SUPABASE_JWT_SECRET = SECRET;
 process.env.STORAGE_DRIVER = 'local';
 
-const { createApp } = await import(`${ROOT}/backend-src/app.ts`);
-const { query } = await import(`${ROOT}/backend-src/db/pool.ts`);
+const { createApp } = await import(toUrl('backend-src/app.ts'));
+const { query } = await import(toUrl('backend-src/db/pool.ts'));
 
 const enc = new TextEncoder().encode(SECRET);
 const sign = (sub: string, o: { exp?: string; secret?: Uint8Array; extra?: Record<string, unknown> } = {}) =>

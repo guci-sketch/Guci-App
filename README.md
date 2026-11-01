@@ -1,8 +1,8 @@
-# Verlie — Operational & Commercial Management Platform
+# Fieldwork — Operational & Commercial Management Platform
 
 Sistem Terpadu Manajemen Inventaris, Pemantauan Operasional Lapangan (Presensi GPS & Anomali), dan Eksekusi *Pest Control* (Pengendalian Hama Terpadu & Anti Rayap) yang dirancang khusus untuk sektor B2B komersial.
 
-Verlie dibangun menggunakan **React 19 + Vite 6** dengan antarmuka modern yang mengadopsi standar **Feature-Sliced Design (FSD)**. Aplikasi ini didukung oleh **Node.js (Express)** sebagai backend API dan **Supabase (PostgreSQL)** sebagai penyedia basis data yang terpusat. Dilengkapi dengan kemampuan *Progressive Web App* (PWA) dan sinkronisasi data luring (*offline-queue*), memungkinkan teknisi bekerja penuh di area minim sinyal.
+Fieldwork dibangun menggunakan **React 19 + Vite 6** dengan antarmuka modern yang mengadopsi standar **Feature-Sliced Design (FSD)**. Aplikasi ini didukung oleh **Node.js (Express)** sebagai backend API dan **Supabase (PostgreSQL)** sebagai penyedia basis data yang terpusat. Dilengkapi dengan kemampuan *Progressive Web App* (PWA) dan sinkronisasi data luring (*offline-queue*), memungkinkan teknisi bekerja penuh di area minim sinyal.
 
 ---
 

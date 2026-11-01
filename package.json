@@ -1,9 +1,9 @@
 {
-  "name": "verlie-web",
+  "name": "fieldwork-web",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "VERLIE — Operational & Commercial Management Platform (frontend)",
+  "description": "Fieldwork — Operational & Commercial Management Platform (frontend)",
   "scripts": {
     "dev": "tsx backend-src/server.ts",
     "build": "vite build && esbuild backend-src/server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
