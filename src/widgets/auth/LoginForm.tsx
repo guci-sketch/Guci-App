@@ -5,6 +5,7 @@ import { useAuthStore } from '@/app/store/authStore';
 import { AlertCircle, Loader2, Lock, Mail, Eye, EyeOff, ShieldCheck, Sparkles, ArrowRight, UserCheck, KeyRound } from "lucide-react";
 import type { AppUser } from '@/entities/types';
 import { fetchAppUser } from '@/shared/api/authProfile';
+import { readPendingInvite, repairPendingInviteUser } from '@/shared/api/inviteService';
 
 const QUICK_DEMO_ACCOUNTS = [
     {
@@ -77,34 +78,68 @@ export function LoginPage() {
     const performSignIn = async (loginEmail: string, loginPassword: string) => {
         setError("");
         setLoading(true);
+        const cleanEmail = loginEmail.trim().toLowerCase();
 
         try {
             let { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-                email: loginEmail.trim(),
+                email: cleanEmail,
                 password: loginPassword,
             });
 
-            // Jika gagal karena email belum terkonfirmasi, coba auto-confirm lewat server API dan retry
-            if (authErr && (authErr.message.toLowerCase().includes("not confirmed") || authErr.message.toLowerCase().includes("unconfirmed"))) {
-                try {
-                    const confirmRes = await fetch("/api/auth/auto-confirm-email", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: loginEmail.trim() }),
-                    });
-                    const confirmData = await confirmRes.json();
-                    if (confirmData.success) {
-                        const retry = await supabase.auth.signInWithPassword({
-                            email: loginEmail.trim(),
-                            password: loginPassword,
+            // Jika login ditolak (HTTP 400: Email not confirmed / akun undangan sempat tertahan),
+            // jalankan auto-repair via RPC Supabase terlebih dahulu lalu coba login kembali
+            if (authErr) {
+                const pending = readPendingInvite();
+                const repairedViaRpc = await repairPendingInviteUser(
+                    cleanEmail,
+                    pending?.token,
+                    pending?.name
+                );
+
+                let repairedViaApi = false;
+                if (!repairedViaRpc) {
+                    try {
+                        const confirmRes = await fetch("/api/auth/auto-confirm-email", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                email: cleanEmail,
+                                token: pending?.token,
+                                name: pending?.name,
+                            }),
                         });
-                        authData = retry.data;
-                        authErr = retry.error;
+                        const rawText = await confirmRes.text();
+                        const confirmData = rawText ? JSON.parse(rawText) : null;
+                        repairedViaApi = Boolean(confirmData?.success);
+                    } catch {
+                        /* abaikan jika API backend tidak aktif */
                     }
-                } catch { /* abaikan error fallback */ }
+                }
+
+                if (repairedViaRpc || repairedViaApi) {
+                    const retry = await supabase.auth.signInWithPassword({
+                        email: cleanEmail,
+                        password: loginPassword,
+                    });
+                    authData = retry.data;
+                    authErr = retry.error;
+                }
             }
 
-            if (authErr) throw authErr;
+            if (authErr) {
+                const errLower = authErr.message.toLowerCase();
+                if (errLower.includes("not confirmed") || errLower.includes("unconfirmed")) {
+                    throw new Error(
+                        "Email akun Anda belum terkonfirmasi di Supabase. Jalankan file SQL `06_fix_invite_auth_and_autoconfirm.sql` di Supabase SQL Editor untuk mengaktifkan seluruh akun undangan secara otomatis."
+                    );
+                }
+                if (errLower.includes("invalid login credentials")) {
+                    throw new Error(
+                        "Email atau password salah (atau akun undangan Anda belum diaktifkan di Supabase). Jika baru mendaftar via link undangan, pastikan password sesuai atau jalankan SQL patch `06_fix_invite_auth_and_autoconfirm.sql` di Supabase SQL Editor."
+                    );
+                }
+                throw authErr;
+            }
             if (!authData.user) throw new Error("Login gagal. Silakan coba lagi.");
 
             const res = await fetchAppUser(authData.user.id);
@@ -197,7 +232,7 @@ export function LoginPage() {
                         </div>
 
                         {error && (
-                            <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-xs font-medium">
+                            <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-xs font-medium leading-relaxed">
                                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
                                 <span>{error}</span>
                             </div>

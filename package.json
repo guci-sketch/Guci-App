@@ -6,7 +6,7 @@
   "description": "Fieldwork — Operational & Commercial Management Platform (frontend)",
   "scripts": {
     "dev": "tsx backend-src/server.ts",
-    "build": "vite build && esbuild backend-src/server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild backend-src/server.ts --bundle --platform=node --format=cjs --external:pg --external:pg-native --external:express --external:helmet --external:express-rate-limit --external:multer --external:dotenv --external:@supabase/supabase-js --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",

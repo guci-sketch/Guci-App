@@ -98,74 +98,176 @@ export async function revokeInvite(token: string): Promise<void> {
 
 /**
  * Memvalidasi token undangan (boleh dipanggil TANPA login — dipakai halaman daftar `/signup`).
+ * Memprioritaskan Supabase RPC `get_invite_public` secara langsung agar tidak memicu error 500 di console
+ * ketika backend serverless tidak mengonfigurasi DATABASE_URL.
  */
 export async function getInviteByToken(token: string): Promise<Invite | null> {
-    const cleanToken = token.trim();
+    const cleanToken = token.trim().replace(/^["']|["']$/g, '');
     if (!cleanToken) return null;
 
-    // 1. Coba verifikasi melalui backend API server
+    // 1. Utamakan via Supabase RPC get_invite_public (SECURITY DEFINER, cepat & bebas error 500)
     try {
-        const res = await fetch(`/api/auth/invite/${encodeURIComponent(cleanToken)}`);
-        if (res.ok) {
-            const d = await res.json();
+        const { data, error } = await supabase.rpc('get_invite_public', { p_token: cleanToken });
+        if (!error && data) {
+            const d = data as { token: string; companyId: string; companyName: string; role: InviteRole; expiresAt: string };
             return {
                 id: d.token,
                 companyId: d.companyId,
-                companyName: d.companyName,
-                role: d.role,
+                companyName: d.companyName || 'Perusahaan',
+                role: (d.role || 'TEKNISI_LAPANGAN') as InviteRole,
                 createdBy: '',
                 createdAt: new Date(),
-                expiresAt: new Date(d.expiresAt),
+                expiresAt: d.expiresAt ? new Date(d.expiresAt) : new Date(Date.now() + 7 * 86400000),
                 used: false,
                 usedBy: null,
             };
         }
-        if (res.status === 400 || res.status === 404) {
-            const errData = await res.json().catch(() => null);
-            throw new Error(errData?.message || 'Token undangan tidak valid atau sudah kedaluwarsa.');
-        }
-    } catch (apiErr) {
-        if (apiErr instanceof Error && (apiErr.message.includes('kedaluwarsa') || apiErr.message.includes('sudah') || apiErr.message.includes('tidak ditemukan'))) {
-            throw apiErr;
-        }
-        console.warn('[inviteService] Backend invite verification fallback ke Supabase RPC:', apiErr);
+    } catch (rpcErr) {
+        console.warn('[inviteService] get_invite_public RPC error, mencoba fallback API:', rpcErr);
     }
 
-    // 2. Fallback via Supabase RPC get_invite_public
-    const { data, error } = await supabase.rpc('get_invite_public', { p_token: cleanToken });
-    if (error) throw new Error(error.message);
-    if (!data) return null;
-    const d = data as { token: string; companyId: string; companyName: string; role: InviteRole; expiresAt: string };
-    return {
-        id: d.token,
-        companyId: d.companyId,
-        companyName: d.companyName,
-        role: d.role,
-        createdBy: '',
-        createdAt: new Date(),
-        expiresAt: new Date(d.expiresAt),
-        used: false,
-        usedBy: null,
-    };
+    // 2. Fallback via backend API server jika RPC belum tersedia
+    try {
+        const res = await fetch(`/api/auth/invite/${encodeURIComponent(cleanToken)}`);
+        if (res.ok) {
+            const raw = await res.text();
+            const d = JSON.parse(raw);
+            return {
+                id: d.token,
+                companyId: d.companyId,
+                companyName: d.companyName || 'Perusahaan',
+                role: (d.role || 'TEKNISI_LAPANGAN') as InviteRole,
+                createdBy: '',
+                createdAt: new Date(),
+                expiresAt: d.expiresAt ? new Date(d.expiresAt) : new Date(Date.now() + 7 * 86400000),
+                used: false,
+                usedBy: null,
+            };
+        }
+    } catch {
+        // Abaikan jika endpoint backend tidak aktif
+    }
+
+    return null;
 }
 
 const PENDING_KEY = 'fw_pending_invite_v1';
 
-export function rememberPendingInvite(token: string, name: string, phone?: string) {
-    try { localStorage.setItem(PENDING_KEY, JSON.stringify({ token, name, phone })); } catch { /* abaikan */ }
+export interface PendingInviteRecord {
+    token: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    nip?: string;
 }
-export function readPendingInvite(): { token: string; name: string; phone?: string } | null {
-    try { const v = localStorage.getItem(PENDING_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+
+export function rememberPendingInvite(token: string, name: string, phone?: string, email?: string, nip?: string) {
+    try {
+        localStorage.setItem(
+            PENDING_KEY,
+            JSON.stringify({
+                token: token.trim(),
+                name: name.trim(),
+                phone: phone?.trim() || undefined,
+                email: email?.trim().toLowerCase() || undefined,
+                nip: nip?.trim() || undefined,
+            })
+        );
+    } catch {
+        /* abaikan */
+    }
 }
+
+export function readPendingInvite(): PendingInviteRecord | null {
+    try {
+        const v = localStorage.getItem(PENDING_KEY);
+        return v ? JSON.parse(v) : null;
+    } catch {
+        return null;
+    }
+}
+
 export function clearPendingInvite() {
-    try { localStorage.removeItem(PENDING_KEY); } catch { /* abaikan */ }
+    try {
+        localStorage.removeItem(PENDING_KEY);
+    } catch {
+        /* abaikan */
+    }
+}
+
+/**
+ * Menyelesaikan registrasi undangan sekaligus auto-confirm email di `auth.users`
+ * menggunakan RPC `complete_invite_registration` (atau fallback `accept_invite`).
+ */
+export async function completeInviteRegistration(params: {
+    token: string;
+    email: string;
+    name: string;
+    nip?: string;
+    phone?: string;
+}): Promise<{ ok: boolean; confirmedViaRpc: boolean; message?: string }> {
+    const cleanToken = params.token.trim();
+    const cleanEmail = params.email.trim().toLowerCase();
+    const cleanName = params.name.trim();
+
+    // 1. Coba RPC complete_invite_registration (SECURITY DEFINER: auto-confirm email + upsert public.users + mark invite used)
+    const { data, error } = await supabase.rpc('complete_invite_registration', {
+        p_token: cleanToken,
+        p_email: cleanEmail,
+        p_name: cleanName,
+        p_nip: params.nip?.trim() || null,
+        p_phone: params.phone?.trim() || null,
+    });
+
+    if (!error && data) {
+        clearPendingInvite();
+        return { ok: true, confirmedViaRpc: true };
+    }
+
+    if (error) {
+        const msg = error.message || '';
+        // Jika error bisnis eksplisit (misal token kedaluwarsa / sudah dipakai orang lain), lempar ke pemanggil
+        if (msg.includes('sudah pernah digunakan') || msg.includes('kedaluwarsa') || msg.includes('tidak ditemukan')) {
+            throw new Error(msg);
+        }
+        console.warn('[inviteService] complete_invite_registration belum terpasang atau gagal, mencoba fallback accept_invite:', msg);
+    }
+
+    // 2. Fallback: jika sudah memiliki sesi aktif, panggil accept_invite bawaan
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+        await acceptInvite(cleanToken, cleanName, params.phone);
+        return { ok: true, confirmedViaRpc: false };
+    }
+
+    return { ok: false, confirmedViaRpc: false, message: error?.message };
+}
+
+/**
+ * Memperbaiki akun undangan yang sempat tertahan (email belum terkonfirmasi / belum masuk ke public.users).
+ */
+export async function repairPendingInviteUser(email: string, token?: string, name?: string): Promise<boolean> {
+    try {
+        const { data, error } = await supabase.rpc('repair_pending_invite_user', {
+            p_email: email.trim().toLowerCase(),
+            p_token: token?.trim() || null,
+            p_name: name?.trim() || null,
+        });
+        if (!error && data && (data as any).ok) {
+            clearPendingInvite();
+            return true;
+        }
+    } catch {
+        // Abaikan jika RPC belum tersedia
+    }
+    return false;
 }
 
 /**
  * Menerima undangan untuk pengguna yang sedang mendaftar/login via RPC `accept_invite`.
  */
 export async function acceptInvite(token: string, name: string, phone?: string): Promise<void> {
-    const { error } = await supabase.rpc('accept_invite', { p_token: token.trim(), p_name: name, p_phone: phone ?? null });
+    const { error } = await supabase.rpc('accept_invite', { p_token: token.trim(), p_name: name.trim(), p_phone: phone ?? null });
     if (error) throw new Error(error.message);
     clearPendingInvite();
 }

@@ -1,6 +1,8 @@
-// Vercel Serverless Function Entrypoint
-// Ini akan menggunakan bundel CJS yang sudah dioptimasi oleh esbuild saat npm run build
+// Vercel Serverless Function Entrypoint (ESM-compatible with package.json "type": "module")
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 const { createApp } = require('../dist/server.cjs');
 
 const app = createApp();
-module.exports = app;
+export default app;

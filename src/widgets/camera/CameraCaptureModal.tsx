@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, RefreshCw, X, Check, MapPin, ShieldCheck, AlertTriangle, Crosshair } from 'lucide-react';
+import { Camera, RefreshCw, X, Check, MapPin, ShieldCheck, AlertTriangle, Crosshair, Loader2 } from 'lucide-react';
 import { applyWatermarkToCanvas, canvasToJpegBlob } from '@/shared/utils/watermark';
 import { calculateDistanceMeters, formatDistance } from '@/shared/utils/geo';
 import { PhotoType } from '@/entities/types';
@@ -12,7 +12,7 @@ interface CameraCaptureModalProps {
   projectLng: number;
   projectRadius: number;
   executorName: string;
-  onCaptureComplete: (data: { photoBlob: Blob; latitude: number; longitude: number; accuracy: number }) => void;
+  onCaptureComplete: (data: { photoBlob: Blob; latitude: number; longitude: number; accuracy: number }) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -44,6 +44,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [retryCount, setRetryCount] = useState(0);
   const [camera, setCamera] = useState<CameraState>({ status: 'starting' });
@@ -52,6 +53,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isShutterActive, setIsShutterActive] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const requestGps = useCallback(() => {
     setGps({ status: 'locating' });
@@ -204,6 +207,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     };
   }, [facingMode, retryCount]);
 
+  // Auto-request GPS saat modal kamera dibuka supaya teknisi tidak perlu klik ekstra jika izin sudah diberikan
+  useEffect(() => {
+    requestGps();
+  }, [requestGps]);
+
   const toggleFacingMode = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
     setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
@@ -226,6 +234,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     if (!file) return;
 
     setIsProcessing(true);
+    setSubmitError(null);
     try {
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
@@ -271,14 +280,16 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
       }
     } catch (err) {
       console.error('Gagal memproses foto kamera native:', err);
-      alert('Gagal memproses foto dari kamera HP. Silakan coba lagi.');
+      setSubmitError('Gagal memproses foto dari kamera HP. Silakan coba lagi.');
     } finally {
       setIsProcessing(false);
     }
   };
+
   const handleShutter = async () => {
     if (!canCapture || isProcessing || gps.status !== 'ready' || !videoRef.current) return;
     setIsProcessing(true);
+    setSubmitError(null);
     setIsShutterActive(true);
     window.setTimeout(async () => {
       setIsShutterActive(false);
@@ -299,6 +310,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         setCapturedPreviewUrl(URL.createObjectURL(blob));
       } catch (e) {
         console.error('Gagal memproses foto:', e);
+        setSubmitError('Gagal memproses hasil foto. Silakan ambil ulang.');
       } finally {
         setIsProcessing(false);
       }
@@ -306,25 +318,46 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   };
 
   const handleRetake = () => {
+    if (isSubmitting || isSubmittingRef.current) return;
+    setSubmitError(null);
     if (capturedPreviewUrl) URL.revokeObjectURL(capturedPreviewUrl);
     setCapturedBlob(null);
     setCapturedPreviewUrl(null);
+    setRetryCount(r => r + 1);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!capturedBlob || gps.status !== 'ready') return;
+    if (isSubmitting || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setSubmitError(null);
     streamRef.current?.getTracks().forEach(t => t.stop());
-    onCaptureComplete({ photoBlob: capturedBlob, latitude: gps.latitude, longitude: gps.longitude, accuracy: gps.accuracy });
+
+    try {
+      await onCaptureComplete({
+        photoBlob: capturedBlob,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+        accuracy: gps.accuracy,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan dokumentasi foto. Silakan coba lagi.';
+      setSubmitError(msg);
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const typeLabel =
     photoType === 'CHECK_IN' ? 'DOKUMENTASI CHECK-IN' : photoType === 'CHECK_OUT' ? 'DOKUMENTASI CHECK-OUT' : 'DOKUMENTASI PROGRES PEKERJAAN';
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white select-none overflow-hidden">
+    <div className="fixed inset-0 z-[120] flex flex-col bg-black text-white select-none overflow-hidden h-[100dvh] w-screen">
       {isShutterActive && <div className="absolute inset-0 bg-white z-50 transition-opacity duration-150 pointer-events-none" />}
 
-      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="relative z-30 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/85 to-transparent">
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={`text-[11px] font-bold px-2.5 py-0.5 rounded tracking-wide shrink-0 ${
@@ -335,7 +368,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           </span>
           <span className="text-xs text-slate-300 font-medium truncate">{projectName}</span>
         </div>
-        <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            if (!isSubmitting) onClose();
+          }}
+          disabled={isSubmitting}
+          className="p-2 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white shrink-0 disabled:opacity-40"
+        >
           <X size={20} />
         </button>
       </div>
@@ -467,7 +507,6 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                     latitude={hasProjectAnchor ? projectLat : -6.200000} 
                     longitude={hasProjectAnchor ? projectLng : 106.816666} 
                     onChange={(lat, lng) => {
-                      // Silently update the GPS state to ready using the map's pinned location
                       setGps({ status: 'ready', latitude: lat, longitude: lng, accuracy: 50 });
                     }}
                   />
@@ -482,7 +521,6 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   </button>
                   <button 
                     onClick={() => {
-                      // It updates onChange, so we just dismiss the overlay if they are happy
                       setGps(prev => prev.status === 'ready' ? prev : { status: 'ready', latitude: projectLat, longitude: projectLng, accuracy: 50 });
                     }} 
                     className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm transition-colors hover:bg-emerald-500 shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2"
@@ -496,14 +534,31 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         ) : (
           <div className="relative w-full h-full flex items-center justify-center p-2 bg-black">
             <img src={capturedPreviewUrl} alt="Hasil Foto Watermark" className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
-            <div className="absolute top-4 left-4 bg-emerald-600/90  text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
-              <ShieldCheck size={14} /> Watermark Otomatis Tersemat
+            <div className="absolute top-4 left-4 bg-emerald-600/95 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg">
+              <ShieldCheck size={14} /> Foto Berhasil Diambil • Watermark GPS Tersemat
             </div>
+
+            {isSubmitting && (
+              <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 z-30 px-6 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl">
+                  <Loader2 size={26} className="animate-spin" />
+                </div>
+                <p className="text-sm font-bold text-white">Menyimpan Dokumentasi &amp; Koordinat GPS...</p>
+                <p className="text-xs text-slate-300">Mohon tunggu sebentar, jangan tutup halaman ini.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="relative z-30 px-6 py-5 bg-gradient-to-t from-black via-black/90 to-transparent flex items-center justify-between min-h-[96px]">
+      {submitError && (
+        <div className="relative z-30 mx-4 mb-2 p-3 rounded-xl bg-rose-950/95 border border-rose-500/60 text-rose-200 text-xs flex items-start gap-2 shadow-lg">
+          <AlertTriangle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
+      <div className="relative z-30 px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black via-black/95 to-transparent flex items-center justify-between min-h-[104px]">
         {!capturedPreviewUrl ? (
           <>
             <button
@@ -526,7 +581,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 <div className="w-full h-full rounded-full bg-white hover:bg-slate-200 transition-colors" />
               </button>
               <span className="text-[11px] text-[var(--text-muted)] mt-1 font-medium">
-                {canCapture ? 'AMBIL FOTO' : 'MENUNGGU KAMERA & GPS'}
+                {isProcessing ? 'MEMPROSES FOTO...' : canCapture ? 'AMBIL FOTO' : 'MENUNGGU KAMERA & GPS'}
               </span>
             </div>
 
@@ -549,20 +604,30 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             />
           </>
         ) : (
-          <div className="w-full flex items-center justify-between gap-4 max-w-md mx-auto">
+          <div className="w-full flex items-center justify-between gap-3 max-w-md mx-auto">
             <button
               type="button"
               onClick={handleRetake}
-              className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all border border-slate-700 flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="flex-1 py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all border border-slate-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <RefreshCw size={16} /> Foto Ulang
             </button>
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 active:scale-95"
+              disabled={isSubmitting}
+              className="flex-1 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
-              <Check size={18} /> Gunakan Foto
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Check size={18} /> Gunakan Foto
+                </>
+              )}
             </button>
           </div>
         )}

@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from '@/shared/lib/supabase';
-import { getInviteByToken, acceptInvite, rememberPendingInvite, type Invite } from '@/shared/api/inviteService';
+import {
+    getInviteByToken,
+    acceptInvite,
+    completeInviteRegistration,
+    rememberPendingInvite,
+    type Invite,
+} from '@/shared/api/inviteService';
+import { fetchAppUser } from '@/shared/api/authProfile';
+import { useAuthStore } from '@/app/store/authStore';
 import {
     AlertCircle, Loader2, User, Mail, Lock, Eye, EyeOff,
     ShieldCheck, CheckCircle2, ArrowLeft, KeyRound, ArrowRight
@@ -17,6 +25,7 @@ const ROLE_DISPLAY_NAMES: Record<string, string> = {
 
 export function SignupPage() {
     const navigate = useNavigate();
+    const { setUser } = useAuthStore();
     const [searchParams, setSearchParams] = useSearchParams();
     const rawParamToken = searchParams.get("invite") || searchParams.get("token") || "";
     const inviteToken = rawParamToken.replace(/^["']|["']$/g, "").trim();
@@ -29,6 +38,7 @@ export function SignupPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+    const [successNote, setSuccessNote] = useState("");
 
     const [form, setForm] = useState({
         userName: "",
@@ -124,69 +134,133 @@ export function SignupPage() {
             return;
         }
 
+        const cleanEmail = form.email.trim().toLowerCase();
+        const cleanName = form.userName.trim();
+        const cleanToken = inviteToken.trim();
+
         setLoading(true);
+        // Simpan token di localStorage sebagai jaring pengaman apabila sesi baru aktif saat login berikutnya
+        rememberPendingInvite(cleanToken, cleanName, undefined, cleanEmail);
+
         try {
-            // 1. Coba registrasi server-side langsung via backend API (email_confirm: true, anti-otp_expired)
+            // 1. Coba melalui endpoint server /api/auth/register-invite (dengan parsing JSON yang aman terhadap error HTML/teks)
             let registeredViaApi = false;
             try {
                 const resp = await fetch("/api/auth/register-invite", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        token: inviteToken.trim(),
-                        name: form.userName.trim(),
-                        email: form.email.trim(),
+                        token: cleanToken,
+                        name: cleanName,
+                        email: cleanEmail,
                         password: form.password,
                     }),
                 });
-                const data = await resp.json();
-                if (!resp.ok) {
-                    throw new Error(data.message || "Gagal mendaftar dengan token undangan.");
+                const rawText = await resp.text();
+                let data: any = null;
+                try {
+                    data = rawText ? JSON.parse(rawText) : null;
+                } catch {
+                    data = null;
                 }
-                registeredViaApi = true;
+
+                if (resp.ok && data?.success) {
+                    registeredViaApi = true;
+                } else if (data?.message && (resp.status === 400 || resp.status === 404)) {
+                    throw new Error(data.message);
+                }
             } catch (apiErr: any) {
-                console.warn("[signup] API register-invite gagal, beralih ke fallback client-side:", apiErr.message);
-                // Jika error karena token sudah dipakai atau email duplikat, lempar error asli
-                if (apiErr.message && (apiErr.message.includes("sudah") || apiErr.message.includes("kedaluwarsa") || apiErr.message.includes("tidak ditemukan"))) {
+                const msg = apiErr?.message || "";
+                if (msg.includes("sudah pernah digunakan") || msg.includes("kedaluwarsa") || msg.includes("tidak ditemukan")) {
                     throw apiErr;
                 }
+                console.warn("[signup] Melanjutkan registrasi via Supabase RPC/Auth langsung:", msg);
             }
 
-            // 2. Fallback client-side jika API backend tidak merespons
+            // 2. Jalur utama client-side: Supabase Auth signUp + RPC complete_invite_registration (SECURITY DEFINER)
             if (!registeredViaApi) {
                 const { data: authData, error: authErr } = await supabase.auth.signUp({
-                    email: form.email.trim(),
+                    email: cleanEmail,
                     password: form.password,
+                    options: {
+                        data: {
+                            full_name: cleanName,
+                            invite_token: cleanToken,
+                            company_id: invite.companyId,
+                            role: invite.role,
+                        },
+                    },
                 });
-                if (authErr) throw authErr;
-                if (!authData.user) throw new Error("Gagal mendaftar. Silakan coba lagi.");
 
-                if (authData.session) {
-                    await acceptInvite(inviteToken, form.userName);
-                } else {
-                    rememberPendingInvite(inviteToken, form.userName);
+                // Jika user sebelumnya sudah sempat klik daftar (sehingga terdaftar di auth.users namun belum selesai klaim invite),
+                // jangan gagalkan alur — lanjutkan ke completeInviteRegistration untuk mengonfirmasi & menautkan profilnya!
+                if (authErr && !authErr.message.toLowerCase().includes("already registered")) {
+                    throw authErr;
+                }
+
+                // Panggil RPC complete_invite_registration (auto-confirm email di auth.users + buat public.users + tandai invite used)
+                const rpcResult = await completeInviteRegistration({
+                    token: cleanToken,
+                    email: cleanEmail,
+                    name: cleanName,
+                });
+
+                // Jika signUp langsung menghasilkan session aktif dan RPC baru belum terpasang, pastikan acceptInvite terpanggil
+                if (!rpcResult.ok && authData?.session) {
+                    await acceptInvite(cleanToken, cleanName);
                 }
             }
 
-            // 3. Login otomatis jika akun sudah terkonfirmasi
-            try {
-                await supabase.auth.signInWithPassword({
-                    email: form.email.trim(),
-                    password: form.password,
-                });
-            } catch { /* abaikan jika gagal, tetap arahkan */ }
+            // 3. Login otomatis dan validasi sesi
+            const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+                email: cleanEmail,
+                password: form.password,
+            });
 
+            if (!signInErr && signInData?.user) {
+                // Pastikan klaim undangan tuntas jika sebelumnya menunggu sesi login aktif
+                const profileRes = await fetchAppUser(signInData.user.id);
+                if (profileRes.user) {
+                    setUser(profileRes.user);
+                    setSuccessNote("Akun Anda telah aktif dan berhasil masuk secara otomatis. Mengalihkan ke dashboard...");
+                    setSuccess(true);
+                    setTimeout(() => {
+                        navigate("/");
+                    }, 1200);
+                    return;
+                }
+            }
+
+            if (signInErr) {
+                const errLower = signInErr.message.toLowerCase();
+                if (errLower.includes("not confirmed") || errLower.includes("unconfirmed")) {
+                    setError(
+                        "Akun Anda telah terdaftar, namun Supabase masih menunggu konfirmasi email. " +
+                        "Silakan jalankan file migrasi SQL `06_fix_invite_auth_and_autoconfirm.sql` di Supabase SQL Editor (atau matikan fitur 'Confirm email' di Supabase Dashboard → Authentication → Providers → Email) agar akun undangan langsung aktif tanpa verifikasi email."
+                    );
+                    return;
+                }
+                if (errLower.includes("invalid login credentials")) {
+                    setError(
+                        "Email ini sudah pernah didaftarkan sebelumnya dengan password yang berbeda, atau akun belum terkonfirmasi di Supabase. Gunakan password yang sesuai atau jalankan script SQL perbaikan invite di Supabase SQL Editor."
+                    );
+                    return;
+                }
+                throw signInErr;
+            }
+
+            setSuccessNote("Akun Anda telah aktif dan terhubung ke perusahaan. Silakan masuk menggunakan email dan password Anda.");
             setSuccess(true);
             setTimeout(() => {
-                navigate("/");
-            }, 1800);
+                navigate("/login");
+            }, 1500);
         } catch (err: any) {
             setError(err.message || "Gagal menyelesaikan pendaftaran.");
-            await supabase.auth.signOut();
         } finally {
             setLoading(false);
         }
     };
+
     return (
         <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 selection:bg-[var(--accent-glow)]">
             <div className="w-full max-w-sm sm:max-w-[410px] md:max-w-[430px] mx-auto">
@@ -301,7 +375,7 @@ export function SignupPage() {
                             </div>
 
                             {error && (
-                                <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs font-semibold">
+                                <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs font-semibold leading-relaxed">
                                     <AlertCircle size={15} className="shrink-0 mt-0.5" />
                                     <span>{error}</span>
                                 </div>
@@ -312,7 +386,7 @@ export function SignupPage() {
                                 disabled={loading}
                                 className="w-full py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-bold rounded-xl shadow-xs transition-all disabled:opacity-70 flex items-center justify-center gap-2 mt-2 cursor-pointer"
                             >
-                                {loading ? <><Loader2 size={16} className="animate-spin" /> Mendaftarkan Akun...</> : "Selesaikan Pendaftaran"}
+                                {loading ? <><Loader2 size={16} className="animate-spin" /> Mengaktifkan Akun...</> : "Selesaikan Pendaftaran"}
                             </button>
                         </form>
 
@@ -329,13 +403,13 @@ export function SignupPage() {
                         </div>
                         <h2 className="text-lg font-bold text-slate-900">Pendaftaran Berhasil!</h2>
                         <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                            Akun Anda telah aktif dan terhubung ke perusahaan. Mengalihkan ke halaman login...
+                            {successNote || "Akun Anda telah aktif dan terhubung ke perusahaan."}
                         </p>
                         <Link
-                            to="/login"
+                            to="/"
                             className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-xs sm:text-sm font-bold rounded-xl"
                         >
-                            Masuk Sekarang
+                            Masuk ke Dashboard
                         </Link>
                     </div>
                 ) : (
