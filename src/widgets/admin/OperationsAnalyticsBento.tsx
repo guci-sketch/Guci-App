@@ -111,6 +111,9 @@ function formatIsoDateKey(key: string, mode: 'short' | 'full' | 'stepper' | 'sho
   return fullDateFmt.format(dt);
 }
 
+type AttentionModalTab = 'notStarted' | 'flagged' | 'delayed' | 'noClockIn' | 'lateClockIn';
+type RenewalBucketKey = '90d' | '60d' | '30d' | 'expired';
+
 export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> = ({
   summary,
   quotationSummary,
@@ -142,10 +145,21 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
   const [selectedPeriod, setSelectedPeriod] = useState<JarivisPeriodKey>('month');
   const [workloadSort, setWorkloadSort] = useState<'mostRemaining' | 'highestRisk'>('mostRemaining');
 
-  // Live Map drawer states
+  // Modal states for Operation Center (NeedAttentionModal 5 Tabs & IdleMembersModal)
+  const [attentionModalOpen, setAttentionModalOpen] = useState<boolean>(false);
+  const [attentionModalTab, setAttentionModalTab] = useState<AttentionModalTab>('notStarted');
+  const [idleModalOpen, setIdleModalOpen] = useState<boolean>(false);
+
+  // Live Map drawer & layer states
   const [mapDrawerOpen, setMapDrawerOpen] = useState<boolean>(true);
   const [mapBucketFilter, setMapBucketFilter] = useState<'pending' | 'delayed' | 'completed'>('pending');
   const [mapSearchQuery, setMapSearchQuery] = useState<string>('');
+  const [showMapCustomers, setShowMapCustomers] = useState<boolean>(true);
+  const [showMapMembers, setShowMapMembers] = useState<boolean>(true);
+  const [showMapJourney, setShowMapJourney] = useState<boolean>(false);
+
+  // Business Renewal Contract filter
+  const [renewalBucket, setRenewalBucket] = useState<RenewalBucketKey>('30d');
 
   const greetingText = useMemo(() => getIndonesianTimeGreeting(new Date()), []);
 
@@ -208,6 +222,7 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
   }, [computed.liveMap.customerLocations, mapBucketFilter, mapSearchQuery]);
 
   const filteredProjectsForMap = useMemo(() => {
+    if (!showMapCustomers) return [];
     const q = mapSearchQuery.trim().toLowerCase();
     if (!q) return projects;
     return projects.filter(
@@ -216,7 +231,116 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
         p.clientName.toLowerCase().includes(q) ||
         p.address.toLowerCase().includes(q)
     );
-  }, [projects, mapSearchQuery]);
+  }, [projects, mapSearchQuery, showMapCustomers]);
+
+  const filteredLocationsForMap = useMemo(
+    () => (showMapMembers ? userLocations : []),
+    [userLocations, showMapMembers]
+  );
+
+  // Member workload & leaderboard computation for Operation Center & Performance Team
+  const memberWorkloadRows = useMemo(() => {
+    return executors
+      .map(ex => {
+        const assigned = Math.max(ex.totalJobs, ex.completedJobs);
+        const remaining = Math.max(0, assigned - ex.completedJobs);
+        const pct = assigned > 0 ? Math.min(100, Math.round((ex.completedJobs / assigned) * 100)) : 0;
+        const compliancePct = assigned > 0 ? Math.max(0, Math.round(((assigned - ex.highRiskJobs) / assigned) * 100)) : 100;
+        return {
+          ...ex,
+          assigned,
+          remaining,
+          pct,
+          compliancePct,
+        };
+      })
+      .sort((a, b) => (b.completedJobs !== a.completedJobs ? b.completedJobs - a.completedJobs : b.pct - a.pct));
+  }, [executors]);
+
+  // Idle staff list for IdleMembersModal
+  const idleExecutorsList = useMemo(() => {
+    const activeExecIdsToday = new Set(
+      reports
+        .filter(r => toLocalDateKey(r.createdAt) === selectedDateKey)
+        .map(r => r.executor.id)
+    );
+    return executors.filter(e => e.isActive !== false && !activeExecIdsToday.has(e.id));
+  }, [executors, reports, selectedDateKey]);
+
+  // Completion by Day of Week (Senin - Minggu) & Hour of Day for Performance Team
+  const completionByDayAndHour = useMemo(() => {
+    const dayLabels = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+    const hourBuckets = [
+      { label: '06:00–09:00', count: 0 },
+      { label: '09:00–12:00', count: 0 },
+      { label: '12:00–15:00', count: 0 },
+      { label: '15:00–18:00', count: 0 },
+      { label: '18:00–22:00', count: 0 },
+    ];
+
+    for (const r of reports) {
+      if (r.status === 'COMPLETED' || r.status === 'REVIEWED') {
+        const d = new Date(r.checkOutAt || r.createdAt);
+        if (!Number.isNaN(d.getTime())) {
+          dayCounts[d.getDay()] += 1;
+          const h = d.getHours();
+          if (h < 9) hourBuckets[0].count += 1;
+          else if (h < 12) hourBuckets[1].count += 1;
+          else if (h < 15) hourBuckets[2].count += 1;
+          else if (h < 18) hourBuckets[3].count += 1;
+          else hourBuckets[4].count += 1;
+        }
+      }
+    }
+
+    const orderedDays = [1, 2, 3, 4, 5, 6, 0].map(idx => ({
+      day: dayLabels[idx],
+      count: dayCounts[idx],
+    }));
+
+    return { orderedDays, hourBuckets };
+  }, [reports]);
+
+  // Renewal Contracts & Inactive Customers for Business Tab
+  const businessRenewalAndInactive = useMemo(() => {
+    const now = new Date();
+    const contracts = projects.map(p => {
+      const baseDate = p.nextServiceDate ? new Date(p.nextServiceDate) : new Date(p.workDate);
+      const expiryDate = new Date(baseDate);
+      if (!p.nextServiceDate && p.warrantyMonths > 0) {
+        expiryDate.setMonth(expiryDate.getMonth() + p.warrantyMonths);
+      }
+      const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / 86400_000);
+      let bucket: RenewalBucketKey = '90d';
+      if (daysLeft < 0) bucket = 'expired';
+      else if (daysLeft <= 30) bucket = '30d';
+      else if (daysLeft <= 60) bucket = '60d';
+      return {
+        id: p.id,
+        projectName: p.projectName,
+        clientName: p.clientName,
+        expiryDateStr: expiryDate.toISOString().slice(0, 10),
+        daysLeft,
+        bucket,
+        contractType: p.contractType,
+      };
+    });
+
+    const reportedProjectIds = new Set(reports.map(r => r.project.id));
+    const inactiveCustomers = projects.filter(p => !reportedProjectIds.has(p.id));
+
+    return {
+      contracts,
+      counts: {
+        '90d': contracts.filter(c => c.bucket === '90d' && c.daysLeft <= 90).length,
+        '60d': contracts.filter(c => c.bucket === '60d').length,
+        '30d': contracts.filter(c => c.bucket === '30d').length,
+        expired: contracts.filter(c => c.bucket === 'expired').length,
+      },
+      inactiveCustomers,
+    };
+  }, [projects, reports]);
 
   const businessKpiItems = useMemo<JarivisBusinessKpiItem[]>(() => {
     const suffix = computed.performanceTeam.comparisonSuffix;
@@ -433,7 +557,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
           {/* 12-Column Operation Center Grid */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-stretch">
-              {/* Col 1 (3 cols): Tugas Ditugaskan Hari Ini + Tenaga Kerja Hari Ini */}
               <div className="xl:col-span-3 flex flex-col gap-4">
                 <JarivisRadialMetricCard
                   title="TUGAS DITUGASKAN HARI INI"
@@ -457,7 +580,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 2 (3 cols): Kunjungan Pelanggan Hari Ini + Tingkat Pembatalan / Anomali */}
               <div className="xl:col-span-3 flex flex-col gap-4">
                 <JarivisRadialMetricCard
                   title="KUNJUNGAN PELANGGAN HARI INI"
@@ -481,7 +603,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 3 (3 cols): Efisiensi Operasional */}
               <div className="xl:col-span-3">
                 <JarivisEfficiencyCard
                   avgStartTime={computed.operationCenter.efficiency.avgStartTime}
@@ -490,12 +611,11 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 4 (3 cols): Deep Crimson "PERLU PERHATIAN!" Card */}
               <div className="xl:col-span-3">
                 <JarivisCrimsonAttentionCard
                   rows={computed.operationCenter.attentionRows}
                   onSelectRow={handleAttentionAction}
-                  onOpenDetail={onOpenAnomaliesTab}
+                  onOpenDetail={() => setAttentionModalOpen(true)}
                 />
               </div>
             </div>
@@ -505,13 +625,13 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
           <JarivisIdleAlertBanner
             idleStaffCount={computed.operationCenter.idleStaffCount}
             draftQuotationsCount={quotationSummary?.draftCount ?? 0}
-            onReviewStaff={() => onOpenExecutorsTab?.()}
+            onReviewStaff={() => setIdleModalOpen(true)}
             onReviewQuotations={() =>
               (onOpenQuotationsTab || quotationSummary?.onOpenQuotations)?.()
             }
           />
 
-          {/* Bottom Section: BEBAN KERJA SAAT INI */}
+          {/* Bottom Section 1: BEBAN KERJA SAAT INI & ANTREAN VERIFIKASI */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
@@ -541,10 +661,9 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
               </div>
             </div>
 
-            {/* Active Workload List or Calm Empty State */}
             {(summary.priorityReports ?? []).length === 0 && reports.length === 0 ? (
-              <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl py-12 px-4 text-center space-y-2">
-                <div className="w-16 h-16 rounded-2xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] mx-auto flex items-center justify-center text-xl font-bold text-[#3b82f6]">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl py-10 px-4 text-center space-y-2">
+                <div className="w-14 h-14 rounded-2xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] mx-auto flex items-center justify-center text-lg font-bold text-[#3b82f6]">
                   ✓
                 </div>
                 <p className="text-sm font-bold text-[var(--text-primary)] pt-1">
@@ -606,6 +725,101 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
               </div>
             )}
           </div>
+
+          {/* Bottom Section 2: PROGRES ANGGOTA & PERINGKAT LEADERBOARD TIM */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-7 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  PROGRES TUGAS PER ANGGOTA
+                </h3>
+                <button
+                  type="button"
+                  onClick={onOpenExecutorsTab}
+                  className="text-xs font-bold text-[#3b82f6] hover:underline cursor-pointer"
+                >
+                  Semua Anggota &rsaquo;
+                </button>
+              </div>
+
+              {memberWorkloadRows.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[var(--text-muted)]">
+                  Belum ada data anggota pelaksana terdaftar.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {memberWorkloadRows.slice(0, 6).map(m => (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-bold text-[var(--text-primary)] truncate">{m.name}</span>
+                        <span className="font-mono text-[var(--text-secondary)] shrink-0">
+                          <strong>{m.completedJobs}</strong>/{m.assigned} Selesai ({m.pct}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+                        <div
+                          style={{ width: `${m.pct}%` }}
+                          className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#10b981] transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  LEADERBOARD ANGGOTA TERBAIK
+                </h3>
+                <span className="text-[11px] font-semibold text-amber-500">Top Performers</span>
+              </div>
+
+              {memberWorkloadRows.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[var(--text-muted)]">
+                  Belum ada peringkat anggota.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {memberWorkloadRows.slice(0, 5).map((m, idx) => (
+                    <div
+                      key={m.id}
+                      className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center shrink-0 ${
+                            idx === 0
+                              ? 'bg-amber-500 text-slate-950'
+                              : idx === 1
+                              ? 'bg-slate-300 text-slate-900'
+                              : idx === 2
+                              ? 'bg-amber-700 text-white'
+                              : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[var(--text-primary)] truncate">{m.name}</p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            Kepatuhan SOP: <strong>{m.compliancePct}%</strong> • Durasi rata-rata: {m.avgDurationMinutes}m
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-500 text-xs font-bold font-mono shrink-0">
+                        {m.completedJobs} Tugas
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -633,7 +847,7 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 sub: 'Clock in, tanpa tugas',
                 badgeBg: 'bg-[#64748b]/15 text-[#94a3b8] border-[#64748b]/30',
                 symbol: '⊡',
-                onClick: onOpenExecutorsTab,
+                onClick: () => setIdleModalOpen(true),
               },
               {
                 id: 'visit',
@@ -699,11 +913,54 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
             ))}
           </div>
 
+          {/* Map Layer Control Bar (Tampilkan Pelanggan | Teknisi | Show Journey) */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-[var(--text-secondary)]">Kontrol Lapisan Peta:</span>
+              <button
+                type="button"
+                onClick={() => setShowMapCustomers(v => !v)}
+                className={`px-3 py-1.5 rounded-lg font-semibold border transition-colors cursor-pointer ${
+                  showMapCustomers
+                    ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-subtle)]'
+                }`}
+              >
+                {showMapCustomers ? '✓ ' : ''}Pin Pelanggan ({projects.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMapMembers(v => !v)}
+                className={`px-3 py-1.5 rounded-lg font-semibold border transition-colors cursor-pointer ${
+                  showMapMembers
+                    ? 'bg-[#3b82f6]/20 text-[#60a5fa] border-[#3b82f6]/40'
+                    : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-subtle)]'
+                }`}
+              >
+                {showMapMembers ? '✓ ' : ''}Posisi Teknisi ({userLocations.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMapJourney(v => !v)}
+                className={`px-3 py-1.5 rounded-lg font-semibold border transition-colors cursor-pointer ${
+                  showMapJourney
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border-subtle)]'
+                }`}
+              >
+                {showMapJourney ? '✓ ' : ''}Tampilkan Jalur Perjalanan (Journey)
+              </button>
+            </div>
+            <span className="text-[11px] text-[var(--text-muted)]">
+              Tanggal Peta: <strong>{formatIsoDateKey(selectedDateKey, 'stepper')}</strong>
+            </span>
+          </div>
+
           {/* Full-Width Map Canvas with Jarivis Floating Overlays */}
           <div className="relative rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-card)]">
             <AllProjectsMap
               projects={filteredProjectsForMap}
-              userLocations={userLocations}
+              userLocations={filteredLocationsForMap}
               height="520px"
             />
 
@@ -722,7 +979,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                   </button>
                 </div>
 
-                {/* 3 Bucket Pills */}
                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar text-[11px]">
                   {[
                     {
@@ -753,7 +1009,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                   ))}
                 </div>
 
-                {/* Search Input inside Floating Drawer */}
                 <input
                   type="search"
                   value={mapSearchQuery}
@@ -762,7 +1017,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                   className="w-full h-9 px-3 rounded-xl bg-[#1c2026] border border-[#282d37] text-xs text-white placeholder:text-[#9ca3af] focus:outline-none focus:border-[#3b82f6]"
                 />
 
-                {/* Filtered Customer List or Empty State */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 max-h-[280px]">
                   {filteredMapCustomers.length === 0 ? (
                     <div className="py-8 px-3 text-center space-y-1.5">
@@ -803,8 +1057,7 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
               </button>
             )}
 
-            {/* Floating Center Empty Toast when 0 locations exist on map */}
-            {filteredProjectsForMap.length === 0 && userLocations.length === 0 && (
+            {filteredProjectsForMap.length === 0 && filteredLocationsForMap.length === 0 && (
               <div className="pointer-events-none absolute inset-0 z-[420] flex items-center justify-center p-4">
                 <div className="bg-[#14171c]/95 text-white border border-[#282d37] rounded-xl px-5 py-3.5 text-center shadow-xl max-w-sm">
                   <p className="text-xs font-bold">
@@ -817,12 +1070,12 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
               </div>
             )}
 
-            {/* Floating Bottom-Right Legenda Card (Jarivis Style) */}
+            {/* Floating Bottom-Right Legenda Card */}
             <div className="absolute bottom-3 right-3 z-[450] bg-[#14171c]/95 text-white border border-[#282d37] rounded-xl p-3 text-[11px] shadow-xl space-y-1.5 min-w-[140px]">
               <span className="font-bold block text-xs mb-1">Legenda</span>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-[#3b82f6] inline-block" />
-                <span className="text-[#d1d5db]">Idle</span>
+                <span className="text-[#d1d5db]">Idle / Standby</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-[#10b981] inline-block" />
@@ -836,6 +1089,106 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-[#ef4444] inline-block" />
                 <span className="text-[#d1d5db]">Belum Dikerjakan</span>
               </div>
+            </div>
+          </div>
+
+          {/* 3-Column Bottom Panels below Live Map: Live Activity Feed | Jadwal Hari Ini | Jadwal Mendatang */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  UMPAN AKTIVITAS LANGSUNG (LIVE FEED)
+                </h3>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              {reports.length === 0 ? (
+                <p className="py-6 text-center text-xs text-[var(--text-muted)]">
+                  Belum ada aktivitas check-in/out hari ini.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {reports.slice(0, 6).map(r => (
+                    <div
+                      key={r.id}
+                      onClick={() => onOpenReportDetail(r.id)}
+                      className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[#3b82f6] cursor-pointer text-xs space-y-1 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <strong className="text-[var(--text-primary)]">{r.executor.name}</strong>
+                        <span className="font-mono text-[10px] text-[var(--text-muted)]">
+                          {new Date(r.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                        {r.project.name} ({r.status})
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  SEMUA JADWAL HARI INI ({selectedDateKey})
+                </h3>
+                <span className="text-xs font-mono font-bold text-[#3b82f6]">
+                  {projects.filter(p => p.workDate === selectedDateKey).length}
+                </span>
+              </div>
+              {projects.filter(p => p.workDate === selectedDateKey).length === 0 ? (
+                <p className="py-6 text-center text-xs text-[var(--text-muted)]">
+                  Tidak ada jadwal proyek pada tanggal {selectedDateKey}.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {projects
+                    .filter(p => p.workDate === selectedDateKey)
+                    .map(p => (
+                      <div key={p.id} className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs">
+                        <p className="font-bold text-[var(--text-primary)] truncate">{p.projectName}</p>
+                        <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                          {p.clientName} • Mulainya: {p.scheduledStartTime || '09:00'} WIB
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  JADWAL MENDATANG (UPCOMING)
+                </h3>
+                <button
+                  type="button"
+                  onClick={onOpenProjectsTab}
+                  className="text-[11px] font-bold text-[#3b82f6] hover:underline cursor-pointer"
+                >
+                  Lihat Semua
+                </button>
+              </div>
+              {projects.filter(p => p.workDate > selectedDateKey || Boolean(p.nextServiceDate)).length === 0 ? (
+                <p className="py-6 text-center text-xs text-[var(--text-muted)]">
+                  Belum ada jadwal proyek mendatang yang terdaftar.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {projects
+                    .filter(p => p.workDate > selectedDateKey || Boolean(p.nextServiceDate))
+                    .slice(0, 6)
+                    .map(p => (
+                      <div key={p.id} className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs">
+                        <p className="font-bold text-[var(--text-primary)] truncate">{p.projectName}</p>
+                        <p className="text-[11px] text-[var(--text-secondary)]">
+                          Jadwal: <strong className="font-mono">{p.nextServiceDate || p.workDate}</strong>
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -859,7 +1212,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-stretch">
-              {/* Col 1 (3 cols): Tingkat Kehadiran & Tingkat Penundaan */}
               <div className="xl:col-span-3 flex flex-col gap-4">
                 <JarivisRadialMetricCard
                   title="TINGKAT KEHADIRAN"
@@ -883,7 +1235,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 2 (3 cols): Tingkat Penyelesaian & Tingkat Pembatalan Tugas */}
               <div className="xl:col-span-3 flex flex-col gap-4">
                 <JarivisRadialMetricCard
                   title="TINGKAT PENYELESAIAN"
@@ -907,7 +1258,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 3 (3 cols): Rata-Rata Tugas Ditugaskan & Selesai per Anggota */}
               <div className="xl:col-span-3 flex flex-col gap-4">
                 <JarivisRadialMetricCard
                   title="RATA-RATA TUGAS DITUGASKAN PER ANGGOTA"
@@ -927,7 +1277,6 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
                 />
               </div>
 
-              {/* Col 4 (3 cols): Efisiensi Operasional */}
               <div className="xl:col-span-3">
                 <JarivisEfficiencyCard
                   avgStartTime={computed.operationCenter.efficiency.avgStartTime}
@@ -956,7 +1305,62 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
             onSelectPeriod={setSelectedPeriod}
           />
 
-          {/* Section 3: Daftar Tugas yang Selesai per Kategori Layanan (from app.jarivis.com Beranda) */}
+          {/* Section 3: Penyelesaian Berdasarkan Hari & Rentang Jam Kerja */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                Penyelesaian Tugas Berdasarkan Hari (Senin – Minggu)
+              </h3>
+              <div className="space-y-2">
+                {completionByDayAndHour.orderedDays.map(d => {
+                  const maxD = Math.max(1, ...completionByDayAndHour.orderedDays.map(x => x.count));
+                  const pct = Math.round((d.count / maxD) * 100);
+                  return (
+                    <div key={d.day} className="flex items-center gap-3 text-xs">
+                      <span className="w-16 font-semibold text-[var(--text-secondary)]">{d.day}</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-[var(--bg-card)] overflow-hidden border border-[var(--border-subtle)]">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className="h-full rounded-full bg-[#3b82f6]"
+                        />
+                      </div>
+                      <span className="w-10 text-right font-mono font-bold text-[var(--text-primary)]">
+                        {d.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                Distribusi Penyelesaian Berdasarkan Jam Kerja
+              </h3>
+              <div className="space-y-2.5">
+                {completionByDayAndHour.hourBuckets.map(hb => {
+                  const maxH = Math.max(1, ...completionByDayAndHour.hourBuckets.map(x => x.count));
+                  const pct = Math.round((hb.count / maxH) * 100);
+                  return (
+                    <div key={hb.label} className="flex items-center gap-3 text-xs">
+                      <span className="w-24 font-mono text-[var(--text-secondary)]">{hb.label}</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-[var(--bg-card)] overflow-hidden border border-[var(--border-subtle)]">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className="h-full rounded-full bg-emerald-500"
+                        />
+                      </div>
+                      <span className="w-10 text-right font-mono font-bold text-[var(--text-primary)]">
+                        {hb.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Daftar Tugas yang Selesai per Kategori Layanan */}
           <JarivisServiceCategoryCard
             totalCompleted={computed.performanceTeam.totalCompletedInPeriod}
             slices={computed.performanceTeam.serviceSlices}
@@ -990,6 +1394,317 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
               (onOpenQuotationsTab || quotationSummary?.onOpenQuotations)?.()
             }
           />
+
+          {/* Section 3: Pembaruan Kontrak (90/60/30 Hari & Kedaluwarsa) + Pelanggan Tanpa Aktivitas */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-7 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    Pemantauan Pembaruan Kontrak &amp; Garansi (Renewal Contract)
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Daftar kontrak layanan yang mendekati masa pembaruan atau telah berakhir
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {([
+                    { id: '90d', label: `< 90 Hari (${businessRenewalAndInactive.counts['90d']})` },
+                    { id: '60d', label: `< 60 Hari (${businessRenewalAndInactive.counts['60d']})` },
+                    { id: '30d', label: `< 30 Hari (${businessRenewalAndInactive.counts['30d']})` },
+                    { id: 'expired', label: `Kedaluwarsa (${businessRenewalAndInactive.counts.expired})` },
+                  ] as const).map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setRenewalBucket(b.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                        renewalBucket === b.id
+                          ? 'bg-[#3b82f6] text-white border-[#3b82f6]'
+                          : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+                      }`}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {businessRenewalAndInactive.contracts.filter(c => c.bucket === renewalBucket).length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-xl">
+                    Tidak ada kontrak pelanggan pada kategori periode ini.
+                  </div>
+                ) : (
+                  businessRenewalAndInactive.contracts
+                    .filter(c => c.bucket === renewalBucket)
+                    .map(c => (
+                      <div
+                        key={c.id}
+                        className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-bold text-[var(--text-primary)] truncate">{c.clientName}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] truncate">{c.projectName}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] ${
+                              c.daysLeft < 0
+                                ? 'bg-rose-500/15 text-rose-500'
+                                : 'bg-amber-500/15 text-amber-500'
+                            }`}
+                          >
+                            {c.daysLeft < 0 ? `Lewat ${Math.abs(c.daysLeft)} hari` : `${c.daysLeft} hari lagi`}
+                          </span>
+                          <span className="block text-[10px] text-[var(--text-muted)] font-mono mt-0.5">
+                            Exp: {c.expiryDateStr}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    Pelanggan Tanpa Aktivitas Kunjungan
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Lokasi pelanggan yang belum memiliki laporan pengerjaan aktif
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 text-xs font-mono font-bold">
+                  {businessRenewalAndInactive.inactiveCustomers.length}
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {businessRenewalAndInactive.inactiveCustomers.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-xl">
+                    Seluruh pelanggan aktif telah memiliki jadwal/kunjungan tercatat.
+                  </div>
+                ) : (
+                  businessRenewalAndInactive.inactiveCustomers.slice(0, 8).map(ic => (
+                    <div
+                      key={ic.id}
+                      className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-[var(--text-primary)] truncate">{ic.clientName}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] truncate">{ic.projectName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onOpenCustomersTab}
+                        className="px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--accent-glow)] text-[var(--text-primary)] font-semibold shrink-0 cursor-pointer"
+                      >
+                        Tindak Lanjuti
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL 1: NEED ATTENTION 5-TAB MODAL (`PERLU PERHATIAN!`)
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {attentionModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setAttentionModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Detail Perlu Perhatian"
+        >
+          <div
+            className="w-full max-w-3xl bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 bg-gradient-to-r from-[#7f1d1d] to-[#450a0a] text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold uppercase tracking-wider">
+                  PERLU PERHATIAN! — Rincian Operasional Harian
+                </h3>
+                <p className="text-xs text-rose-200 mt-0.5">
+                  Tanggal Evaluasi: {formatIsoDateKey(selectedDateKey, 'full')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttentionModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="px-5 pt-3 border-b border-[var(--border-subtle)] flex gap-1.5 overflow-x-auto no-scrollbar">
+              {([
+                { id: 'notStarted', label: 'Tugas Belum Dikerjakan' },
+                { id: 'flagged', label: 'Anomali / Dibatalkan' },
+                { id: 'delayed', label: 'Tugas Ditunda' },
+                { id: 'noClockIn', label: 'Tidak Absen Masuk' },
+                { id: 'lateClockIn', label: 'Terlambat Absen' },
+              ] as const).map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setAttentionModalTab(t.id)}
+                  className={`px-3 py-2 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                    attentionModalTab === t.id
+                      ? 'border-rose-500 text-rose-500'
+                      : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-2.5 text-xs">
+              {attentionModalTab === 'noClockIn' ? (
+                idleExecutorsList.length === 0 ? (
+                  <p className="py-8 text-center text-[var(--text-muted)]">
+                    Seluruh anggota aktif sudah melakukan presensi hari ini.
+                  </p>
+                ) : (
+                  idleExecutorsList.map(ex => (
+                    <div
+                      key={ex.id}
+                      className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-bold text-[var(--text-primary)]">{ex.name}</p>
+                        <p className="text-[11px] text-[var(--text-muted)]">{ex.email}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 font-bold">
+                        Belum Clock-In
+                      </span>
+                    </div>
+                  ))
+                )
+              ) : (
+                (summary.priorityReports ?? []).map(item => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="font-bold text-[var(--text-primary)]">{item.projectName}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        Pelaksana: {item.executorName} • Status: {item.status} • Skor Risiko: {item.riskScore}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttentionModalOpen(false);
+                        onOpenReportDetail(item.id);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer shrink-0"
+                    >
+                      Periksa Laporan
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setAttentionModalOpen(false);
+                  onOpenAnomaliesTab();
+                }}
+                className="text-xs font-bold text-[#3b82f6] hover:underline cursor-pointer"
+              >
+                Buka Halaman Hasil &amp; Verifikasi Kerja Lengkap &rsaquo;
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttentionModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-bold text-[var(--text-primary)] cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL 2: IDLE MEMBERS MODAL (`ANGGOTA TANPA TUGAS HARI INI`)
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {idleModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setIdleModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Daftar Anggota Tanpa Tugas"
+        >
+          <div
+            className="w-full max-w-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+                  Daftar Karyawan Standby / Tanpa Penugasan Hari Ini ({idleExecutorsList.length})
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Anggota aktif yang dapat langsung diberikan penugasan SPK baru
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIdleModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)] cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-5 max-h-80 overflow-y-auto space-y-2.5 text-xs">
+              {idleExecutorsList.length === 0 ? (
+                <p className="py-6 text-center text-[var(--text-muted)]">
+                  Seluruh anggota aktif sudah memiliki penugasan pada tanggal ini.
+                </p>
+              ) : (
+                idleExecutorsList.map(ex => (
+                  <div
+                    key={ex.id}
+                    className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <p className="font-bold text-[var(--text-primary)]">{ex.name}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {ex.email} • Total selesai historis: {ex.completedJobs} tugas
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIdleModalOpen(false);
+                        onOpenProjectsTab?.();
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white font-bold cursor-pointer shrink-0"
+                    >
+                      Beri Tugas SPK
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

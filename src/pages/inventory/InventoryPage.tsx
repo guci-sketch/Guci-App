@@ -3,7 +3,7 @@ import {
     Package, FileText, Search, Plus, Download, UploadCloud,
     ArrowDownCircle, ArrowUpCircle, X, Loader2, AlertTriangle,
     ClipboardList, Trash2, Briefcase, Calculator, TrendingUp, CheckCircle2,
-    Lock, ShieldAlert, ArrowRight, Check, Eye, AlertCircle, CheckSquare,
+    Lock, ArrowRight, Eye, AlertCircle, CheckSquare, FlaskConical, BarChart3, Droplets, Layers,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useAuthStore } from '@/app/store/authStore';
@@ -20,6 +20,7 @@ import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { isDirectorUser } from '@/shared/lib/roles';
 import { GUCI_WAREHOUSE_CATALOG } from '@/shared/data/warehouseCatalog';
 import type { Quotation } from '@/entities/types';
+
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 const INVENTORY_PAGE_SIZE = 10;
@@ -151,8 +152,32 @@ function InventoryImportPreviewModal({
         </div>
     );
 }
+
 type Mutation = { item: InventoryItem; type: "IN" | "OUT"; presetProjectId?: string; presetTipe?: "ESTIMASI" | "REALISASI" } | null;
-type InvTab = "stok" | "proyek" | "rekap" | "log" | "alert";
+type InvTab = "stok" | "chemical-trend" | "proyek" | "rekap" | "log" | "alert";
+type StockHealthFilter = "ALL" | "SAFE" | "LOW" | "EMPTY";
+type ChemicalFormFilter = "ALL" | "LIQUID" | "SOLID";
+type TrendPeriodFilter = "7d" | "30d" | "month" | "all";
+
+function classifyChemicalForm(item?: InventoryItem): "LIQUID" | "SOLID" {
+    const unit = (item?.satuan || "").toLowerCase();
+    const name = (item?.nama || "").toLowerCase();
+    if (
+        unit.includes("ml") ||
+        unit.includes("liter") ||
+        unit.includes("ltr") ||
+        unit.includes("botol") ||
+        unit.includes("jerigen") ||
+        unit.includes("kaleng") ||
+        name.includes("ec") ||
+        name.includes("sc") ||
+        name.includes("cs") ||
+        name.includes("cair")
+    ) {
+        return "LIQUID";
+    }
+    return "SOLID";
+}
 
 interface ProjectCostRow {
     id: string;
@@ -171,10 +196,18 @@ export function InventoryPage() {
         ? (activeCompanyId || user?.companyId || null)
         : (user?.companyId ?? null);
     const isDirector = isDirectorUser(user);
+    const isAdminOrDirector = isDirector || user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+    const isWarehouseOnly = user?.role === "INVENTORY";
     const isWarehouseRole = user?.role === "INVENTORY" || user?.role === "ADMIN";
     const canWrite = isWarehouseRole;
+    const canAccessChemicalTrend = isAdminOrDirector || user?.role === "INVENTORY";
 
+    // Role Gudang (INVENTORY) langsung masuk ke Mode Kerja Gudang Minimalis ("stok")
     const [tab, setTab] = useState<InvTab>(isDirector ? "proyek" : "stok");
+    const [stockHealthFilter, setStockHealthFilter] = useState<StockHealthFilter>("ALL");
+    const [chemFormFilter, setChemFormFilter] = useState<ChemicalFormFilter>("ALL");
+    const [trendPeriod, setTrendPeriod] = useState<TrendPeriodFilter>("30d");
+
     const [searchQ, setSearchQ] = useState("");
     const [itemsPage, setItemsPage] = useState(1);
     const [projectPage, setProjectPage] = useState(1);
@@ -194,7 +227,7 @@ export function InventoryPage() {
     const [mNote, setMNote] = useState("");
     const [mProjectId, setMProjectId] = useState("");
     const [mProyek, setMProyek] = useState("");
-    const [mTipeCatatan, setMTipeCatatan] = useState<"ESTIMASI" | "REALISASI">("ESTIMASI");
+    const [mTipeCatatan, setMTipeCatatan] = useState<"ESTIMASI" | "REALISASI">("REALISASI");
     const [selectedItemIdForProj, setSelectedItemIdForProj] = useState("");
 
     const [busy, setBusy] = useState(false);
@@ -427,7 +460,6 @@ export function InventoryPage() {
         reader.onload = evt => {
             try {
                 const wb = XLSX.read(evt.target?.result, { type: file.name.endsWith('.csv') ? "string" : "binary" });
-                // Gabungkan semua sheet (multi-sheet template)
                 const allRows: InventoryImportRow[] = [];
                 for (const sheetName of wb.SheetNames) {
                     const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName]);
@@ -491,15 +523,23 @@ export function InventoryPage() {
         return Array.from(set);
     }, [items]);
 
+    const safeStockItems = useMemo(() => items.filter(s => s.stok > s.minAlert), [items]);
     const lowStockItems = useMemo(() => items.filter(s => s.stok <= s.minAlert), [items]);
+    const emptyStockItems = useMemo(() => items.filter(s => s.stok <= 0), [items]);
 
     const filtered = useMemo(() => {
         let base = tab === "alert" ? lowStockItems : items;
+        if (tab === "stok") {
+            if (stockHealthFilter === "SAFE") base = safeStockItems;
+            else if (stockHealthFilter === "LOW") base = lowStockItems;
+            else if (stockHealthFilter === "EMPTY") base = emptyStockItems;
+        }
         if (kategoriFilter !== "ALL") base = base.filter(s => s.kategori === kategoriFilter);
         const search = debouncedSearch.trim().toLowerCase();
         if (search) base = base.filter(s => s.nama.toLowerCase().includes(search));
         return base;
-    }, [items, lowStockItems, tab, kategoriFilter, debouncedSearch]);
+    }, [items, safeStockItems, lowStockItems, emptyStockItems, tab, stockHealthFilter, kategoriFilter, debouncedSearch]);
+
     const pagedItems = useMemo(
         () => filtered.slice((itemsPage - 1) * INVENTORY_PAGE_SIZE, itemsPage * INVENTORY_PAGE_SIZE),
         [filtered, itemsPage],
@@ -512,6 +552,111 @@ export function InventoryPage() {
     const logTotalPages = Math.max(1, Math.ceil(logs.length / INVENTORY_PAGE_SIZE));
     useEffect(() => { if (itemsPage > itemTotalPages) setItemsPage(itemTotalPages); }, [itemsPage, itemTotalPages]);
     useEffect(() => { if (logsPage > logTotalPages) setLogsPage(logTotalPages); }, [logsPage, logTotalPages]);
+
+    // ─── ANALITIK TREN BAHAN KIMIA (CAIR & PADAT) — KHUSUS ADMIN, DIREKTUR, & GUDANG ───
+    const chemicalTrendAnalytics = useMemo(() => {
+        const now = new Date();
+        const cutoffMs = (() => {
+            if (trendPeriod === "7d") return now.getTime() - 7 * 86400_000;
+            if (trendPeriod === "30d") return now.getTime() - 30 * 86400_000;
+            if (trendPeriod === "month") return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            return 0;
+        })();
+
+        const outLogs = logs.filter(l => {
+            if ((l.qtyKeluar || 0) <= 0) return false;
+            const logTime = l.createdAt instanceof Date ? l.createdAt.getTime() : new Date(l.tanggal).getTime();
+            if (cutoffMs > 0 && logTime < cutoffMs) return false;
+            const it = itemName.get(l.itemId);
+            const form = classifyChemicalForm(it);
+            if (chemFormFilter !== "ALL" && form !== chemFormFilter) return false;
+            return true;
+        });
+
+        const byDate = new Map<string, { date: string; liquidQty: number; solidQty: number; totalQty: number; totalCost: number }>();
+        const byChemical = new Map<string, { id: string; nama: string; satuan: string; form: "LIQUID" | "SOLID"; qty: number; cost: number; count: number }>();
+        const byProject = new Map<string, { projectLabel: string; liquidQty: number; solidQty: number; itemsUsed: string[]; totalCost: number; lastDate: string }>();
+
+        let totalLiquidQty = 0;
+        let totalSolidQty = 0;
+        let totalCostUsed = 0;
+
+        for (const l of outLogs) {
+            const it = itemName.get(l.itemId);
+            const form = classifyChemicalForm(it);
+            const qty = l.qtyKeluar || 0;
+            const cost = l.biayaTotal > 0 ? l.biayaTotal : qty * (it?.hargaSatuan ?? 150000);
+            const dKey = l.tanggal || new Date().toISOString().slice(0, 10);
+
+            if (form === "LIQUID") totalLiquidQty += qty;
+            else totalSolidQty += qty;
+            totalCostUsed += cost;
+
+            const dRec = byDate.get(dKey) ?? { date: dKey, liquidQty: 0, solidQty: 0, totalQty: 0, totalCost: 0 };
+            if (form === "LIQUID") dRec.liquidQty += qty;
+            else dRec.solidQty += qty;
+            dRec.totalQty += qty;
+            dRec.totalCost += cost;
+            byDate.set(dKey, dRec);
+
+            const cKey = l.itemId;
+            const cRec = byChemical.get(cKey) ?? {
+                id: cKey,
+                nama: it?.nama ?? "Bahan Kimia",
+                satuan: it?.satuan ?? "Unit",
+                form,
+                qty: 0,
+                cost: 0,
+                count: 0,
+            };
+            cRec.qty += qty;
+            cRec.cost += cost;
+            cRec.count += 1;
+            byChemical.set(cKey, cRec);
+
+            const pLabel = l.proyek || "Pemakaian Operasional Umum";
+            const pRec = byProject.get(pLabel) ?? {
+                projectLabel: pLabel,
+                liquidQty: 0,
+                solidQty: 0,
+                itemsUsed: [],
+                totalCost: 0,
+                lastDate: dKey,
+            };
+            if (form === "LIQUID") pRec.liquidQty += qty;
+            else pRec.solidQty += qty;
+            const itemEntry = `${it?.nama ?? "Chemical"} (${fmt(qty)} ${it?.satuan ?? ""})`;
+            if (!pRec.itemsUsed.includes(itemEntry)) pRec.itemsUsed.push(itemEntry);
+            pRec.totalCost += cost;
+            if (dKey > pRec.lastDate) pRec.lastDate = dKey;
+            byProject.set(pLabel, pRec);
+        }
+
+        const dailySeries = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+        const peakDay = dailySeries.reduce<{ date: string; totalQty: number } | null>(
+            (best, cur) => (!best || cur.totalQty > best.totalQty ? { date: cur.date, totalQty: cur.totalQty } : best),
+            null
+        );
+        const lowestDay = dailySeries.reduce<{ date: string; totalQty: number } | null>(
+            (best, cur) => (!best || cur.totalQty < best.totalQty ? { date: cur.date, totalQty: cur.totalQty } : best),
+            null
+        );
+        const totalCombinedQty = totalLiquidQty + totalSolidQty;
+        const avgDailyQty = dailySeries.length > 0 ? totalCombinedQty / dailySeries.length : 0;
+
+        return {
+            totalLiquidQty,
+            totalSolidQty,
+            totalCombinedQty,
+            totalCostUsed,
+            peakDay,
+            lowestDay,
+            avgDailyQty,
+            dailySeries,
+            topChemicals: Array.from(byChemical.values()).sort((a, b) => b.qty - a.qty),
+            projectUsage: Array.from(byProject.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)),
+        };
+    }, [logs, itemName, trendPeriod, chemFormFilter]);
 
     // Hitung Estimasi Chemical & Analisis Untung Rugi per ID Proyek (Untuk Gudang, Admin, Marketing, & Superadmin)
     const projectProfitability = useMemo(() => {
@@ -539,13 +684,12 @@ export function InventoryPage() {
                 };
             });
 
-            // Jika belum ada log manual, berikan estimasi baseline dari standar chemical proyek agar tabel Untung Rugi tetap informatif
             const hasManualLogs = chemicalEntries.length > 0;
             const totalChemicalCost = hasManualLogs
                 ? chemicalEntries.reduce((acc, c) => acc + c.totalCost, 0)
-                : Math.round(proj.contractValue * 0.14); // Baseline estimasi 14% HPP chemical jika belum diinput Gudang
+                : Math.round(proj.contractValue * 0.14);
 
-            const operationalCost = Math.round(proj.contractValue * 0.12); // Estimasi transport & operasional teknisi 12%
+            const operationalCost = Math.round(proj.contractValue * 0.12);
             const grossProfit = proj.contractValue - totalChemicalCost - operationalCost;
             const marginPct = proj.contractValue > 0 ? Math.round((grossProfit / proj.contractValue) * 100) : 0;
 
@@ -560,6 +704,7 @@ export function InventoryPage() {
             };
         });
     }, [projects, logs, itemName]);
+
     const pagedProjectProfitability = useMemo(
         () => projectProfitability.slice((projectPage - 1) * INVENTORY_PAGE_SIZE, projectPage * INVENTORY_PAGE_SIZE),
         [projectProfitability, projectPage],
@@ -570,15 +715,19 @@ export function InventoryPage() {
     const invTabs: { id: InvTab; label: string; shortLabel: string; icon: React.ReactNode; badge?: number; badgeTone?: "danger" }[] = isDirector ? [
         { id: "proyek", label: "Analisis Untung Rugi & Keuntungan Chemical", shortLabel: "Untung Rugi", icon: <Calculator size={15} />, badge: projects.length },
         { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "chemical-trend", label: "Tren Bahan Kimia (Cair & Padat)", shortLabel: "Tren Kimia", icon: <FlaskConical size={15} /> },
         { id: "rekap",  label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileText size={15} /> },
         { id: "log",    label: "Riwayat Masuk / Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
         { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Stok Minim", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
     ] : [
-        { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Semua Stok", icon: <ClipboardList size={15} />, badge: items.length },
-        { id: "proyek", label: "Alokasi Pemakaian ke Proyek", shortLabel: "Dipakai Proyek", icon: <Briefcase size={15} />, badge: projects.length },
-        { id: "rekap",  label: "Rekap Mutasi Bulanan", shortLabel: "Rekap Bulanan", icon: <FileText size={15} /> },
-        { id: "log",    label: "Riwayat Masuk & Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
-        { id: "alert",  label: "Stok Mau Habis (Perlu Beli)", shortLabel: "Mau Habis", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+        { id: "stok",   label: "Daftar Stok Obat & Alat", shortLabel: "Stok Gudang", icon: <ClipboardList size={15} />, badge: items.length },
+        { id: "alert",  label: "Stok Hampir Habis", shortLabel: "Perlu Beli", icon: <AlertTriangle size={15} />, badge: lowStockItems.length, badgeTone: "danger" as const },
+        { id: "proyek", label: "Alokasi Pemakaian ke Proyek", shortLabel: "Alokasi Proyek", icon: <Briefcase size={15} />, badge: projects.length },
+        ...(canAccessChemicalTrend
+            ? [{ id: "chemical-trend" as InvTab, label: "Tren Bahan Kimia (Cair & Padat)", shortLabel: "Tren Kimia", icon: <FlaskConical size={15} /> }]
+            : []),
+        { id: "log",    label: "Riwayat Masuk / Keluar", shortLabel: "Riwayat", icon: <Trash2 size={15} />, badge: logs.length },
+        { id: "rekap",  label: "Rekap Bulanan", shortLabel: "Rekap", icon: <FileText size={15} /> },
     ];
 
     if (!companyId) {
@@ -587,9 +736,9 @@ export function InventoryPage() {
 
     return (
         <div className="space-y-5">
-            {/* Pusat Aksi Cepat (Senior Staff & Mobile Friendly Attention Bar) */}
+            {/* Pusat Aksi Cepat Minimalis (1-Klik Barang Masuk & Dipakai Proyek) */}
             {canWrite && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                         type="button"
                         onClick={() => {
@@ -597,22 +746,22 @@ export function InventoryPage() {
                             if (defaultItem) openMutationModal(defaultItem, "IN", "", "REALISASI");
                             else setShowNew(true);
                         }}
-                        className="clean-card p-4 sm:p-5 flex items-center justify-between gap-3 text-left hover:border-emerald-500 bg-gradient-to-r from-emerald-50/70 to-white transition-all cursor-pointer group shadow-2xs"
+                        className="clean-card p-4 flex items-center justify-between gap-3 text-left hover:border-emerald-500 bg-gradient-to-r from-emerald-50/70 to-white dark:from-emerald-950/30 dark:to-[var(--bg-card)] transition-all cursor-pointer group shadow-2xs"
                     >
-                        <div className="flex items-center gap-3.5">
-                            <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                                <ArrowDownCircle size={22} />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                                <ArrowDownCircle size={20} />
                             </div>
                             <div>
-                                <span className="font-extrabold text-sm sm:text-base text-emerald-950 block">
+                                <span className="font-extrabold text-sm text-[var(--text-primary)] block">
                                     + Catat Barang Masuk (IN)
                                 </span>
-                                <span className="text-xs text-emerald-800/90 mt-0.5 block">
-                                    Tambah stok obat atau alat yang baru dibeli / datang dari supplier
+                                <span className="text-xs text-[var(--text-secondary)] mt-0.5 block">
+                                    1-klik tambah stok obat atau alat dari supplier
                                 </span>
                             </div>
                         </div>
-                        <span className="text-xs font-bold text-emerald-700 hidden sm:inline-flex items-center gap-1 shrink-0">
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hidden sm:inline-flex items-center gap-1 shrink-0">
                             Catat <ArrowRight size={13} />
                         </span>
                     </button>
@@ -624,29 +773,29 @@ export function InventoryPage() {
                             if (defaultItem) openMutationModal(defaultItem, "OUT", projects[0]?.id || "", "REALISASI");
                             else setTab("proyek");
                         }}
-                        className="clean-card p-4 sm:p-5 flex items-center justify-between gap-3 text-left hover:border-amber-500 bg-gradient-to-r from-amber-50/70 to-white transition-all cursor-pointer group shadow-2xs"
+                        className="clean-card p-4 flex items-center justify-between gap-3 text-left hover:border-amber-500 bg-gradient-to-r from-amber-50/70 to-white dark:from-amber-950/30 dark:to-[var(--bg-card)] transition-all cursor-pointer group shadow-2xs"
                     >
-                        <div className="flex items-center gap-3.5">
-                            <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                                <ArrowUpCircle size={22} />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                                <ArrowUpCircle size={20} />
                             </div>
                             <div>
-                                <span className="font-extrabold text-sm sm:text-base text-amber-950 block">
-                                    - Catat Dipakai Proyek / Teknisi (OUT)
+                                <span className="font-extrabold text-sm text-[var(--text-primary)] block">
+                                    - Keluarkan ke Proyek / Teknisi (OUT)
                                 </span>
-                                <span className="text-xs text-amber-800/90 mt-0.5 block">
-                                    Keluarkan obat/alat yang dibawa teknisi ke lokasi proyek klien
+                                <span className="text-xs text-[var(--text-secondary)] mt-0.5 block">
+                                    1-klik catat obat/alat yang dibawa teknisi ke lokasi klien
                                 </span>
                             </div>
                         </div>
-                        <span className="text-xs font-bold text-amber-700 hidden sm:inline-flex items-center gap-1 shrink-0">
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 hidden sm:inline-flex items-center gap-1 shrink-0">
                             Catat <ArrowRight size={13} />
                         </span>
                     </button>
                 </div>
             )}
 
-            {/* Sub-tab internal Gudang & Analisis Direktur */}
+            {/* Sub-tab internal Gudang, Tren Bahan Kimia & Analisis Direktur */}
             {(isWarehouseRole || isDirector) && (
                 <TabContainer
                     tabs={invTabs}
@@ -664,23 +813,27 @@ export function InventoryPage() {
                             ? isDirector
                                 ? "Estimasi Chemical per ID Proyek & Analisis Untung Rugi"
                                 : "Alokasi Bahan Chemical per ID Proyek"
-                            : "Stok Obat & Alat Gudang"}
+                            : tab === "chemical-trend"
+                            ? "Analitik & Tren Pemakaian Bahan Kimia (Cair & Padat)"
+                            : "Mode Kerja Gudang Minimalis — Stok Obat & Alat"}
                     </h2>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                         {tab === "proyek"
                             ? isDirector
                                 ? "Pantau nilai kontrak, biaya chemical, operasional teknisi, dan margin untung rugi per proyek."
                                 : "Catat alokasi chemical ke ID proyek untuk operasional. Estimasi keuntungan dan margin finansial dikunci khusus Direktur."
-                            : "Catat obat masuk, alokasi per ID proyek, dan pantau barang yang hampir habis."}
+                            : tab === "chemical-trend"
+                            ? "Evaluasi tren pemakaian bahan kimia cair (mL/Liter) dan padat/umpan (gr/Kg/Butir) per periode dan per proyek."
+                            : "Klik kartu status di bawah untuk menyaring stok, atau klik tombol [+ Masuk] / [- Pakai Proyek] langsung pada baris barang."}
                     </p>
                 </div>
                 {canWrite && (
-                    <div className="flex flex-wrap items-center gap-2 bg-[#f5f3ef] border border-[#e8e5e0] rounded-2xl p-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
-                            onClick={() => setTab("proyek")}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors cursor-pointer"
+                            onClick={() => setTab("chemical-trend")}
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[var(--accent-text)] bg-[var(--accent-glow)] border border-[var(--border-subtle)] rounded-xl transition-colors cursor-pointer"
                         >
-                            <Calculator size={14} /> Estimasi Proyek
+                            <FlaskConical size={14} /> Cek Tren Kimia
                         </button>
                         <button
                             onClick={() => setShowNew(true)}
@@ -696,10 +849,285 @@ export function InventoryPage() {
 
             {loading && <div className="py-10 text-center text-sm text-slate-400"><Loader2 className="inline animate-spin mr-2" size={14} />Memuat data gudang & proyek...</div>}
 
-            {/* SUB-TAB BARU: PROYEK BARU, ESTIMASI CHEMICAL PER ID PROYEK, & ANALISIS UNTUNG RUGI */}
+            {/* ═══════════════════════════════════════════════════════════════════════
+                TAB BARU (PHASE 2): TREN BAHAN KIMIA (CAIR & PADAT)
+                Diakses oleh: SUPERADMIN (Direktur), ADMIN, dan INVENTORY (Gudang)
+               ═══════════════════════════════════════════════════════════════════════ */}
+            {!loading && tab === "chemical-trend" && canAccessChemicalTrend && (
+                <div className="space-y-5">
+                    {/* Baris Filter Mode Wujud Kimia (Cair vs Padat) & Periode */}
+                    <div className="clean-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-bold text-[var(--text-secondary)] mr-1">Wujud Kimia:</span>
+                            {([
+                                { id: "ALL", label: "Semua Bahan Kimia", icon: <Layers size={13} /> },
+                                { id: "LIQUID", label: "Bahan Kimia Cair (mL / Liter)", icon: <Droplets size={13} /> },
+                                { id: "SOLID", label: "Bahan Kimia Padat & Umpan (gr / Kg / Pcs)", icon: <FlaskConical size={13} /> },
+                            ] as const).map(opt => (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => setChemFormFilter(opt.id)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                        chemFormFilter === opt.id
+                                            ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-2xs"
+                                            : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                                    }`}
+                                >
+                                    {opt.icon}
+                                    <span>{opt.label}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-bold text-[var(--text-secondary)] mr-1">Periode:</span>
+                            {([
+                                { id: "7d", label: "7 Hari" },
+                                { id: "30d", label: "30 Hari" },
+                                { id: "month", label: "Bulan Ini" },
+                                { id: "all", label: "Semua" },
+                            ] as const).map(p => (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => setTrendPeriod(p.id)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                                        trendPeriod === p.id
+                                            ? "bg-[#1e3a8a] text-white border-[#3b82f6]"
+                                            : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                                    }`}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 4 Kartu Ringkasan Metrik Tren Bahan Kimia (Gaya Jarivis Analytics PCO) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div className="clean-card p-4 border-l-4 border-l-[#3b82f6] space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                TOTAL PENGGUNAAN PERIODE
+                            </span>
+                            <div className="text-xl font-black font-mono text-[var(--text-primary)]">
+                                {fmt(chemicalTrendAnalytics.totalCombinedQty)} <span className="text-xs font-semibold text-[var(--text-secondary)]">Unit</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                                Cair: <strong>{fmt(chemicalTrendAnalytics.totalLiquidQty)}</strong> • Padat: <strong>{fmt(chemicalTrendAnalytics.totalSolidQty)}</strong>
+                            </p>
+                        </div>
+
+                        <div className="clean-card p-4 border-l-4 border-l-emerald-500 space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                PUNCAK PENGGUNAAN TERTINGGI
+                            </span>
+                            <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                {chemicalTrendAnalytics.peakDay ? `${fmt(chemicalTrendAnalytics.peakDay.totalQty)} Unit` : "0 Unit"}
+                            </div>
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                                {chemicalTrendAnalytics.peakDay ? `Tanggal: ${chemicalTrendAnalytics.peakDay.date}` : "Belum ada pemakaian tercatat"}
+                            </p>
+                        </div>
+
+                        <div className="clean-card p-4 border-l-4 border-l-amber-500 space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                PENGGUNAAN TERENDAH (HARI AKTIF)
+                            </span>
+                            <div className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                                {chemicalTrendAnalytics.lowestDay ? `${fmt(chemicalTrendAnalytics.lowestDay.totalQty)} Unit` : "0 Unit"}
+                            </div>
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                                {chemicalTrendAnalytics.lowestDay ? `Tanggal: ${chemicalTrendAnalytics.lowestDay.date}` : "Belum ada pemakaian tercatat"}
+                            </p>
+                        </div>
+
+                        <div className="clean-card p-4 border-l-4 border-l-purple-500 space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                RATA-RATA HARIAN
+                            </span>
+                            <div className="text-xl font-black font-mono text-[var(--text-primary)]">
+                                {fmt(chemicalTrendAnalytics.avgDailyQty)} <span className="text-xs font-semibold text-[var(--text-secondary)]">Unit / Hari</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--text-secondary)]">
+                                {isAdminOrDirector
+                                    ? `Nilai HPP Terpakai: ${formatRupiah(chemicalTrendAnalytics.totalCostUsed)}`
+                                    : `${chemicalTrendAnalytics.dailySeries.length} hari kerja aktif`}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Grid Grafik Tren Harian & Komposisi Bahan Kimia Teratas */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        {/* Grafik Tren Penggunaan Harian (7 cols) */}
+                        <div className="lg:col-span-7 clean-card p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                        <BarChart3 size={16} className="text-[var(--accent)]" />
+                                        Grafik Tren Pemakaian Bahan Kimia Harian
+                                    </h3>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        Perbandingan volume bahan kimia Cair (Biru) vs Padat/Umpan (Hijau Emerald)
+                                    </p>
+                                </div>
+                            </div>
+
+                            {chemicalTrendAnalytics.dailySeries.length === 0 ? (
+                                <div className="py-12 text-center text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-subtle)] rounded-xl">
+                                    Belum ada riwayat pengeluaran bahan kimia pada periode ini. Klik <strong>- Pakai Proyek</strong> di tab Stok untuk mulai mencatat.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="h-48 flex items-end gap-2 pt-4 pb-2 px-2 overflow-x-auto border-b border-[var(--border-subtle)]">
+                                        {chemicalTrendAnalytics.dailySeries.map(d => {
+                                            const maxVal = Math.max(1, ...chemicalTrendAnalytics.dailySeries.map(x => x.totalQty));
+                                            const heightPct = Math.max(10, Math.round((d.totalQty / maxVal) * 100));
+                                            const liqRatio = d.totalQty > 0 ? Math.round((d.liquidQty / d.totalQty) * 100) : 0;
+                                            return (
+                                                <div key={d.date} className="flex-1 min-w-[44px] flex flex-col items-center gap-1.5 group">
+                                                    <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)]">
+                                                        {fmt(d.totalQty)}
+                                                    </span>
+                                                    <div className="w-full max-w-[32px] h-32 bg-[var(--bg-tertiary)] rounded-t-lg flex flex-col justify-end overflow-hidden border border-[var(--border-subtle)]">
+                                                        <div
+                                                            style={{ height: `${heightPct}%` }}
+                                                            className="w-full flex flex-col justify-end transition-all duration-300"
+                                                            title={`${d.date}: Cair ${fmt(d.liquidQty)} | Padat ${fmt(d.solidQty)}`}
+                                                        >
+                                                            <div
+                                                                style={{ height: `${liqRatio}%` }}
+                                                                className="w-full bg-[#3b82f6]"
+                                                            />
+                                                            <div
+                                                                style={{ height: `${100 - liqRatio}%` }}
+                                                                className="w-full bg-emerald-600"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[10px] font-mono text-[var(--text-muted)] whitespace-nowrap">
+                                                        {d.date.slice(5)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex items-center justify-center gap-5 text-xs">
+                                        <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
+                                            <span className="w-3 h-3 rounded-xs bg-[#3b82f6]" /> Kimia Cair (mL/Liter/Botol)
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
+                                            <span className="w-3 h-3 rounded-xs bg-emerald-600" /> Kimia Padat &amp; Umpan (gr/Kg/Pcs)
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Top Bahan Kimia Paling Banyak Digunakan (5 cols) */}
+                        <div className="lg:col-span-5 clean-card p-5 space-y-3">
+                            <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                                Peringkat Konsumsi Bahan Kimia Teratas
+                            </h3>
+                            <p className="text-xs text-[var(--text-secondary)]">
+                                Urutan item berdasarkan total volume pemakaian di lapangan
+                            </p>
+
+                            {chemicalTrendAnalytics.topChemicals.length === 0 ? (
+                                <div className="py-10 text-center text-xs text-[var(--text-muted)]">
+                                    Belum ada item bahan kimia yang dikeluarkan pada periode ini.
+                                </div>
+                            ) : (
+                                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                                    {chemicalTrendAnalytics.topChemicals.slice(0, 8).map(c => {
+                                        const maxC = Math.max(1, chemicalTrendAnalytics.topChemicals[0]?.qty || 1);
+                                        const pct = Math.min(100, Math.round((c.qty / maxC) * 100));
+                                        return (
+                                            <div key={c.id} className="space-y-1 p-2.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                                                <div className="flex items-center justify-between gap-2 text-xs">
+                                                    <div className="font-bold text-[var(--text-primary)] truncate flex items-center gap-1.5">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                            c.form === "LIQUID" ? "bg-blue-500/15 text-blue-600" : "bg-emerald-500/15 text-emerald-700"
+                                                        }`}>
+                                                            {c.form === "LIQUID" ? "CAIR" : "PADAT"}
+                                                        </span>
+                                                        <span className="truncate">{c.nama}</span>
+                                                    </div>
+                                                    <span className="font-mono font-bold text-[var(--text-primary)] shrink-0">
+                                                        {fmt(c.qty)} {c.satuan}
+                                                    </span>
+                                                </div>
+                                                <div className="w-full h-1.5 rounded-full bg-[var(--bg-card)] overflow-hidden">
+                                                    <div
+                                                        style={{ width: `${pct}%` }}
+                                                        className={`h-full rounded-full ${c.form === "LIQUID" ? "bg-[#3b82f6]" : "bg-emerald-600"}`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tabel Rincian Pemakaian Bahan Kimia per Pelanggan / Proyek */}
+                    <div className="clean-card overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                                    Rincian Pemakaian Bahan Kimia Berdasarkan Pelanggan / Proyek
+                                </h3>
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                    Rekapitulasi alokasi bahan kimia cair &amp; padat untuk setiap lokasi proyek
+                                </p>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse min-w-[680px]">
+                                <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)] text-[10.5px] font-bold uppercase text-[var(--text-muted)]">
+                                    <tr>
+                                        <th className="py-3 px-4">Pelanggan / Proyek</th>
+                                        <th className="py-3 px-4">Tanggal Terakhir</th>
+                                        <th className="py-3 px-4 text-center">Kimia Cair</th>
+                                        <th className="py-3 px-4 text-center">Kimia Padat</th>
+                                        <th className="py-3 px-4">Rincian Material Dipakai</th>
+                                        {isAdminOrDirector && <th className="py-3 px-4 text-right">Nilai HPP</th>}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--border-subtle)]">
+                                    {chemicalTrendAnalytics.projectUsage.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="py-8 text-center text-[var(--text-muted)]">
+                                                Belum ada data pemakaian bahan kimia per proyek.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        chemicalTrendAnalytics.projectUsage.map((pu, idx) => (
+                                            <tr key={idx} className="hover:bg-[var(--bg-tertiary)]/50">
+                                                <td className="py-3 px-4 font-bold text-[var(--text-primary)]">{pu.projectLabel}</td>
+                                                <td className="py-3 px-4 font-mono text-[var(--text-secondary)]">{pu.lastDate}</td>
+                                                <td className="py-3 px-4 text-center font-mono font-bold text-blue-600">{fmt(pu.liquidQty)}</td>
+                                                <td className="py-3 px-4 text-center font-mono font-bold text-emerald-700">{fmt(pu.solidQty)}</td>
+                                                <td className="py-3 px-4 text-[var(--text-secondary)]">{pu.itemsUsed.join(", ")}</td>
+                                                {isAdminOrDirector && (
+                                                    <td className="py-3 px-4 text-right font-mono font-semibold text-[var(--text-primary)]">
+                                                        {formatRupiah(pu.totalCost)}
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SUB-TAB: PROYEK BARU, ESTIMASI CHEMICAL PER ID PROYEK, & ANALISIS UNTUNG RUGI */}
             {!loading && tab === "proyek" && (
                 <div className="space-y-6">
-                    {/* Quick Input Bar untuk Gudang / Admin: Pilih Proyek + Pilih Chemical + Input Estimasi ke ID Proyek */}
                     {canWrite && items.length > 0 && projects.length > 0 && (
                         <div className="clean-card p-5 sm:p-6 border-emerald-200/80 bg-emerald-50/25 space-y-4">
                             <div>
@@ -721,7 +1149,7 @@ export function InventoryPage() {
                                     >
                                         {projects.map(p => (
                                             <option key={p.id} value={p.id}>
-                                                [{p.code}] {p.projectName} ({formatRupiah(p.contractValue)})
+                                                [{p.code}] {p.projectName} {isAdminOrDirector ? `(${formatRupiah(p.contractValue)})` : ""}
                                             </option>
                                         ))}
                                     </select>
@@ -735,7 +1163,7 @@ export function InventoryPage() {
                                     >
                                         {items.map(it => (
                                             <option key={it.id} value={it.id}>
-                                                {it.nama} ({it.satuan} • HPP {formatRupiah(it.hargaSatuan)})
+                                                {it.nama} ({it.satuan}{isAdminOrDirector ? ` • HPP ${formatRupiah(it.hargaSatuan)}` : ""})
                                             </option>
                                         ))}
                                     </select>
@@ -875,7 +1303,7 @@ export function InventoryPage() {
                                                                 const chosen = items[0];
                                                                 if (chosen) openMutationModal(chosen, "OUT", p.id, "ESTIMASI");
                                                             }}
-                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer"
                                                         >
                                                             <Plus size={12} /> Estimasi Chemical
                                                         </button>
@@ -893,203 +1321,352 @@ export function InventoryPage() {
                 </div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════════════
+                MODE KERJA GUDANG MINIMALIS (PHASE 1) — STOK & PERINGATAN RESTKOCK
+               ═══════════════════════════════════════════════════════════════════════ */}
             {!loading && (tab === "stok" || tab === "alert") && (
-                <div className="clean-card p-5 sm:p-6 space-y-5">
-                    {/* Barventis Filter & Action Row */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-700">Tanggal:</span>
-                                <span className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
-                                    {new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-700">Kategori:</span>
-                                <select
-                                    value={kategoriFilter}
-                                    onChange={e => { setKategoriFilter(e.target.value); setItemsPage(1); }}
-                                    className="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl text-slate-700"
-                                >
-                                    <option value="ALL">Semua Lokasi / Kategori</option>
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                        </div>
+                <div className="space-y-4">
+                    {/* 4 Kartu Status Stok Warna Solid Interaktif (1-Klik Filter Cepat) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => { setTab("stok"); setStockHealthFilter("ALL"); setItemsPage(1); }}
+                            className={`p-4 rounded-2xl text-left transition-all cursor-pointer border ${
+                                tab === "stok" && stockHealthFilter === "ALL"
+                                    ? "bg-[#1e293b] text-white border-[#3b82f6] ring-2 ring-[#3b82f6]/30 shadow-sm"
+                                    : "bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                            }`}
+                        >
+                            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 block">Semua Item Gudang</span>
+                            <span className="text-2xl font-black font-mono mt-1 block">{items.length}</span>
+                            <span className="text-[11px] opacity-75 mt-0.5 block">Klik tampilkan semua</span>
+                        </button>
 
-                        {canWrite && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={loadGuciWarehouseCatalog}
-                                    disabled={isImporting}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer"
-                                    title="Muat otomatis master data inventaris dari arsip Data Gudang September"
-                                >
-                                    <Package size={13} /> {isImporting ? "Memuat..." : "Muat Data Gudang"}
-                                </button>
-                                <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                                    <Download size={13} /> Export Template
-                                </button>
-                                <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
-                                    {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import Excel / CSV
-                                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
-                                </label>
-                            </div>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => { setTab("stok"); setStockHealthFilter("SAFE"); setItemsPage(1); }}
+                            className={`p-4 rounded-2xl text-left transition-all cursor-pointer border ${
+                                tab === "stok" && stockHealthFilter === "SAFE"
+                                    ? "bg-emerald-700 text-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm"
+                                    : "bg-emerald-50/70 dark:bg-emerald-950/25 text-emerald-950 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100/70"
+                            }`}
+                        >
+                            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 block">Stok Aman</span>
+                            <span className="text-2xl font-black font-mono mt-1 block">{safeStockItems.length}</span>
+                            <span className="text-[11px] opacity-75 mt-0.5 block">Siap dialokasikan</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => { setTab("stok"); setStockHealthFilter("LOW"); setItemsPage(1); }}
+                            className={`p-4 rounded-2xl text-left transition-all cursor-pointer border ${
+                                (tab === "stok" && stockHealthFilter === "LOW") || tab === "alert"
+                                    ? "bg-amber-600 text-white border-amber-400 ring-2 ring-amber-400/30 shadow-sm"
+                                    : "bg-amber-50/70 dark:bg-amber-950/25 text-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800/50 hover:bg-amber-100/70"
+                            }`}
+                        >
+                            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 block">Stok Hampir Habis</span>
+                            <span className="text-2xl font-black font-mono mt-1 block">{lowStockItems.length}</span>
+                            <span className="text-[11px] opacity-75 mt-0.5 block">Perlu segera restock</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => { setTab("stok"); setStockHealthFilter("EMPTY"); setItemsPage(1); }}
+                            className={`p-4 rounded-2xl text-left transition-all cursor-pointer border ${
+                                tab === "stok" && stockHealthFilter === "EMPTY"
+                                    ? "bg-rose-700 text-white border-rose-500 ring-2 ring-rose-500/30 shadow-sm"
+                                    : "bg-rose-50/70 dark:bg-rose-950/25 text-rose-950 dark:text-rose-200 border-rose-200 dark:border-rose-800/50 hover:bg-rose-100/70"
+                            }`}
+                        >
+                            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 block">Stok Habis (0)</span>
+                            <span className="text-2xl font-black font-mono mt-1 block">{emptyStockItems.length}</span>
+                            <span className="text-[11px] opacity-75 mt-0.5 block">Kosong di gudang</span>
+                        </button>
                     </div>
 
-                    {/* Search Bar Box */}
-                    <div className="bg-[#faf9f7] border border-[#e8e5e0] rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="relative flex-1">
-                            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                value={searchQ}
-                                onChange={e => { setSearchQ(e.target.value); setItemsPage(1); }}
-                                placeholder="Cari nama chemical, kode barang, atau material..."
-                                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[var(--accent)]"
-                            />
-                        </div>
-                        <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                            Menampilkan <b>{filtered.length}</b> dari <b>{items.length}</b> material
-                        </span>
-                    </div>
+                    <div className="clean-card p-4 sm:p-6 space-y-4">
+                        {/* Barventis Filter & Action Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                <span className="text-xs font-bold text-[var(--text-secondary)]">Kategori:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setKategoriFilter("ALL"); setItemsPage(1); }}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                                            kategoriFilter === "ALL"
+                                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                                : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                                        }`}
+                                    >
+                                        Semua ({items.length})
+                                    </button>
+                                    {categories.map(c => (
+                                        <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => { setKategoriFilter(c); setItemsPage(1); }}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                                                kategoriFilter === c
+                                                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                                    : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                                            }`}
+                                        >
+                                            {c}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
 
-                    {/* Barventis Pill Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="bg-[#f5f3ef] text-slate-600 text-[11px] font-bold uppercase tracking-wider">
-                                    <th className="p-3 rounded-l-xl">Barang / Material &amp; HPP</th>
-                                    <th className="p-3 text-center">Stok Saat Ini (Full)</th>
-                                    <th className="p-3 text-center">Batas Minimum</th>
-                                    <th className="p-3 text-center">Status Stok</th>
-                                    {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-50/60">Catat Masuk / Estimasi Proyek</th>}
-                                </tr>
-                            </thead>
-                            <tbody key={itemsPage} className="result-enter">
-                                {filtered.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="p-8 text-center text-slate-500">
-                                            {items.length === 0 ? (
-                                                <div className="max-w-md mx-auto space-y-3 py-4">
-                                                    <Package size={32} className="mx-auto text-emerald-600 opacity-60" />
-                                                    <div className="font-bold text-slate-800 text-sm">Inventaris Gudang Belum Terisi</div>
-                                                    <p className="text-xs text-slate-500 leading-relaxed">
-                                                        Muat otomatis seluruh 35+ item obat anti rayap, pest control, mesin, sparepart, dan pipa dari arsip <b>Data Gudang September</b>.
-                                                    </p>
-                                                    {canWrite && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={loadGuciWarehouseCatalog}
-                                                            disabled={isImporting}
-                                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                                        >
-                                                            <Package size={14} /> {isImporting ? "Memuat..." : "Muat 35+ Item Data Gudang"}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                "Tidak ada hasil yang cocok dengan filter atau kata kunci."
-                                            )}
-                                        </td>
-                                    </tr>
+                            {canWrite && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={loadGuciWarehouseCatalog}
+                                        disabled={isImporting}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer"
+                                        title="Muat otomatis master data inventaris dari arsip Data Gudang September"
+                                    >
+                                        <Package size={13} /> {isImporting ? "Memuat..." : "Muat Data Gudang"}
+                                    </button>
+                                    <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer">
+                                        <Download size={13} /> Template Excel
+                                    </button>
+                                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--bg-tertiary)] cursor-pointer transition-colors">
+                                        {isImporting ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />} Import Excel
+                                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={isImporting} onChange={handleImportBulk} />
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search Bar Box */}
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="relative flex-1">
+                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                                <input
+                                    value={searchQ}
+                                    onChange={e => { setSearchQ(e.target.value); setItemsPage(1); }}
+                                    placeholder="Ketik nama obat/alat untuk langsung mencatat masuk atau keluar..."
+                                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                                />
+                                {searchQ && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQ("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                                    >
+                                        <X size={14} />
+                                    </button>
                                 )}
-                                {pagedItems.map(s => {
-                                    const low = s.stok <= s.minAlert;
-                                    return (
-                                        <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors">
-                                            <td className="p-3">
-                                                <div className="font-bold text-slate-900">{s.nama}</div>
-                                                <div className="text-xs text-slate-500 mt-0.5">
-                                                    {s.kategori} • Satuan: {s.satuan} • HPP: <span className="font-mono font-semibold text-slate-700">{formatRupiah(s.hargaSatuan)}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <span className={`inline-flex items-center justify-center min-w-[88px] px-3 py-1.5 rounded-full border text-xs font-bold ${
-                                                    low ? "border-rose-300 bg-rose-50 text-rose-700" : "border-slate-200 bg-white text-slate-800"
+                            </div>
+                            <span className="text-xs font-medium text-[var(--text-secondary)] whitespace-nowrap">
+                                Menampilkan <b>{filtered.length}</b> dari <b>{items.length}</b> barang
+                            </span>
+                        </div>
+
+                        {/* Tampilan Mobile HP (< 768px): Kartu Gudang Minimalis Ramah Jempol */}
+                        <div className="md:hidden space-y-2.5">
+                            {pagedItems.map(s => {
+                                const low = s.stok <= s.minAlert;
+                                return (
+                                    <div key={s.id} className="p-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] space-y-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+                                                    {s.kategori}
+                                                </span>
+                                                <h4 className="font-extrabold text-sm text-[var(--text-primary)] mt-1">{s.nama}</h4>
+                                                {!isWarehouseOnly && (
+                                                    <p className="text-[11px] text-[var(--text-muted)] font-mono">
+                                                        HPP: {formatRupiah(s.hargaSatuan)} / {s.satuan}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <span className={`inline-block px-3 py-1 rounded-xl font-mono font-black text-sm border ${
+                                                    low ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                                 }`}>
-                                                    {fmt(s.stok)}
+                                                    {fmt(s.stok)} {s.satuan}
                                                 </span>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <span className="inline-flex items-center justify-center min-w-[76px] px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                                                    {fmt(s.minAlert)}
+                                                <span className="block text-[10px] text-[var(--text-muted)] mt-0.5">
+                                                    Min: {fmt(s.minAlert)}
                                                 </span>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                {low ? (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
-                                                        <AlertTriangle size={12} /> Perlu Restock
-                                                    </span>
+                                            </div>
+                                        </div>
+
+                                        {canWrite && (
+                                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[var(--border-subtle)]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openMutationModal(s, "IN", "", "REALISASI")}
+                                                    className="min-h-[42px] py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <ArrowDownCircle size={15} /> + Stok Masuk
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openMutationModal(s, "OUT", projects[0]?.id ?? "", "REALISASI")}
+                                                    className="min-h-[42px] py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer"
+                                                >
+                                                    <ArrowUpCircle size={15} /> - Pakai Proyek
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Tampilan Desktop (>= 768px): Barventis Pill Table */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[11px] font-bold uppercase tracking-wider">
+                                        <th className="p-3 rounded-l-xl">Barang / Material</th>
+                                        <th className="p-3 text-center">Stok Saat Ini (Full)</th>
+                                        <th className="p-3 text-center">Batas Minimum</th>
+                                        <th className="p-3 text-center">Status Stok</th>
+                                        {canWrite && <th className="p-3 text-center rounded-r-xl bg-emerald-500/10">Aksi Cepat 1-Klik (Masuk / Proyek)</th>}
+                                    </tr>
+                                </thead>
+                                <tbody key={itemsPage} className="result-enter">
+                                    {filtered.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="p-8 text-center text-[var(--text-muted)]">
+                                                {items.length === 0 ? (
+                                                    <div className="max-w-md mx-auto space-y-3 py-4">
+                                                        <Package size={32} className="mx-auto text-emerald-600 opacity-60" />
+                                                        <div className="font-bold text-[var(--text-primary)] text-sm">Inventaris Gudang Belum Terisi</div>
+                                                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                                                            Muat otomatis seluruh 35+ item obat anti rayap, pest control, mesin, sparepart, dan pipa dari arsip <b>Data Gudang September</b>.
+                                                        </p>
+                                                        {canWrite && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={loadGuciWarehouseCatalog}
+                                                                disabled={isImporting}
+                                                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                                            >
+                                                                <Package size={14} /> {isImporting ? "Memuat..." : "Muat 35+ Item Data Gudang"}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                                        Aman
-                                                    </span>
+                                                    "Tidak ada hasil yang cocok dengan filter atau kata kunci."
                                                 )}
                                             </td>
-                                            {canWrite && (
-                                                <td className="p-3 text-center whitespace-nowrap bg-emerald-50/15">
-                                                    <div className="inline-flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openMutationModal(s, "IN", "", "REALISASI")}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all cursor-pointer shadow-2xs"
-                                                            title="Catat Barang Masuk (+)"
-                                                        >
-                                                            <ArrowDownCircle size={15} className="text-emerald-700 shrink-0" />
-                                                            <span>+ Masuk</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openMutationModal(s, "OUT", projects[0]?.id ?? "", "REALISASI")}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition-all cursor-pointer shadow-2xs"
-                                                            title="Catat Dipakai Proyek (-)"
-                                                        >
-                                                            <ArrowUpCircle size={15} className="text-amber-700 shrink-0" />
-                                                            <span>- Pakai Proyek</span>
-                                                        </button>
+                                        </tr>
+                                    )}
+                                    {pagedItems.map(s => {
+                                        const low = s.stok <= s.minAlert;
+                                        return (
+                                            <tr key={s.id} className="border-t border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]/60 transition-colors">
+                                                <td className="p-3">
+                                                    <div className="font-bold text-[var(--text-primary)]">{s.nama}</div>
+                                                    <div className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                        {s.kategori} • Satuan: <strong>{s.satuan}</strong>
+                                                        {!isWarehouseOnly && (
+                                                            <> • HPP: <span className="font-mono font-semibold">{formatRupiah(s.hargaSatuan)}</span></>
+                                                        )}
                                                     </div>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                                <td className="p-3 text-center">
+                                                    <span className={`inline-flex items-center justify-center min-w-[88px] px-3 py-1.5 rounded-full border text-xs font-bold font-mono ${
+                                                        low ? "border-rose-300 bg-rose-50 text-rose-700" : "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]"
+                                                    }`}>
+                                                        {fmt(s.stok)} {s.satuan}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className="inline-flex items-center justify-center min-w-[76px] px-3 py-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs font-semibold text-[var(--text-secondary)] font-mono">
+                                                        {fmt(s.minAlert)}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    {low ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+                                                            <AlertTriangle size={12} /> Perlu Restock
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                            Aman
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                {canWrite && (
+                                                    <td className="p-3 text-center whitespace-nowrap">
+                                                        <div className="inline-flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openMutationModal(s, "IN", "", "REALISASI")}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                                                title="Catat Barang Masuk (+)"
+                                                            >
+                                                                <ArrowDownCircle size={15} className="text-emerald-700 shrink-0" />
+                                                                <span>+ Masuk</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openMutationModal(s, "OUT", projects[0]?.id ?? "", "REALISASI")}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] text-xs font-extrabold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                                                title="Catat Dipakai Proyek (-)"
+                                                            >
+                                                                <ArrowUpCircle size={15} className="text-amber-700 shrink-0" />
+                                                                <span>- Pakai Proyek</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <Pagination page={itemsPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={filtered.length}
+                            onPageChange={setItemsPage} itemLabel="material" />
                     </div>
-                    <Pagination page={itemsPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={filtered.length}
-                        onPageChange={setItemsPage} itemLabel="material" />
                 </div>
             )}
 
             {!loading && tab === "log" && (
-                <div className="bg-white border border-[#e8e5e0] rounded-2xl overflow-hidden shadow-xs">
+                <div className="clean-card overflow-hidden">
                     <div className="overflow-x-auto p-4">
-                    <table className="w-full text-left border-collapse text-sm">
-                        <thead><tr className="bg-[#f5f3ef] text-slate-600 text-xs uppercase font-bold">
-                            <th className="p-3 rounded-l-xl">Tanggal</th><th className="p-3">Tipe</th><th className="p-3">Item</th><th className="p-3 text-right">Masuk (IN)</th><th className="p-3 text-right">Keluar / Estimasi</th><th className="p-3 text-right">Sisa Stok</th><th className="p-3">ID Proyek</th><th className="p-3 rounded-r-xl">Keterangan</th>
-                        </tr></thead>
-                        <tbody key={logsPage} className="result-enter">
-                            {logs.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-400">Belum ada mutasi stok.</td></tr>}
-                            {pagedLogs.map(l => (
-                                <tr key={l.id} className="border-t border-slate-100">
-                                    <td className="p-3 text-slate-500 whitespace-nowrap">{l.tanggal}</td>
-                                    <td className="p-3">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.tipeCatatan === "ESTIMASI" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-                                            {l.tipeCatatan}
-                                        </span>
-                                    </td>
-                                    <td className="p-3 font-semibold text-slate-800">{itemName.get(l.itemId)?.nama ?? "—"}</td>
-                                    <td className="p-3 text-right text-emerald-600 font-bold">{l.qtyMasuk ? `+${fmt(l.qtyMasuk)}` : "—"}</td>
-                                    <td className="p-3 text-right text-orange-600 font-bold">{l.qtyKeluar ? `-${fmt(l.qtyKeluar)}` : "—"}</td>
-                                    <td className="p-3 text-right font-semibold">{fmt(l.sisaStok)}</td>
-                                    <td className="p-3 text-slate-700 font-mono text-xs">{l.proyek ?? "—"}</td>
-                                    <td className="p-3 text-slate-500">{l.keterangan ?? "—"}</td>
+                        <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold">
+                                    <th className="p-3 rounded-l-xl">Tanggal</th>
+                                    <th className="p-3">Tipe</th>
+                                    <th className="p-3">Item</th>
+                                    <th className="p-3 text-right">Masuk (IN)</th>
+                                    <th className="p-3 text-right">Keluar / Proyek</th>
+                                    <th className="p-3 text-right">Sisa Stok</th>
+                                    <th className="p-3">ID Proyek</th>
+                                    <th className="p-3 rounded-r-xl">Keterangan</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody key={logsPage} className="result-enter">
+                                {logs.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-[var(--text-muted)]">Belum ada mutasi stok.</td></tr>}
+                                {pagedLogs.map(l => (
+                                    <tr key={l.id} className="border-t border-[var(--border-subtle)]">
+                                        <td className="p-3 text-[var(--text-secondary)] whitespace-nowrap font-mono text-xs">{l.tanggal}</td>
+                                        <td className="p-3">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.tipeCatatan === "ESTIMASI" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                                                {l.tipeCatatan}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 font-semibold text-[var(--text-primary)]">{itemName.get(l.itemId)?.nama ?? "—"}</td>
+                                        <td className="p-3 text-right text-emerald-600 font-bold font-mono">{l.qtyMasuk ? `+${fmt(l.qtyMasuk)}` : "—"}</td>
+                                        <td className="p-3 text-right text-orange-600 font-bold font-mono">{l.qtyKeluar ? `-${fmt(l.qtyKeluar)}` : "—"}</td>
+                                        <td className="p-3 text-right font-semibold font-mono">{fmt(l.sisaStok)}</td>
+                                        <td className="p-3 text-[var(--text-secondary)] font-mono text-xs">{l.proyek ?? "—"}</td>
+                                        <td className="p-3 text-[var(--text-secondary)] text-xs">{l.keterangan ?? "—"}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                     <Pagination page={logsPage} pageSize={INVENTORY_PAGE_SIZE} totalItems={logs.length}
                         onPageChange={setLogsPage} itemLabel="mutasi stok" />
@@ -1097,23 +1674,31 @@ export function InventoryPage() {
             )}
 
             {!loading && tab === "rekap" && (
-                <div className="bg-white border border-[#e8e5e0] rounded-2xl p-4 space-y-3 shadow-xs">
-                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-700">Periode Bulan:</span>
-                        <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200" />
+                <div className="clean-card p-4 space-y-3">
+                    <div className="pb-3 border-b border-[var(--border-subtle)] flex items-center gap-2">
+                        <span className="text-xs font-bold text-[var(--text-secondary)]">Periode Bulan:</span>
+                        <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)]" />
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-sm">
-                            <thead><tr className="bg-[#f5f3ef] text-slate-600 text-xs uppercase font-bold"><th className="p-3 rounded-l-xl">Item</th><th className="p-3 text-right">Total Masuk</th><th className="p-3 text-right">Total Keluar</th><th className="p-3 text-right">Stok Akhir Bulan</th><th className="p-3 rounded-r-xl">Satuan</th></tr></thead>
+                            <thead>
+                                <tr className="bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs uppercase font-bold">
+                                    <th className="p-3 rounded-l-xl">Item</th>
+                                    <th className="p-3 text-right">Total Masuk</th>
+                                    <th className="p-3 text-right">Total Keluar</th>
+                                    <th className="p-3 text-right">Stok Akhir Bulan</th>
+                                    <th className="p-3 rounded-r-xl">Satuan</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                {recap.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-400">Tidak ada mutasi pada bulan ini.</td></tr>}
+                                {recap.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-[var(--text-muted)]">Tidak ada mutasi pada bulan ini.</td></tr>}
                                 {recap.map(r => (
-                                    <tr key={r.item.id} className="border-t border-slate-100">
-                                        <td className="p-3 font-semibold text-slate-800">{r.item.nama}</td>
-                                        <td className="p-3 text-right text-emerald-600 font-bold">{fmt(r.masuk)}</td>
-                                        <td className="p-3 text-right text-orange-600 font-bold">{fmt(r.keluar)}</td>
-                                        <td className="p-3 text-right font-semibold">{r.akhir == null ? "—" : fmt(r.akhir)}</td>
-                                        <td className="p-3 text-slate-500">{r.item.satuan}</td>
+                                    <tr key={r.item.id} className="border-t border-[var(--border-subtle)]">
+                                        <td className="p-3 font-semibold text-[var(--text-primary)]">{r.item.nama}</td>
+                                        <td className="p-3 text-right text-emerald-600 font-bold font-mono">{fmt(r.masuk)}</td>
+                                        <td className="p-3 text-right text-orange-600 font-bold font-mono">{fmt(r.keluar)}</td>
+                                        <td className="p-3 text-right font-semibold font-mono">{r.akhir == null ? "—" : fmt(r.akhir)}</td>
+                                        <td className="p-3 text-[var(--text-secondary)]">{r.item.satuan}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1126,7 +1711,6 @@ export function InventoryPage() {
             {mutation && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 modal-overlay-in" onClick={() => !busy && setMutation(null)}>
                     <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-lg space-y-4 shadow-2xl modal-card-in border border-[var(--border)]" onClick={e => e.stopPropagation()}>
-                        {/* Header Modal */}
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                             <div className="flex items-center gap-2.5">
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-2xs ${
@@ -1153,7 +1737,6 @@ export function InventoryPage() {
                             </button>
                         </div>
 
-                        {/* Preview Saldo Stok Otomatis */}
                         <div className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
                             mutation.type === "IN"
                                 ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
@@ -1181,7 +1764,6 @@ export function InventoryPage() {
                             </div>
                         </div>
 
-                        {/* Pilihan Barang / Item */}
                         <div className="space-y-1.5 text-xs">
                             <label className="block font-bold text-slate-800">Nama Barang / Obat / Alat *</label>
                             <select
@@ -1200,7 +1782,6 @@ export function InventoryPage() {
                             </select>
                         </div>
 
-                        {/* Jika Barang Keluar: Pilih Proyek / Klien */}
                         {mutation.type === "OUT" && (
                             <div className="space-y-3">
                                 <div className="space-y-1.5 text-xs">
@@ -1253,7 +1834,6 @@ export function InventoryPage() {
                             </div>
                         )}
 
-                        {/* Input Jumlah Qty */}
                         <div className="space-y-1.5 text-xs">
                             <label className="block font-bold text-slate-800">
                                 Jumlah ({mutation.item.satuan}) Yang {mutation.type === "IN" ? "Masuk (+)" : "Dikeluarkan (-)"} *
@@ -1273,7 +1853,6 @@ export function InventoryPage() {
                             )}
                         </div>
 
-                        {/* Input Catatan / Nama Teknisi */}
                         <div className="space-y-1.5 text-xs">
                             <label className="block font-bold text-slate-800">Catatan / Nama Teknisi Pembawa</label>
                             <input
@@ -1284,7 +1863,6 @@ export function InventoryPage() {
                             />
                         </div>
 
-                        {/* Tombol Simpan */}
                         <div className="pt-2">
                             <button
                                 type="button"

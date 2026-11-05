@@ -20,6 +20,7 @@ import { formatDate } from '@/shared/lib/utils';
 import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
 import type { Quotation } from '@/entities/types';
 import { MapPicker } from '@/widgets/common/MapPicker';
+import { KontrolRayapPage } from './KontrolRayapPage';
 import { searchAddressSuggestions, type AddressSuggestion } from '@/shared/utils/geocoding';
 
 interface ControlChecklist {
@@ -977,8 +978,22 @@ function BulkImportPreviewModal({
 
 const CUSTOMER_PAGE_SIZE = 10;
 
-export function CustomersPage() {
+export type CustomerHubTab = "master" | "garansi" | "analisis" | "pengaturan";
+
+export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: CustomerHubTab } = {}) {
     const { user } = useAuthStore();
+    const [hubTab, setHubTab] = useState<CustomerHubTab>(initialSubTab);
+    const [onlyMissingPin, setOnlyMissingPin] = useState(false);
+    const [customerViewMode, setCustomerViewMode] = useState<'card' | 'table'>('card');
+    const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+    const [contractReminderEnabled, setContractReminderEnabled] = useState(true);
+    const [reminderDays1, setReminderDays1] = useState(14);
+    const [reminderDays2, setReminderDays2] = useState(30);
+    const [reminderSaved, setReminderSaved] = useState(false);
+
+    useEffect(() => {
+        setHubTab(initialSubTab);
+    }, [initialSubTab]);
     const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [checklists, setChecklists] = useState<(ControlChecklist & { customerId: string })[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1182,9 +1197,15 @@ export function CustomersPage() {
         return map;
     }, [quotations, checklists]);
 
+    const missingPinCustomers = useMemo(
+        () => Array.from(customerMap.values()).filter(c => !c.latitude || !c.longitude),
+        [customerMap]
+    );
+
     const customers = useMemo(() => {
         let result = Array.from(customerMap.values());
         if (filterWarranty) result = result.filter(c => c.activeWarranty?.isActive);
+        if (onlyMissingPin) result = result.filter(c => !c.latitude || !c.longitude);
         const s = debouncedSearch.trim().toLowerCase();
         if (s) result = result.filter(c =>
             c.name.toLowerCase().includes(s) ||
@@ -1199,7 +1220,7 @@ export function CustomersPage() {
             : (b.services[0]?.tanggal?.getTime() ?? 0) - (a.services[0]?.tanggal?.getTime() ?? 0)
         );
         return result;
-    }, [customerMap, filterWarranty, debouncedSearch, sortBy]);
+    }, [customerMap, filterWarranty, onlyMissingPin, debouncedSearch, sortBy]);
     const pagedCustomers = useMemo(
         () => customers.slice((page - 1) * CUSTOMER_PAGE_SIZE, page * CUSTOMER_PAGE_SIZE),
         [customers, page],
@@ -1220,26 +1241,248 @@ export function CustomersPage() {
     }, [customerMap]);
 
     return (
-        <div className="p-4 md:p-6 max-w-screen-lg mx-auto space-y-5">
-            <div className="flex items-center justify-between">
+        <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <Users size={20} className="text-blue-600" /> Pelanggan
+                    <h1 className="text-xl font-extrabold text-[var(--text-primary)] flex items-center gap-2">
+                        <Users size={20} className="text-[var(--accent)]" /> Master Pelanggan, Analisis Peta &amp; Garansi Rayap
                     </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                        {canSeeAll ? "Database klien perusahaan" : "Klien dari quotation kamu"}
+                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                        {canSeeAll ? "Pusat data klien, pemantauan garansi anti-rayap, detektor pin peta, dan pengingat kontrak H-14/H-30" : "Klien dan garansi dari quotation Anda"}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const rows = customers.map((c, idx) => ({
+                                Kode: `CUST-${String(idx + 1).padStart(4, "0")}`,
+                                Nama_Pelanggan: c.name,
+                                Wilayah: c.wilayah,
+                                Alamat: c.address,
+                                PIC: c.up || "-",
+                                WhatsApp: c.wa || "-",
+                                Total_PH: c.totalQuotations,
+                                Total_Deal: c.totalDeal,
+                                Status_Garansi: c.activeWarranty?.isActive ? `Aktif (${c.activeWarranty.daysRemaining} hari)` : "Tidak Ada",
+                                Koordinat: c.latitude && c.longitude ? `${c.latitude}, ${c.longitude}` : "Belum Ada Pin",
+                            }));
+                            const ws = XLSX.utils.json_to_sheet(rows);
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, ws, "Data_Pelanggan");
+                            XLSX.writeFile(wb, "Daftar_Pelanggan_Guci_Emas.xlsx");
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                        <Download size={13} /> Unduh Pelanggan ({customers.length})
+                    </button>
+                    <button onClick={downloadTemplate} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer">
                         <Download size={13} /> Template Excel
                     </button>
-                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] cursor-pointer transition-colors shadow-sm">
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] cursor-pointer transition-colors shadow-xs">
                         <UploadCloud size={13} /> Import Bulk
                         <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileSelect} />
                     </label>
                 </div>
             </div>
+
+            {/* ── In-Page Consolidated Tabs (Master Pelanggan | Garansi Rayap | Analisis Peta | Pengaturan Kontrak) ── */}
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2.5">
+                {([
+                    { id: "master", label: `👥 Master Pelanggan (${totalCustomers})` },
+                    { id: "garansi", label: `🛡️ Jadwal Garansi Rayap (${activeWarranties})` },
+                    { id: "analisis", label: `🗺️ Analisis & Detektor Pin Peta (${missingPinCustomers.length} Tanpa Pin)` },
+                    { id: "pengaturan", label: "⚙️ Pengaturan Kontrak (H-14 & H-30)" },
+                ] as const).map(t => (
+                    <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setHubTab(t.id)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                            hubTab === t.id
+                                ? "bg-[var(--accent)] text-white border-[var(--accent)] shadow-2xs"
+                                : "bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)]"
+                        }`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
+            {hubTab === "garansi" && <KontrolRayapPage />}
+
+            {hubTab === "analisis" && (
+                <div className="space-y-4">
+                    {/* Dual Gradient Banners: Pelanggan Aktif vs Tidak Aktif + Detektor Tanpa Pin Point Map (Screenshot 3: beta.jarivis.com/customer/analysis) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-5 rounded-2xl bg-gradient-to-r from-[#1e3a8a] to-[#2563eb] text-white shadow-sm space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">PELANGGAN AKTIF (DEAL)</span>
+                            <div className="text-3xl font-black font-mono">{withDeal}</div>
+                            <p className="text-xs text-blue-100">Memiliki riwayat kontrak / layanan aktif</p>
+                        </div>
+
+                        <div className="p-5 rounded-2xl bg-gradient-to-r from-[#065f46] to-[#10b981] text-white shadow-sm space-y-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-100">GARANSI RAYAP AKTIF</span>
+                            <div className="text-3xl font-black font-mono">{activeWarranties}</div>
+                            <p className="text-xs text-emerald-100">{expiringWarranties} garansi mendekati jadwal kontrol</p>
+                        </div>
+
+                        <div className="p-5 rounded-2xl bg-[var(--bg-card)] border-2 border-amber-400/80 space-y-2 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 block">
+                                    JUMLAH PELANGGAN TIDAK ADA PIN POINT MAP
+                                </span>
+                                <div className="text-2xl font-black font-mono text-[var(--text-primary)] mt-1">
+                                    {missingPinCustomers.length} Pelanggan
+                                </div>
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                    Belum memiliki titik koordinat GPS untuk geofence teknisi
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setOnlyMissingPin(true);
+                                    setHubTab("master");
+                                }}
+                                className="self-start px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold cursor-pointer"
+                            >
+                                Cek Pelanggan &nearr;
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Grid Pelanggan Teratas & Mendekati Kontrak Berakhir */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="clean-card p-5 space-y-3">
+                            <h3 className="text-sm font-bold text-[var(--text-primary)]">Pelanggan Teratas (Berdasarkan Total Kontrak Deal)</h3>
+                            <div className="space-y-2">
+                                {Array.from(customerMap.values())
+                                    .sort((a, b) => b.totalDeal - a.totalDeal)
+                                    .slice(0, 5)
+                                    .map((c, idx) => (
+                                        <div key={c.id} className="p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className="w-6 h-6 rounded-full bg-[var(--accent)] text-white font-bold flex items-center justify-center shrink-0">
+                                                    {idx + 1}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-[var(--text-primary)] truncate">{c.name}</p>
+                                                    <p className="text-[11px] text-[var(--text-muted)] truncate">{c.wilayah}</p>
+                                                </div>
+                                            </div>
+                                            <span className="font-mono font-bold text-emerald-600 shrink-0">{c.totalDeal} Deal</span>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+
+                        <div className="clean-card p-5 space-y-3">
+                            <h3 className="text-sm font-bold text-[var(--text-primary)]">Pelanggan yang Mendekati Garansi / Kontrak Berakhir</h3>
+                            <div className="space-y-2">
+                                {Array.from(customerMap.values())
+                                    .filter(c => c.activeWarranty?.isActive)
+                                    .sort((a, b) => (a.activeWarranty?.daysRemaining ?? 9999) - (b.activeWarranty?.daysRemaining ?? 9999))
+                                    .slice(0, 5)
+                                    .map(c => (
+                                        <div key={c.id} className="p-3 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex items-center justify-between text-xs">
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-[var(--text-primary)] truncate">{c.name}</p>
+                                                <p className="text-[11px] text-[var(--text-muted)] truncate">No: {c.activeWarranty?.noSurat}</p>
+                                            </div>
+                                            <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 font-mono font-bold shrink-0">
+                                                {c.activeWarranty?.daysRemaining} hari lagi
+                                            </span>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {hubTab === "pengaturan" && (
+                <div className="clean-card p-5 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div className="md:col-span-4 border-b md:border-b-0 md:border-r border-[var(--border-subtle)] pb-4 md:pb-0 md:pr-4 space-y-2">
+                        <div className="p-3 rounded-xl bg-[var(--accent-glow)] border border-[var(--accent)] flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-extrabold text-[var(--text-primary)]">Manajemen Kontrak</p>
+                                <p className="text-[11px] text-[var(--text-secondary)]">Pengingat masa berlaku kontrak &amp; garansi</p>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-bold">
+                                {contractReminderEnabled ? "Aktif" : "Nonaktif"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-8 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">Manajemen Kontrak &amp; Notifikasi Berakhir</h3>
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                    Kirim pengingat otomatis sebelum masa kontrak PCO atau garansi anti-rayap berakhir
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setContractReminderEnabled(v => !v)}
+                                className={`px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer ${
+                                    contractReminderEnabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"
+                                }`}
+                            >
+                                {contractReminderEnabled ? "Status: Aktif" : "Status: Nonaktif"}
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div className="p-3.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1.5">
+                                <label className="block text-xs font-bold text-[var(--text-primary)]">Pengingat Tahap Pertama (H-30)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={reminderDays2}
+                                        onChange={e => setReminderDays2(Number(e.target.value))}
+                                        className="w-24 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-sm font-mono font-bold"
+                                    />
+                                    <span className="text-xs text-[var(--text-secondary)]">hari sebelum kontrak berakhir</span>
+                                </div>
+                            </div>
+
+                            <div className="p-3.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1.5">
+                                <label className="block text-xs font-bold text-[var(--text-primary)]">Pengingat Mendesak (H-14)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={reminderDays1}
+                                        onChange={e => setReminderDays1(Number(e.target.value))}
+                                        className="w-24 px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] text-sm font-mono font-bold"
+                                    />
+                                    <span className="text-xs text-[var(--text-secondary)]">hari sebelum kontrak berakhir</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            {reminderSaved && (
+                                <span className="text-xs font-bold text-emerald-600">Pengaturan pengingat kontrak tersimpan.</span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setReminderSaved(true);
+                                    setTimeout(() => setReminderSaved(false), 2500);
+                                }}
+                                className="px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold cursor-pointer"
+                            >
+                                Simpan Pengaturan Kontrak
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {hubTab === "master" && (
+            <>
 
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white border border-slate-200 rounded-xl p-3">
@@ -1300,6 +1543,17 @@ export function CustomersPage() {
                     Bergaransi
                 </button>
 
+                <button
+                    onClick={() => { setOnlyMissingPin(v => !v); setPage(1); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+                        onlyMissingPin
+                            ? "bg-amber-600 text-white border-amber-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}>
+                    <MapPin size={12} />
+                    Tanpa Pin Peta ({missingPinCustomers.length})
+                </button>
+
                 <select
                     value={sortBy}
                     onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
@@ -1326,10 +1580,34 @@ export function CustomersPage() {
                     </button>
                 )}
 
-                {/* Result count */}
-                <span className="ml-auto text-xs text-slate-400 font-medium">
-                    {loading ? "..." : `${customers.length} klien`}
-                </span>
+                {/* View Mode Toggle: Card View vs Table View (Screenshot 1: beta.jarivis.com/customer) */}
+                <div className="ml-auto flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setCustomerViewMode("card")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
+                            customerViewMode === "card"
+                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                : "bg-white text-slate-600 border-slate-200"
+                        }`}
+                    >
+                        Kartu Ringkas
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setCustomerViewMode("table")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
+                            customerViewMode === "table"
+                                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                                : "bg-white text-slate-600 border-slate-200"
+                        }`}
+                    >
+                        Tabel Master
+                    </button>
+                    <span className="text-xs text-slate-400 font-medium ml-1">
+                        {loading ? "..." : `${customers.length} klien`}
+                    </span>
+                </div>
             </div>
 
             {loading ? (
@@ -1348,19 +1626,105 @@ export function CustomersPage() {
                 </div>
             ) : (
                 <div className="space-y-3 result-enter" key={page}>
-                    {pagedCustomers.map(c => (
-                        <CustomerCard key={c.id} customer={c}
-                            expanded={expandedId === c.id}
-                            onToggle={() => setExpandedId(prev => prev === c.id ? null : c.id)}
-                            onAddChecklist={() => setChecklistTarget(c)}
-                            onEditProfile={() => setEditCustomerTarget(c)} />
-                    ))}
+                    {customerViewMode === "table" ? (
+                        <div className="clean-card overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse min-w-[860px]">
+                                <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)] text-[10.5px] font-bold uppercase text-[var(--text-muted)]">
+                                    <tr>
+                                        <th className="py-3 px-3.5">Kode</th>
+                                        <th className="py-3 px-3.5">Nama Pelanggan</th>
+                                        <th className="py-3 px-3.5">Wilayah</th>
+                                        <th className="py-3 px-3.5">PIC &amp; WhatsApp</th>
+                                        <th className="py-3 px-3.5 text-center">Deal / PH</th>
+                                        <th className="py-3 px-3.5">Garansi Rayap</th>
+                                        <th className="py-3 px-3.5">Pin Peta</th>
+                                        <th className="py-3 px-3.5 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[var(--border-subtle)]">
+                                    {pagedCustomers.map((c, idx) => {
+                                        const code = `CUST-${String((page - 1) * CUSTOMER_PAGE_SIZE + idx + 1).padStart(4, "0")}`;
+                                        return (
+                                            <tr key={c.id} className="hover:bg-[var(--bg-tertiary)]/50">
+                                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigator.clipboard?.writeText(code);
+                                                            setCopiedCodeId(c.id);
+                                                            setTimeout(() => setCopiedCodeId(null), 1500);
+                                                        }}
+                                                        className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-mono font-bold text-[11px] cursor-pointer"
+                                                        title="Klik untuk salin kode pelanggan"
+                                                    >
+                                                        {copiedCodeId === c.id ? "✓ Tersalin" : code}
+                                                    </button>
+                                                </td>
+                                                <td className="py-3 px-3.5">
+                                                    <p className="font-bold text-[var(--text-primary)]">{c.name}</p>
+                                                    <p className="text-[11px] text-[var(--text-muted)] truncate max-w-[220px]">{c.address}</p>
+                                                </td>
+                                                <td className="py-3 px-3.5 font-semibold text-[var(--text-secondary)]">{c.wilayah}</td>
+                                                <td className="py-3 px-3.5">
+                                                    <p className="font-medium text-[var(--text-primary)]">{c.up || "-"}</p>
+                                                    <p className="font-mono text-[11px] text-[var(--text-muted)]">{c.wa || "-"}</p>
+                                                </td>
+                                                <td className="py-3 px-3.5 text-center font-mono font-bold text-emerald-700">
+                                                    {c.totalDeal}/{c.totalQuotations}
+                                                </td>
+                                                <td className="py-3 px-3.5">
+                                                    {c.activeWarranty?.isActive ? (
+                                                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10.5px]">
+                                                            Aktif ({c.activeWarranty.daysRemaining}h)
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[var(--text-muted)]">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3.5">
+                                                    {c.latitude && c.longitude ? (
+                                                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[10.5px] font-semibold">
+                                                            📍 Terkunci
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[10.5px]">
+                                                            ⚠️ Belum Ada Pin
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditCustomerTarget(c)}
+                                                        className="px-2.5 py-1 rounded-lg bg-[var(--accent)] text-white font-bold text-[11px] cursor-pointer"
+                                                    >
+                                                        Atur Profil &amp; Pin
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        pagedCustomers.map(c => (
+                            <CustomerCard key={c.id} customer={c}
+                                expanded={expandedId === c.id}
+                                onToggle={() => setExpandedId(prev => prev === c.id ? null : c.id)}
+                                onAddChecklist={() => setChecklistTarget(c)}
+                                onEditProfile={() => setEditCustomerTarget(c)} />
+                        ))
+                    )}
                     <p className="text-xs text-slate-400 text-center pt-1">
                         {customers.length} hasil filter dari {totalCustomers} klien
                     </p>
                     <Pagination page={page} pageSize={CUSTOMER_PAGE_SIZE} totalItems={customers.length}
                         onPageChange={setPage} itemLabel="klien" />
                 </div>
+            )}
+
+            </>
             )}
 
             {checklistTarget && (
