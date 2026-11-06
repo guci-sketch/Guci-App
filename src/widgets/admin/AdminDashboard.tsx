@@ -99,6 +99,8 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { generateInvite } from '@/shared/api/auth';
 import { TemplateSettingsPanel } from '@/widgets/admin/TemplateSettingsPanel';
+import { MonthlyRecapBuilderModal } from '@/widgets/admin/MonthlyRecapBuilderModal';
+import { canGenerateMonthlyRecap } from '@/shared/lib/permenkesRecapEngine';
 import { CompanyPicker } from '@/widgets/admin/CompanyPicker';
 import { OperationsAnalyticsBento, ExecutiveQuotationSummary } from '@/widgets/admin/OperationsAnalyticsBento';
 import { isDirectorUser } from '@/shared/lib/roles';
@@ -266,6 +268,8 @@ export const AdminDashboard: React.FC = () => {
     searchInput: string;
   } | null>(null);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showMonthlyRecapModal, setShowMonthlyRecapModal] = useState(false);
+  const [recapModalMode, setRecapModalMode] = useState<'PCO' | 'AR'>('PCO');
   const [searchInput, setSearchInput] = useState('');
 
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -1319,6 +1323,67 @@ export const AdminDashboard: React.FC = () => {
                           </button>
                         )}
 
+                        <div className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] p-0.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setFilters(prev => ({ ...prev, serviceType: 'ALL' }))}
+                            className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer ${
+                              filters.serviceType === 'ALL'
+                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-2xs'
+                                : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            Semua Layanan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFilters(prev => ({ ...prev, serviceType: 'GENERAL_PEST_CONTROL' }))}
+                            className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer ${
+                              filters.serviceType !== 'ALL' && filters.serviceType !== 'TERMITE_CONTROL'
+                                ? 'bg-emerald-700 text-white shadow-2xs'
+                                : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            Pest Control
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFilters(prev => ({ ...prev, serviceType: 'TERMITE_CONTROL' }))}
+                            className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer ${
+                              filters.serviceType === 'TERMITE_CONTROL'
+                                ? 'bg-purple-700 text-white shadow-2xs'
+                                : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            Anti Rayap
+                          </button>
+                        </div>
+                        {canGenerateMonthlyRecap(user?.role) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRecapModalMode('PCO');
+                                setShowMonthlyRecapModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                              title="Buat Laporan Rekapitulasi Pest Control & Kalkulator Permenkes No. 2 Tahun 2023 (Khusus Admin)"
+                            >
+                              Rekap Pest Control (Permenkes)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRecapModalMode('AR');
+                                setShowMonthlyRecapModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                              title="Buat Laporan Rekapitulasi Pengendalian & Monitoring Anti Rayap (Khusus Admin)"
+                            >
+                              Rekap Anti Rayap (AR)
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={handleExportPDF}
@@ -1811,7 +1876,7 @@ export const AdminDashboard: React.FC = () => {
                               : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                           }`}
                         >
-                          📋 Penugasan &amp; Jadwal SPK
+                          Penugasan &amp; Jadwal SPK
                         </button>
                       )}
                       <button
@@ -1823,7 +1888,7 @@ export const AdminDashboard: React.FC = () => {
                             : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                         }`}
                       >
-                        📍 Lokasi &amp; Radius Proyek ({projectTotalCount || projects.length})
+                        Lokasi &amp; Radius Proyek ({projectTotalCount || projects.length})
                       </button>
                     </div>
                   </div>
@@ -2072,7 +2137,7 @@ export const AdminDashboard: React.FC = () => {
                           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                       }`}
                     >
-                      👥 Direktori &amp; Kelola Akun Staf
+                      Direktori &amp; Kelola Akun Staf
                     </button>
                     <button
                       type="button"
@@ -2239,7 +2304,7 @@ export const AdminDashboard: React.FC = () => {
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
-                        📍 Lokasi Terkini (Live)
+                        Lokasi Terkini (Live)
                       </button>
                       <button
                         type="button"
@@ -2470,7 +2535,7 @@ export const AdminDashboard: React.FC = () => {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold text-xs">
-                          🛡️ Mode Admin (Akun Admin Lain Dilindungi)
+                          Mode Admin (Akun Admin Lain Dilindungi)
                         </span>
                       )}
                     </div>
@@ -2775,7 +2840,7 @@ export const AdminDashboard: React.FC = () => {
                                       }`}
                                       title="Klik untuk mengubah status wajib Geofence pada anggota ini"
                                     >
-                                      📍 Geofence: {(memberGeofenceMap[u.id] ?? true) ? 'Aktif' : 'Fleksibel'}
+                                      Geofence: {(memberGeofenceMap[u.id] ?? true) ? 'Aktif' : 'Fleksibel'}
                                     </button>
                                     <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
                                       🛰️ Live Tracking: {liveTrackingEnabled ? 'ON' : 'OFF'}
@@ -2971,7 +3036,7 @@ export const AdminDashboard: React.FC = () => {
                             : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                         }`}
                       >
-                        🛡️ Riwayat Audit Sistem
+                        Riwayat Audit Sistem
                       </button>
                     </>
                   )}
@@ -3138,7 +3203,7 @@ export const AdminDashboard: React.FC = () => {
                       title="Unduh Laporan Kunjungan (PDF)"
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-50 transition-colors cursor-pointer"
                     >
-                      <Download size={14} aria-hidden="true" /> {pdfBusy ? 'Membuat PDF...' : 'PDF'}
+                      <Download size={14} aria-hidden="true" /> {pdfBusy ? 'Membuat PDF...' : selectedReport.serviceType === 'TERMITE_CONTROL' ? 'PDF Anti Rayap' : 'PDF Pest Control'}
                     </button>
                     <button
                       type="button"
@@ -3775,6 +3840,23 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {showMonthlyRecapModal && (
+        <MonthlyRecapBuilderModal
+          isOpen={showMonthlyRecapModal}
+          initialCategoryMode={recapModalMode}
+          onClose={() => setShowMonthlyRecapModal(false)}
+          userRole={user?.role}
+          companyId={activeCompanyId}
+          defaultCompilerName={user?.name || 'Admin Operasional'}
+          availableCustomers={Array.from(
+            new Set([
+              ...projects.map(p => p.clientName).filter(Boolean),
+              ...quotationsList.map(q => q.kepadaNama).filter(Boolean),
+            ])
+          )}
+          reports={selectedReport ? [selectedReport] : []}
+        />
       )}
       {viewingPhoto && <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} />}
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}

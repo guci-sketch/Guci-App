@@ -15,7 +15,8 @@ import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
 import { getQuotations, updateCustomerProfileQuotations } from '@/shared/api/quotationService';
 import * as XLSX from "xlsx";
-import { UploadCloud, Download } from "lucide-react";
+import { UploadCloud, Download, Plus } from "lucide-react";
+import { getCustomerRecapPermission, setCustomerRecapPermission } from '@/shared/lib/permenkesRecapEngine';
 import { formatDate } from '@/shared/lib/utils';
 import { LAYANAN_CONFIG } from '@/shared/lib/quotationConfig';
 import type { Quotation } from '@/entities/types';
@@ -115,9 +116,9 @@ function ChecklistModal({ customer, onClose, onSaved }: {
     const [hasil, setHasil] = useState<ControlChecklist["hasilKontrol"]>("baik");
     const [saving, setSaving] = useState(false);
     const opts = [
-        { val: "baik" as const, label: "✓ Baik", cls: "bg-emerald-50 border-emerald-300 text-emerald-700" },
-        { val: "perlu_tindak_lanjut" as const, label: "⚠ Perlu Tindak Lanjut", cls: "bg-amber-50 border-amber-300 text-amber-700" },
-        { val: "darurat" as const, label: "🚨 Darurat", cls: "bg-red-50 border-red-300 text-red-700" },
+        { val: "baik" as const, label: "Baik", cls: "bg-emerald-50 border-emerald-300 text-emerald-700" },
+        { val: "perlu_tindak_lanjut" as const, label: "Perlu Tindak Lanjut", cls: "bg-amber-50 border-amber-300 text-amber-700" },
+        { val: "darurat" as const, label: "Darurat", cls: "bg-red-50 border-red-300 text-red-700" },
     ];
     const handleSave = async () => {
         if (!user) return;
@@ -978,6 +979,193 @@ function BulkImportPreviewModal({
 
 const CUSTOMER_PAGE_SIZE = 10;
 
+
+function ManualCustomerModal({
+    companyId,
+    marketingUid,
+    marketingNama,
+    onClose,
+    onSaved,
+}: {
+    companyId: string;
+    marketingUid: string;
+    marketingNama: string;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [name, setName] = useState("");
+    const [wa, setWa] = useState("");
+    const [up, setUp] = useState("");
+    const [address, setAddress] = useState("");
+    const [kategori, setKategori] = useState<"PCO" | "AR">("PCO");
+    const [allowMonthlyRecap, setAllowMonthlyRecap] = useState(false);
+    const [buildingsText, setBuildingsText] = useState("GEDUNG A, GEDUNG B, AREA LUAR");
+    const [saving, setSaving] = useState(false);
+    const [err, setErr] = useState("");
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) {
+            setErr("Nama pelanggan wajib diisi.");
+            return;
+        }
+        setSaving(true);
+        setErr("");
+        try {
+            setCustomerRecapPermission(name.trim(), {
+                allowMonthlyRecap,
+                defaultBuildings: buildingsText.split(",").map(s => s.trim()).filter(Boolean),
+            });
+            const nowIso = new Date().toISOString();
+            const { error } = await supabase.from("quotations").insert({
+                company_id: companyId,
+                marketing_uid: marketingUid,
+                status: "draft",
+                payload: {
+                    noSurat: `CUST-MANUAL/${Date.now().toString().slice(-5)}`,
+                    kepadaNama: name.trim(),
+                    kepadaUp: up.trim() || undefined,
+                    kepadaWa: wa.trim() || undefined,
+                    kepadaKontak: wa.trim() || undefined,
+                    kepadaAlamat: address.trim(),
+                    kepadaAlamatLines: address.trim() ? [address.trim()] : [],
+                    perihal: "Registrasi Master Pelanggan Manual",
+                    kategori,
+                    jenisLayanan: kategori === "AR" ? "anti_rayap_injeksi" : "pest_umum",
+                    tipeKontrak: "U",
+                    tanggal: nowIso,
+                    companyId,
+                    marketingUid,
+                    marketingNama,
+                    status: "draft",
+                    allowMonthlyRecap,
+                },
+            });
+            if (error) throw error;
+            onSaved();
+            onClose();
+        } catch (ex) {
+            setErr(ex instanceof Error ? ex.message : "Gagal menyimpan pelanggan baru.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4 text-slate-800">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-base font-bold text-slate-900">Tambah Pelanggan Manual</h3>
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                        <X size={18} />
+                    </button>
+                </div>
+                {err && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                        {err}
+                    </div>
+                )}
+                <form onSubmit={handleSave} className="space-y-3 text-xs">
+                    <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Nama Pelanggan / Instansi *</label>
+                        <input
+                            type="text"
+                            required
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="Contoh: RS PON Prof. Dr. dr. Mahar Mardjono"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block font-semibold text-slate-700 mb-1">Kategori Layanan</label>
+                            <select
+                                value={kategori}
+                                onChange={e => setKategori(e.target.value as "PCO" | "AR")}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white"
+                            >
+                                <option value="PCO">Pest &amp; Rodent Control (PCO)</option>
+                                <option value="AR">Anti Rayap (AR)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block font-semibold text-slate-700 mb-1">PIC / U.P.</label>
+                            <input
+                                type="text"
+                                value={up}
+                                onChange={e => setUp(e.target.value)}
+                                placeholder="Nama PIC"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Nomor Telepon / WhatsApp</label>
+                        <input
+                            type="text"
+                            value={wa}
+                            onChange={e => setWa(e.target.value)}
+                            placeholder="0812-xxxx-xxxx"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl"
+                        />
+                    </div>
+                    <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Alamat Lengkap</label>
+                        <textarea
+                            rows={2}
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
+                            placeholder="Alamat lokasi pelanggan..."
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl resize-none"
+                        />
+                    </div>
+                    <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                        <label className="flex items-center justify-between font-bold text-slate-800 cursor-pointer">
+                            <span>Izinkan Laporan Rekapitulasi Bulanan (Permenkes)</span>
+                            <input
+                                type="checkbox"
+                                checked={allowMonthlyRecap}
+                                onChange={e => setAllowMonthlyRecap(e.target.checked)}
+                            />
+                        </label>
+                        {allowMonthlyRecap && (
+                            <div>
+                                <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                                    Daftar Gedung / Zona Standar (pisahkan dengan koma)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={buildingsText}
+                                    onChange={e => setBuildingsText(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white"
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white font-bold disabled:opacity-50"
+                        >
+                            {saving ? "Menyimpan..." : "Simpan Pelanggan"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export type CustomerHubTab = "master" | "garansi" | "analisis" | "pengaturan";
 
 export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: CustomerHubTab } = {}) {
@@ -1004,6 +1192,7 @@ export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: Cu
     const [filterWarranty, setFilterWarranty] = useState(false);
     const [checklistTarget, setChecklistTarget] = useState<DerivedCustomer | null>(null);
     const [editCustomerTarget, setEditCustomerTarget] = useState<DerivedCustomer | null>(null);
+    const [showAddManualModal, setShowAddManualModal] = useState(false);
     const [importPreviewRows, setImportPreviewRows] = useState<ImportRow[] | null>(null);
     const [isImporting, setIsImporting] = useState(false);
 
@@ -1244,14 +1433,20 @@ export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: Cu
         <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                        <Users size={20} className="text-[var(--accent)]" /> Master Pelanggan, Analisis Peta &amp; Garansi Rayap
+                    <h1 className="text-xl font-extrabold text-[var(--text-primary)]">
+                        Master Pelanggan
                     </h1>
-                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
-                        {canSeeAll ? "Pusat data klien, pemantauan garansi anti-rayap, detektor pin peta, dan pengingat kontrak H-14/H-30" : "Klien dan garansi dari quotation Anda"}
-                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {user?.role !== "MARKETING" && (
+                        <button
+                            type="button"
+                            onClick={() => setShowAddManualModal(true)}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-hover)] transition-colors cursor-pointer shadow-xs"
+                        >
+                            <Plus size={14} /> Tambah Pelanggan
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => {
@@ -1289,10 +1484,10 @@ export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: Cu
             {/* ── In-Page Consolidated Tabs (Master Pelanggan | Garansi Rayap | Analisis Peta | Pengaturan Kontrak) ── */}
             <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-subtle)] pb-2.5">
                 {([
-                    { id: "master", label: `👥 Master Pelanggan (${totalCustomers})` },
-                    { id: "garansi", label: `🛡️ Jadwal Garansi Rayap (${activeWarranties})` },
-                    { id: "analisis", label: `🗺️ Analisis & Detektor Pin Peta (${missingPinCustomers.length} Tanpa Pin)` },
-                    { id: "pengaturan", label: "⚙️ Pengaturan Kontrak (H-14 & H-30)" },
+                    { id: "master", label: `Master Pelanggan (${totalCustomers})` },
+                    { id: "garansi", label: `Jadwal Garansi (${activeWarranties})` },
+                    { id: "analisis", label: `Analisis Peta (${missingPinCustomers.length} Tanpa Pin)` },
+                    { id: "pengaturan", label: "Pengaturan Kontrak" },
                 ] as const).map(t => (
                     <button
                         key={t.id}
@@ -1684,11 +1879,11 @@ export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: Cu
                                                 <td className="py-3 px-3.5">
                                                     {c.latitude && c.longitude ? (
                                                         <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[10.5px] font-semibold">
-                                                            📍 Terkunci
+                                                            Terkunci
                                                         </span>
                                                     ) : (
                                                         <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[10.5px]">
-                                                            ⚠️ Belum Ada Pin
+                                                            Belum Ada Pin
                                                         </span>
                                                     )}
                                                 </td>
@@ -1734,6 +1929,18 @@ export function CustomersPage({ initialSubTab = "master" }: { initialSubTab?: Cu
                         setChecklists(prev => [...prev, { ...entry, customerId: checklistTarget.id }]);
                         setChecklistTarget(null);
                     }} />
+            )}
+
+            {showAddManualModal && user?.companyId && (
+                <ManualCustomerModal
+                    companyId={user.companyId}
+                    marketingUid={user.uid}
+                    marketingNama={user.name}
+                    onClose={() => setShowAddManualModal(false)}
+                    onSaved={() => {
+                        load();
+                    }}
+                />
             )}
 
             {editCustomerTarget && user?.companyId && (

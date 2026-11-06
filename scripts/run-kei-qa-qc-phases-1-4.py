@@ -40,16 +40,16 @@ def run_check(test_id, title, preconditions, steps, expected_result, priority, l
     })
     assert condition, f"[{test_id}] FAILED: {title} -> {evidence}"
 
-# KEI-01: Phase 1 - Sidebar Instant Search & Vertical Active Indicator (`AppLayout.tsx`)
+# KEI-01: Phase 1 - Clean Sidebar Tanpa Search Bar Ganda & Indikator Garis Vertikal (`AppLayout.tsx`)
 run_check(
     "KEI-01",
-    "Phase 1: Fitur Search Menu Instan & Indikator Garis Vertikal di Sidebar",
-    "AppLayout.tsx dimuat pada mode diperlebar (isExpanded)",
-    "Ketik kata kunci pada input Cari menu atau fitur di sidebar",
-    "Daftar menu disaring secara real-time berdasarkan label, shortLabel, group, dan keywords",
-    "HIGH", "component", "functional",
-    "menuSearchQuery" in app_layout and "Cari menu atau fitur..." in app_layout and "filteredSidebarItems" in app_layout,
-    "AppLayout.tsx memiliki state menuSearchQuery, input pencarian, dan memo filteredSidebarItems."
+    "Phase 1: Penghapusan Search Bar Ganda di Sidebar & Indikator Garis Vertikal Aktif",
+    "AppLayout.tsx dimuat bersama Header.tsx (Ctrl+K global search)",
+    "Periksa ketiadaan input pencarian di dalam sidebar AppLayout.tsx",
+    "Sidebar bersih tanpa search bar ganda dan tetap memiliki indikator garis vertikal aktif",
+    "HIGH", "component", "usability",
+    "Cari menu atau fitur..." not in app_layout and "active-nav-indicator" in app_layout,
+    "Search bar di dalam sidebar telah dihapus sesuai permintaan user (terpusat di Ctrl+K Header)."
 )
 
 # KEI-02: Phase 1 - Sidebar Consolidation (18 -> 10 Fokus Menu) & Backward-Compatible Tab Mapping
@@ -220,6 +220,59 @@ run_check(
     "CRITICAL", "component", "structural",
     all_balanced,
     "; ".join(balance_details)
+)
+
+
+# KEI-14: Clean UI (Anti-AI Slop) & Input Pelanggan Manual (`CustomersPage.tsx`)
+run_check(
+    "KEI-14",
+    "Phase 5: Clean UI Tanpa Emoji Berlebihan & Fitur Tambah Pelanggan Manual (+ Permission Rekap)",
+    "Admin membuka modul Master Pelanggan (CustomersPage.tsx)",
+    "Klik tombol + Tambah Pelanggan dan periksa opsi Izinkan Laporan Rekapitulasi Bulanan (Permenkes)",
+    "Admin dapat menambah pelanggan secara manual tanpa melalui Quotation/Excel, dan tab bebas dari emoji dekoratif",
+    "CRITICAL", "system", "functional",
+    "ManualCustomerModal" in cust_page and "Tambah Pelanggan" in cust_page and "👥 Master Pelanggan" not in cust_page,
+    "CustomersPage.tsx memiliki ManualCustomerModal, tombol + Tambah Pelanggan, dan tab bersih tanpa emoji."
+)
+
+# KEI-15: Sistem 2 Mode Laporan Teknisi (Kunjungan + Rekapitulasi Bulanan Permenkes No. 2 Tahun 2023)
+recap_engine = (repo / "src/shared/lib/permenkesRecapEngine.ts").read_text(encoding="utf-8")
+recap_pdf = (repo / "src/shared/lib/monthlyRecapPdf.ts").read_text(encoding="utf-8")
+recap_modal = (repo / "src/widgets/admin/MonthlyRecapBuilderModal.tsx").read_text(encoding="utf-8")
+visit_pdf = (repo / "src/shared/lib/visitReportPdf.ts").read_text(encoding="utf-8")
+treat_modal = (repo / "src/widgets/executor/TreatmentFormModal.tsx").read_text(encoding="utf-8")
+
+run_check(
+    "KEI-15",
+    "Phase 5: Engine 2 Mode Laporan (Hybrid Data, Khusus Admin, Dropdown 26 Hama Filter > 0, & Kalkulator Permenkes 2023)",
+    "Admin membuka Hasil & Verifikasi Kerja dan menekan tombol Laporan Rekapitulasi (Permenkes)",
+    "Uji tarik data kunjungan + input manual (Hybrid), otorisasi khusus Admin, filter hama > 0, toggle rumus Permenkes, dan edit narasi",
+    "100% sesuai 4 konfirmasi user: Hybrid data, Admin-only RBAC, Dropdown 26 hama hanya visualkan > 0, dan SBMKL + narasi editable",
+    "CRITICAL", "system", "functional",
+    all(k in recap_engine for k in ["PEST_CATALOG_26", "canGenerateMonthlyRecap", "buildFilteredRecapMatrix", "calculatePermenkesMetrics", "generateEditableRecapNarrative"])
+    and "generateMonthlyRecapPDF" in recap_pdf
+    and "MonthlyRecapBuilderModal" in recap_modal
+    and "PEST_CATALOG_26" in treat_modal
+    and "parsePestFindingsFromNotes" in visit_pdf,
+    "permenkesRecapEngine.ts, monthlyRecapPdf.ts, MonthlyRecapBuilderModal.tsx, TreatmentFormModal.tsx, dan visitReportPdf.ts terintegrasi penuh."
+)
+
+
+# KEI-16: Pemisahan Penuh Laporan Anti Rayap (AR / Termite Control) vs Laporan Pest Control (PCO)
+run_check(
+    "KEI-16",
+    "Phase 5: Pemisahan Laporan Kunjungan & Rekapitulasi antara Anti Rayap (AR) dan Pest Control (PCO)",
+    "Teknisi maupun Admin membuka form/generator laporan untuk layanan TERMITE_CONTROL (AR) vs GENERAL_PEST_CONTROL (PCO)",
+    "Periksa pembedaan katalog dropdown (TERMITE_CATALOG_AR vs PEST_CATALOG_26), kalkulator (calculateTermiteMetrics vs Permenkes PCO), judul & kolom tabel PDF, serta tombol Rekap Pest Control vs Rekap Anti Rayap",
+    "Laporan Anti Rayap dan Laporan Pest Control memiliki katalog dropdown, kalkulator evaluasi, draf narasi, struktur kolom PDF, dan nama file unduhan yang terpisah secara spesifik",
+    "CRITICAL", "system", "functional",
+    all(k in recap_engine for k in ["TERMITE_CATALOG_AR", "calculateTermiteMetrics", "resolveReportCategoryMode"])
+    and "LAPORAN PEKERJAAN & KONTROL ANTI RAYAP" in visit_pdf
+    and "LAPORAN KUNJUNGAN PEST CONTROL" in visit_pdf
+    and "LAPORAN PENGENDALIAN & MONITORING ANTI RAYAP" in recap_pdf
+    and "Rekap Anti Rayap (AR)" in admin_dash
+    and "Rekap Pest Control (Permenkes)" in admin_dash,
+    "Laporan Anti Rayap (AR) dan Pest Control (PCO) terpisah penuh di form teknisi, PDF kunjungan, modal rekap Admin, dan PDF rekapitulasi."
 )
 
 # Write CSV
