@@ -9,68 +9,80 @@ interface ServiceTypeMeta {
   description: string;
 }
 
+/**
+ * Dua Layanan Utama PT Guci Emas Pratama (Selaras dengan Jarivis & Modul Quotation AR/PCO):
+ * 1. GENERAL_PEST_CONTROL -> "Pest Control"
+ * 2. TERMITE_CONTROL      -> "Anti Rayap"
+ * (Nilai enum lama tetap dipertahankan di peta metadata untuk kompatibilitas mundur database)
+ */
+export const PRIMARY_SERVICE_TYPES: ServiceType[] = [
+  'GENERAL_PEST_CONTROL',
+  'TERMITE_CONTROL',
+];
+
 export const SERVICE_TYPE_META: Partial<Record<ServiceType, ServiceTypeMeta>> = {
   GENERAL_PEST_CONTROL: {
-    label: 'Pengendalian Umum',
-    shortLabel: 'Pengendalian',
+    label: 'Pest Control',
+    shortLabel: 'Pest Control',
     icon: Shield,
     badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    description: 'Tindakan pengendalian hama residensial dan komersial umum.',
+    description: 'Pengendalian hama terpadu (Serangga merayap/terbang, Rodent/Tikus, Vektor, & Fumigasi).',
   },
   TERMITE_CONTROL: {
     label: 'Anti Rayap',
     shortLabel: 'Anti Rayap',
     icon: Home,
-    badgeClass: 'bg-amber-50 text-amber-900 border-amber-200',
-    description: 'Pengerjaan struktur bangunan pasca dan pra konstruksi.',
+    badgeClass: 'bg-purple-50 text-purple-900 border-purple-200',
+    description: 'Pengendalian rayap pra/pasca konstruksi (Drilling/Injeksi, Soil Treatment, Baiting & Garansi).',
   },
   FUMIGATION: {
-    label: 'Fumigasi',
-    shortLabel: 'Fumigasi',
+    label: 'Pest Control (Fumigasi)',
+    shortLabel: 'Pest Control',
     icon: Wind,
-    badgeClass: 'bg-rose-50 text-rose-800 border-rose-200',
-    description: 'Prosedur pembersihan udara tertutup/pergudangan.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Prosedur fumigasi ruang tertutup/pergudangan (Sub-layanan Pest Control).',
   },
   RODENT_CONTROL: {
-    label: 'Kontrol Hama Tikus',
-    shortLabel: 'Rodent',
+    label: 'Pest Control (Rodent)',
+    shortLabel: 'Pest Control',
     icon: Target,
-    badgeClass: 'bg-blue-50 text-blue-800 border-blue-200',
-    description: 'Sistem pengendalian terpadu hama pengerat.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Sistem pengendalian terpadu hama pengerat/tikus (Sub-layanan Pest Control).',
   },
   MOSQUITO_CONTROL: {
-    label: 'Kontrol Vektor Nyamuk',
-    shortLabel: 'Vektor',
+    label: 'Pest Control (Vektor)',
+    shortLabel: 'Pest Control',
     icon: Map,
-    badgeClass: 'bg-slate-50 text-slate-800 border-slate-200',
-    description: 'Fogging spasial dan pengendalian vektor lingkungan.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Fogging spasial dan pengendalian vektor nyamuk/lalat (Sub-layanan Pest Control).',
   },
   BIRD_CONTROL: {
-    label: 'Kontrol Burung Liar',
-    shortLabel: 'Avian',
+    label: 'Pest Control',
+    shortLabel: 'Pest Control',
     icon: CheckSquare,
-    badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-    description: 'Pemasangan jaring dan halauan struktur atap.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Pengendalian hama lingkungan terpadu.',
   },
   BED_BUG_CONTROL: {
-    label: 'Kontrol Kutu Kasur',
-    shortLabel: 'Sanitasi Kamar',
+    label: 'Pest Control',
+    shortLabel: 'Pest Control',
     icon: Sparkles,
-    badgeClass: 'bg-violet-50 text-violet-800 border-violet-200',
-    description: 'Sanitasi hospitality dan manajemen kutu bedbug.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Pengendalian hama sanitasi ruangan.',
   },
   DISINFECTION: {
-    label: 'Disinfeksi',
-    shortLabel: 'Disinfeksi',
+    label: 'Pest Control',
+    shortLabel: 'Pest Control',
     icon: Sparkles,
-    badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-    description: 'Sterilisasi area, virus, dan patogen.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    description: 'Sterilisasi dan pengendalian vektor lingkungan.',
   },
 };
 
 export const SERVICE_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: 'ALL', label: 'Semua Layanan' },
-  ...Object.entries(SERVICE_TYPE_META).map(([value, meta]) => ({ value, label: meta!.label })),
+  { value: 'GENERAL_PEST_CONTROL', label: 'Pest Control' },
+  { value: 'TERMITE_CONTROL', label: 'Anti Rayap' },
 ];
 
 export const APPLICATION_METHOD_LABELS: Partial<Record<ApplicationMethod, string>> = {

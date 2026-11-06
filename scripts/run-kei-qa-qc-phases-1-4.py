@@ -275,6 +275,21 @@ run_check(
     "Laporan Anti Rayap (AR) dan Pest Control (PCO) terpisah penuh di form teknisi, PDF kunjungan, modal rekap Admin, dan PDF rekapitulasi."
 )
 
+
+# KEI-17: Penyederhanaan Jenis Layanan Buat Penugasan menjadi 2 Kategori Utama (Pest Control vs Anti Rayap) ala Jarivis
+create_proj_modal = (repo / "src/widgets/executor/CreateProjectModal.tsx").read_text(encoding="utf-8")
+service_meta = (repo / "src/shared/utils/serviceMeta.ts").read_text(encoding="utf-8")
+run_check(
+    "KEI-17",
+    "Phase 5: Penyederhanaan Jenis Layanan Buat Penugasan Menjadi 2 Kategori Utama (Pest Control vs Anti Rayap)",
+    "Pengguna membuka modal Buat Penugasan Layanan Baru (CreateProjectModal.tsx)",
+    "Periksa pilihan Jenis Layanan (2 kartu utama: Pest Control & Anti Rayap) beserta Tipe Tugas SOP Jarivis dan Fokus Target dinamis",
+    "Tidak lagi menampilkan 8 kartu layanan terpecah (Avian/Sanitasi Kamar/Disinfeksi/dll), melainkan 2 layanan inti (Pest Control & Anti Rayap)",
+    "CRITICAL", "component", "usability",
+    "PRIMARY_SERVICE_TYPES" in service_meta and "PRIMARY_SERVICE_TYPES" in create_proj_modal and "JARIVIS_TASK_SUBTYPES" in create_proj_modal and "grid-cols-2 gap-2.5" in create_proj_modal,
+    "CreateProjectModal.tsx dan serviceMeta.ts menampilkan 2 layanan utama (Pest Control & Anti Rayap) dengan sub-tipe tugas Jarivis."
+)
+
 # Write CSV
 csv_out.parent.mkdir(parents=True, exist_ok=True)
 with csv_out.open("w", encoding="utf-8", newline="") as f:
