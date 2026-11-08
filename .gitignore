@@ -29,6 +29,7 @@ Data Penawaran/
 # Local AI agents, skills, and prompts (development & memory only)
 .agents/
 skills/
+Ayling-*/
 AGENTS.md
 agent_lean_prompt_v2.md
 antislop.md
