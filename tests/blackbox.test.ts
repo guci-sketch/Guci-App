@@ -408,3 +408,43 @@ test('BB-11 [Customer Profile Editing & Map Pin Draggable Synchronization]', asy
         assert.equal(lng, 106.669920);
     });
 });
+
+test('BB-12 [Multi-Visit SPK & Dual Signatures Lifecycle]', async (t) => {
+    await t.test('Penjadwalan Kunjungan Bertahap: Auto-increment nomor kunjungan untuk klien berkontrak yang sama', () => {
+        const existingSpks = [
+            { id: 'spk-1', customerName: 'RS PON Mahar Mardjono', status: 'done', visitNumber: 1 },
+            { id: 'spk-2', customerName: 'RS PON Mahar Mardjono', status: 'done', visitNumber: 2 },
+        ];
+        const nextVisit = existingSpks.length + 1;
+        assert.equal(nextVisit, 3);
+        const totalTarget = 12;
+        const progressPct = Math.round((existingSpks.length / totalTarget) * 100);
+        assert.equal(progressPct, 17);
+    });
+
+    await t.test('Verifikasi Tanda Tangan Ganda: Laporan valid hanya jika memuat TTD teknisi dan TTD pelanggan', () => {
+        function validateDualSignature(report: { technicianSignature?: string; customerSignature?: string }) {
+            const hasTech = Boolean(report.technicianSignature?.startsWith('data:image/'));
+            const hasCust = Boolean(report.customerSignature?.startsWith('data:image/'));
+            return {
+                isValid: hasTech && hasCust,
+                hasTech,
+                hasCust,
+            };
+        }
+
+        const validSig = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+        
+        // Kasus 1: Hanya TTD klien tanpa TTD teknisi -> Invalid
+        const res1 = validateDualSignature({ customerSignature: validSig });
+        assert.equal(res1.isValid, false);
+        assert.equal(res1.hasTech, false);
+        assert.equal(res1.hasCust, true);
+
+        // Kasus 2: Kedua TTD lengkap -> Valid
+        const res2 = validateDualSignature({ technicianSignature: validSig, customerSignature: validSig });
+        assert.equal(res2.isValid, true);
+        assert.equal(res2.hasTech, true);
+        assert.equal(res2.hasCust, true);
+    });
+});

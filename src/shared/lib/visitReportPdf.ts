@@ -383,6 +383,7 @@ export function visitReportFromWorkReport(
         findings: o.findings ?? findingsFromReport(report),
         catatan: [parsed.cleanNotes || report.notes, t?.safetyNotes && `Catatan keselamatan: ${t.safetyNotes}`].filter(Boolean).join('\n'),
         saran: o.saran,
+        petugasSignature: (report as any).technicianSignature ?? undefined,
         customerNama: report.customerName ?? undefined,
         customerSignature: report.customerSignature ?? undefined,
         photos: o.photos ?? [],

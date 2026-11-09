@@ -4,7 +4,7 @@ import {
     ChevronRight, User, CalendarDays, AlertCircle,
     CheckCircle2, Clock, PlayCircle, X, MapPin,
     FileText, ArrowRight, Wrench, Filter,
-    Repeat, CalendarCheck, Eye,
+    Repeat, CalendarCheck, Eye, Download,
 } from "lucide-react";
 import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
 import { db } from '@/shared/lib/firebase';
@@ -12,8 +12,10 @@ import { useAuthStore } from '@/app/store/authStore';
 import {
     createSPK, getSPKList, updateSPKStatus, reassignSPK,
 } from '@/shared/api/spkService';
+import { fetchAdminReports, fetchAdminReportDetail } from '@/shared/api/admin';
+import { exportReportToPdf } from '@/shared/utils/pdfExport';
 import { CreateSPKModal } from '@/widgets/spk/CreateSPKModal';
-import type { SPK, AppUser, Quotation } from '@/entities/types';
+import type { SPK, AppUser, Quotation, WorkReport, WorkReportListItem } from '@/entities/types';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -69,12 +71,14 @@ function SPKDetailModal({
     companyId,
     onClose,
     onUpdated,
+    onScheduleNextVisit,
 }: {
     spk: SPK;
     canEdit: boolean;
     companyId: string;
     onClose: () => void;
     onUpdated: () => void;
+    onScheduleNextVisit?: (quotationId: string) => void;
 }) {
     const cfg = STATUS_CONFIG[spk.status];
     const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -83,6 +87,29 @@ function SPKDetailModal({
     const [newTechId, setNewTechId] = useState(spk.technicianId);
     const [newDate, setNewDate] = useState(spk.scheduleDate.toISOString().split("T")[0]);
     const [savingReassign, setSavingReassign] = useState(false);
+
+    // Laporan Kerja Terkait
+    const [matchingReport, setMatchingReport] = useState<WorkReport | null>(null);
+    const [loadingReport, setLoadingReport] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+    useEffect(() => {
+        if (!spk) return;
+        setLoadingReport(true);
+        fetchAdminReports({ page: 1, limit: 100 })
+            .then(res => {
+                const targetName = (spk.customerName || "").trim().toLowerCase();
+                const match = res.reports.find(r => 
+                    r.project.clientName?.trim().toLowerCase() === targetName ||
+                    r.project.name?.trim().toLowerCase().includes(targetName)
+                );
+                if (match) {
+                    fetchAdminReportDetail(match.id).then(setMatchingReport).catch(() => null);
+                }
+            })
+            .catch(() => null)
+            .finally(() => setLoadingReport(false));
+    }, [spk]);
 
     useEffect(() => {
         if (!reassigning) return;
@@ -172,6 +199,107 @@ function SPKDetailModal({
                         <div className="bg-slate-50 rounded-xl px-4 py-3">
                             <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Catatan</p>
                             <p className="text-sm text-slate-700">{(spk as any).notes}</p>
+                        </div>
+                    )}
+
+                    {/* Embedded Laporan Kerja Lapangan & Tanda Tangan Ganda */}
+                    {(matchingReport || spk.status === "done") && (
+                        <div className="border border-[var(--border-subtle)] rounded-xl p-4 space-y-3 bg-[var(--bg-tertiary)]/50">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-[var(--text-primary)]">
+                                    Laporan Kerja Lapangan (BAST)
+                                </span>
+                                {matchingReport?.checkInValid != null && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        matchingReport.checkInValid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                    }`}>
+                                        {matchingReport.checkInValid ? 'Presensi GPS: Valid' : 'Presensi GPS: Anomali'}
+                                    </span>
+                                )}
+                            </div>
+
+                            {loadingReport ? (
+                                <div className="text-center py-4 text-xs text-[var(--text-muted)]">
+                                    <Loader2 size={14} className="animate-spin inline mr-1" /> Memuat detail laporan kerja...
+                                </div>
+                            ) : matchingReport ? (
+                                <div className="space-y-2 text-xs">
+                                    <div className="grid grid-cols-2 gap-2 text-[var(--text-secondary)]">
+                                        <div>
+                                            <span className="text-[10.5px] text-[var(--text-muted)] block">CHECK-IN</span>
+                                            <span className="font-semibold text-[var(--text-primary)]">
+                                                {matchingReport.checkInAt ? new Date(matchingReport.checkInAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-'}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10.5px] text-[var(--text-muted)] block">DURASI KERJA</span>
+                                            <span className="font-semibold text-[var(--text-primary)]">
+                                                {matchingReport.durationSeconds ? Math.round(matchingReport.durationSeconds / 60) : 0} Menit
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Pengesahan Tanda Tangan Ganda */}
+                                    <div className="pt-2 border-t border-[var(--border-subtle)] space-y-1.5">
+                                        <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
+                                            Pengesahan Tanda Tangan Ganda:
+                                        </span>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <div className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                                                <span className="text-[10px] text-[var(--text-muted)] block">PETUGAS TEKNISI</span>
+                                                <span className="font-bold text-[var(--text-primary)] block truncate">
+                                                    {matchingReport.executorName || spk.technicianName}
+                                                </span>
+                                                <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
+                                                    ✓ Terverifikasi Lapangan
+                                                </span>
+                                            </div>
+                                            <div className="p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                                                <span className="text-[10px] text-[var(--text-muted)] block">PIHAK PELANGGAN</span>
+                                                <span className="font-bold text-[var(--text-primary)] block truncate">
+                                                    {matchingReport.customerName || spk.customerName}
+                                                </span>
+                                                <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 block">
+                                                    ✓ Tanda Tangan Klien Sah
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={downloadingPdf}
+                                            onClick={async () => {
+                                                setDownloadingPdf(true);
+                                                try {
+                                                    await exportReportToPdf(matchingReport, undefined, { companyId });
+                                                } finally {
+                                                    setDownloadingPdf(false);
+                                                }
+                                            }}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors cursor-pointer"
+                                        >
+                                            <Download size={13} />
+                                            {downloadingPdf ? 'Mengunduh PDF...' : 'Unduh Berita Acara PDF'}
+                                        </button>
+
+                                        {onScheduleNextVisit && spk.quotationId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onScheduleNextVisit(spk.quotationId)}
+                                                className="py-2 px-3 rounded-lg border border-emerald-700 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-bold text-xs transition-colors cursor-pointer"
+                                            >
+                                                + Jadwalkan Kunjungan Berikutnya
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-[var(--text-muted)] italic">
+                                    Pekerjaan telah ditandai selesai. Detail laporan tersimpan dalam sistem.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -677,6 +805,7 @@ export function SPKPage() {
     const [spkList, setSpkList] = useState<SPK[]>([]);
     const [loading, setLoading] = useState(true);
     const [createOpen, setCreateOpen] = useState(false);
+    const [preSelectedQuoId, setPreSelectedQuoId] = useState<string | undefined>(undefined);
     const [recurringOpen, setRecurringOpen] = useState(false);
     const [selected, setSelected] = useState<SPK | null>(null);
     const [filterStatus, setFilterStatus] = useState<SPK["status"] | "all">("all");
@@ -688,6 +817,21 @@ export function SPKPage() {
     const [selectedTechTimeline, setSelectedTechTimeline] = useState<string>("ALL");
     const [sopRules, setSopRules] = useState<TaskSopRule[]>(DEFAULT_SOP_MATRIX);
     const [sopSavedMsg, setSopSavedMsg] = useState<string | null>(null);
+
+    // Agregasi status kunjungan per pelanggan untuk progress visual
+    const customerVisitStats = useMemo(() => {
+        const counts = new Map<string, { totalSpk: number; doneSpk: number; items: SPK[] }>();
+        const sorted = [...spkList].sort((a, b) => a.scheduleDate.getTime() - b.scheduleDate.getTime());
+        sorted.forEach(s => {
+            const key = (s.customerName || "").trim().toLowerCase();
+            const cur = counts.get(key) || { totalSpk: 0, doneSpk: 0, items: [] };
+            cur.totalSpk += 1;
+            if (s.status === "done") cur.doneSpk += 1;
+            cur.items.push(s);
+            counts.set(key, cur);
+        });
+        return counts;
+    }, [spkList]);
 
     const load = async () => {
         if (!companyId) {
@@ -1009,7 +1153,7 @@ export function SPKPage() {
                                     <table className="w-full border-collapse">
                                         <thead>
                                             <tr>
-                                                {["No. Surat / Perihal", "Klien", "Teknisi", "Jadwal", "Status", ""].map(h => (
+                                                {["No. SPK & Kunjungan", "Pelanggan & Lokasi", "Teknisi", "Jadwal", "Status & Laporan", ""].map(h => (
                                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-[var(--text-muted)] bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)] whitespace-nowrap">
                                                         {h}
                                                     </th>
@@ -1019,6 +1163,14 @@ export function SPKPage() {
                                         <tbody>
                                             {filtered.map(spk => {
                                                 const cfg = STATUS_CONFIG[spk.status];
+                                                const clientKey = (spk.customerName || "").trim().toLowerCase();
+                                                const clientStats = customerVisitStats.get(clientKey);
+                                                const clientItems = clientStats?.items || [];
+                                                const totalTarget = spk.totalTargetKunjungan || (spk.serviceType === "TERMITE_CONTROL" ? 5 : 12);
+                                                const visitIdx = spk.kunjunganKe || (clientItems.findIndex(s => s.id === spk.id) + 1);
+                                                const doneCount = clientStats?.doneSpk || (spk.status === "done" ? 1 : 0);
+                                                const progressPct = Math.min(100, Math.round((doneCount / totalTarget) * 100));
+
                                                 return (
                                                     <tr
                                                         key={spk.id}
@@ -1026,8 +1178,25 @@ export function SPKPage() {
                                                         onClick={() => setSelected(spk)}
                                                     >
                                                         <td className="px-4 py-3">
-                                                            <p className="text-xs font-mono text-[var(--text-muted)]">{(spk as any).quotationNoSurat}</p>
-                                                            <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 max-w-xs truncate">{(spk as any).perihal}</p>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="text-xs font-mono font-bold text-slate-800">
+                                                                    {(spk as any).quotationNoSurat || (spk as any).spkNumber || 'SPK-' + spk.id.slice(0, 6)}
+                                                                </span>
+                                                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">
+                                                                    Kunjungan {visitIdx}/{totalTarget}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm font-semibold text-[var(--text-primary)] mt-0.5 max-w-xs truncate">
+                                                                {(spk as any).perihal}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="w-24 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                                                    <div className="bg-emerald-600 h-full rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                                                                </div>
+                                                                <span className="text-[10px] text-[var(--text-muted)] font-mono font-medium">
+                                                                    {doneCount}/{totalTarget} ({progressPct}%)
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             <p className="text-sm font-medium text-[var(--text-primary)] max-w-[160px] truncate">{spk.customerName}</p>
@@ -1052,9 +1221,35 @@ export function SPKPage() {
                                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${cfg.color}`}>
                                                                 {cfg.icon} {cfg.label}
                                                             </span>
+                                                            {spk.status === "done" && (
+                                                                <span className="text-[10px] text-emerald-800 font-bold block mt-1">
+                                                                    ✓ BAST TTD Ganda
+                                                                </span>
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3">
-                                                            <ChevronRight size={16} className="text-slate-300" />
+                                                        <td className="px-4 py-3 text-right">
+                                                            <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                                                                {spk.status === "done" && spk.quotationId && canCreate && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setPreSelectedQuoId(spk.quotationId);
+                                                                            setCreateOpen(true);
+                                                                        }}
+                                                                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-600 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                                                        title="Jadwalkan kunjungan berikutnya untuk pelanggan ini"
+                                                                    >
+                                                                        + Kunjungan
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSelected(spk)}
+                                                                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                                                                >
+                                                                    <ChevronRight size={16} />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -1067,23 +1262,37 @@ export function SPKPage() {
                                 <div className="md:hidden divide-y divide-[var(--border-subtle)]">
                                     {filtered.map(spk => {
                                         const cfg = STATUS_CONFIG[spk.status];
+                                        const clientKey = (spk.customerName || "").trim().toLowerCase();
+                                        const clientStats = customerVisitStats.get(clientKey);
+                                        const totalTarget = spk.totalTargetKunjungan || (spk.serviceType === "TERMITE_CONTROL" ? 5 : 12);
+                                        const clientItems = clientStats?.items || [];
+                                        const visitIdx = spk.kunjunganKe || (clientItems.findIndex(s => s.id === spk.id) + 1);
+                                        const doneCount = clientStats?.doneSpk || (spk.status === "done" ? 1 : 0);
+                                        const progressPct = Math.min(100, Math.round((doneCount / totalTarget) * 100));
+
                                         return (
                                             <div key={spk.id} className="p-4 cursor-pointer active:bg-[var(--bg-tertiary)]"
                                                 onClick={() => setSelected(spk)}>
                                                 <div className="flex items-start justify-between gap-2 mb-1.5">
                                                     <div className="min-w-0">
-                                                        <p className="text-xs font-mono text-[var(--text-muted)]">{(spk as any).quotationNoSurat}</p>
-                                                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{(spk as any).perihal}</p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-mono font-bold text-slate-800">
+                                                                {(spk as any).quotationNoSurat || (spk as any).spkNumber || 'SPK-' + spk.id.slice(0, 6)}
+                                                            </span>
+                                                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">
+                                                                Kunjungan {visitIdx}/{totalTarget}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate mt-0.5">{(spk as any).perihal}</p>
                                                     </div>
                                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${cfg.color}`}>
                                                         {cfg.icon} {cfg.label}
                                                     </span>
                                                 </div>
                                                 <p className="text-sm text-[var(--text-primary)] truncate">{spk.customerName}</p>
-                                                <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-muted)]">
-                                                    <span>{spk.technicianName}</span>
-                                                    <span>·</span>
-                                                    <span>{fmt(spk.scheduleDate)}</span>
+                                                <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-xs text-[var(--text-muted)]">
+                                                    <span>{spk.technicianName} · {fmt(spk.scheduleDate)}</span>
+                                                    <span className="font-mono font-bold text-emerald-700">{doneCount}/{totalTarget} Selesai ({progressPct}%)</span>
                                                 </div>
                                             </div>
                                         );
@@ -1354,8 +1563,9 @@ export function SPKPage() {
                 <CreateSPKModal
                     companyId={companyId}
                     user={user!}
-                    onClose={() => setCreateOpen(false)}
-                    onCreated={() => { setCreateOpen(false); void load(); }}
+                    preSelectedQuotationId={preSelectedQuoId}
+                    onClose={() => { setCreateOpen(false); setPreSelectedQuoId(undefined); }}
+                    onCreated={() => { setCreateOpen(false); setPreSelectedQuoId(undefined); void load(); }}
                 />
             )}
 
@@ -1375,6 +1585,11 @@ export function SPKPage() {
                     companyId={companyId}
                     onClose={() => setSelected(null)}
                     onUpdated={() => { setSelected(null); void load(); }}
+                    onScheduleNextVisit={(qId) => {
+                        setSelected(null);
+                        setPreSelectedQuoId(qId);
+                        setCreateOpen(true);
+                    }}
                 />
             )}
         </div>

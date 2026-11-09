@@ -327,6 +327,12 @@ export interface SPK {
     lokasi: string;
     notes: string;
     alatPekerjaan?: string[];
+    kunjunganKe?: number;
+    totalTargetKunjungan?: number;
+    tipeKunjungan?: string;
+    labelTahap?: string;
+    technicianSignature?: string;
+    customerSignature?: string;
     companyId: string;
     createdAt: Date;
     createdBy: string;
@@ -475,6 +481,8 @@ export interface WorkReport {
   customerPhone?: string | null;
   customerFeedback?: string | null;
   customerSignature?: string | null;
+  technicianSignature?: string | null;
+  technicianSignedAt?: string | null;
   notes?: string | null;
   teamMembers?: { id?: string; name: string; role?: string; isManual?: boolean }[];
   photos: DocumentationPhoto[];

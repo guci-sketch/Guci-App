@@ -888,6 +888,7 @@ export const ExecutorHome: React.FC = () => {
 
         {checkoutEvidence && (
           <CustomerReviewFormModal
+            technicianName={user.name}
             onClose={() => setCheckoutEvidence(null)}
             onSubmit={handleCustomerReviewSubmit}
           />

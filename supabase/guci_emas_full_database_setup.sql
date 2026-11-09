@@ -284,12 +284,16 @@ CREATE TABLE IF NOT EXISTS public.work_reports (
   customer_phone varchar,
   customer_feedback text,
   customer_signature text,
+  technician_signature text,
+  technician_signed_at timestamptz,
   notes text,
   team_members jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.work_reports ADD COLUMN IF NOT EXISTS team_members jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.work_reports ADD COLUMN IF NOT EXISTS technician_signature text;
+ALTER TABLE public.work_reports ADD COLUMN IF NOT EXISTS technician_signed_at timestamptz;
 
 -- 3.6. Tabel Catatan Penggunaan Chemical & Metode Treatment
 CREATE TABLE IF NOT EXISTS public.treatment_records (

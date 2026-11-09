@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { X, ClipboardList, Loader2, Search, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Loader2, Search } from 'lucide-react';
 import { db } from '@/shared/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from '@/shared/lib/firebase';
 import { createSPK } from '@/shared/api/spkService';
@@ -13,38 +13,55 @@ import { formatRupiah, cn, formatDate as fmt } from '@/shared/lib/utils';
 import type { Quotation, AppUser } from '@/entities/types';
 
 const spkSchema = z.object({
-    quotationId: z.string().min(1, "⚠️ Dokumen penawaran belum dipilih. Silakan klik salah satu penawaran di atas."),
-    technicianId: z.string().min(1, "⚠️ Teknisi belum ditugaskan. Mohon pilih salah satu teknisi untuk pekerjaan ini."),
-    scheduleDate: z.string().min(1, "⚠️ Tanggal pengerjaan wajib diisi. Kapan teknisi harus berangkat?"),
+    quotationId: z.string().min(1, "Pilih salah satu pelanggan dari daftar."),
+    technicianId: z.string().min(1, "Pilih teknisi yang akan bertugas."),
+    scheduleDate: z.string().min(1, "Tanggal pengerjaan wajib diisi."),
     lokasi: z.string().optional(),
     notes: z.string().optional()
 });
 
 type SpkFormValues = z.infer<typeof spkSchema>;
 
+const AR_STAGE_PRESETS = [
+    { id: 'aplikasi_utama', label: 'Aplikasi Utama / Pengeboran & Injeksi', targetMonth: 0 },
+    { id: 'kontrol_1', label: 'Kontrol I (1 Bulan Pasca-Aplikasi)', targetMonth: 1 },
+    { id: 'kontrol_2', label: 'Kontrol II (3 Bulan Pasca-Aplikasi)', targetMonth: 3 },
+    { id: 'kontrol_3', label: 'Kontrol III (6 Bulan Pasca-Aplikasi)', targetMonth: 6 },
+    { id: 'kontrol_tahunan', label: 'Kontrol Rutin Garansi Tahunan', targetMonth: 12 },
+    { id: 'emergency', label: 'Penanganan Komplain / Darurat', targetMonth: 0 },
+];
+
 export function CreateSPKModal({
     companyId,
     user,
+    preSelectedQuotationId,
     onClose,
     onCreated,
 }: {
     companyId: string;
     user: AppUser;
+    preSelectedQuotationId?: string;
     onClose: () => void;
     onCreated: () => void;
 }) {
     const [quotations, setQuotations] = useState<Quotation[]>([]);
     const [teknisis, setTeknisis] = useState<AppUser[]>([]);
+    const [existingSpkCounts, setExistingSpkCounts] = useState<Record<string, number>>({});
     const [loadingData, setLoadingData] = useState(true);
     const [quoSearch, setQuoSearch] = useState("");
     const [serverError, setServerError] = useState("");
 
+    // State Tahap Kunjungan Khusus
+    const [customStageLabel, setCustomStageLabel] = useState("");
+    const [selectedArStage, setSelectedArStage] = useState(AR_STAGE_PRESETS[0].id);
+    const [pcoVisitType, setPcoVisitType] = useState<"ROUTINE" | "EMERGENCY">("ROUTINE");
+
     const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<SpkFormValues>({
         resolver: zodResolver(spkSchema),
         defaultValues: {
-            quotationId: "",
+            quotationId: preSelectedQuotationId || "",
             technicianId: "",
-            scheduleDate: "",
+            scheduleDate: new Date().toISOString().split("T")[0],
             lokasi: "",
             notes: ""
         }
@@ -75,7 +92,23 @@ export function CreateSPKModal({
                     )),
                 ]);
 
-                const usedQIds = new Set(spkSnap.docs.map(d => d.data().quotationId as string));
+                // Hitung riwayat SPK yang sudah pernah dibuat per quotation / pelanggan
+                const countMap: Record<string, number> = {};
+                spkSnap.docs.forEach(d => {
+                    const data = d.data();
+                    const qId = data.quotationId as string;
+                    if (qId) {
+                        countMap[qId] = (countMap[qId] || 0) + 1;
+                    }
+                    const custName = (data.customerName as string || "").trim().toLowerCase();
+                    if (custName) {
+                        countMap[custName] = (countMap[custName] || 0) + 1;
+                    }
+                });
+                setExistingSpkCounts(countMap);
+
+                // Ambil seluruh penawaran yang sudah berstatus sah/deal (Master Pelanggan)
+                // Klien dapat dipilih berkali-kali tanpa diblokir
                 const quoList = quoSnap.docs
                     .map(d => {
                         const data = d.data() as Record<string, unknown>;
@@ -98,28 +131,60 @@ export function CreateSPKModal({
                             status: data.status,
                         } as unknown as Quotation;
                     })
-                    .filter(q => (q.status === "approved" || q.status === "deal" || q.status === "sent_to_client") && !usedQIds.has(q.id));
+                    .filter(q => q.status === "approved" || q.status === "deal" || q.status === "sent_to_client");
 
                 const tekList = userSnap.docs.map(d => ({ uid: d.id, ...d.data() } as AppUser));
 
                 setQuotations(quoList);
                 setTeknisis(tekList);
+
+                if (preSelectedQuotationId) {
+                    const match = quoList.find(q => q.id === preSelectedQuotationId);
+                    if (match) {
+                        setValue('quotationId', match.id);
+                        setValue('lokasi', match.lokasiPekerjaan || (match.kepadaAlamatLines ?? []).join(", "));
+                    }
+                }
             } catch (err) {
-                console.error("Failed to load data for SPK modal", err);
+                console.error("Gagal memuat data pelanggan untuk SPK:", err);
             } finally {
                 setLoadingData(false);
             }
         };
         load();
-    }, [companyId]);
+    }, [companyId, preSelectedQuotationId, setValue]);
+
+    // Riwayat SPK untuk quotation yang sedang dipilih
+    const previousSpkCount = useMemo(() => {
+        if (!selectedQuo) return 0;
+        return existingSpkCounts[selectedQuo.id] || existingSpkCounts[selectedQuo.kepadaNama.trim().toLowerCase()] || 0;
+    }, [selectedQuo, existingSpkCounts]);
+
+    const nextVisitNumber = previousSpkCount + 1;
+    const isAR = selectedQuo?.kategori === "AR";
+
+    // Auto-setup label tahap kunjungan
+    useEffect(() => {
+        if (!selectedQuo) return;
+        if (isAR) {
+            const preset = AR_STAGE_PRESETS.find(p => p.id === selectedArStage);
+            setCustomStageLabel(preset?.label || `Kontrol Kunjungan ke-${nextVisitNumber}`);
+        } else {
+            if (pcoVisitType === "EMERGENCY") {
+                setCustomStageLabel(`Panggilan Darurat / Komplain Hama (Kunjungan ke-${nextVisitNumber})`);
+            } else {
+                setCustomStageLabel(`Kunjungan Rutin ke-${nextVisitNumber} dari 12 (Kontrak Tahunan PCO)`);
+            }
+        }
+    }, [selectedQuo, isAR, selectedArStage, pcoVisitType, nextVisitNumber]);
 
     const filteredQuos = useMemo(() => {
-        if (!quoSearch) return quotations;
+        if (!quoSearch.trim()) return quotations;
         const s = quoSearch.toLowerCase();
         return quotations.filter(q =>
             q.noSurat.toLowerCase().includes(s) ||
             q.kepadaNama.toLowerCase().includes(s) ||
-            q.perihal.toLowerCase().includes(s)
+            (q.perihal || "").toLowerCase().includes(s)
         );
     }, [quotations, quoSearch]);
 
@@ -129,11 +194,13 @@ export function CreateSPKModal({
         if (!selectedQuo || !teknisi) return;
 
         const alamatLengkap = data.lokasi?.trim() || selectedQuo.lokasiPekerjaan || (selectedQuo.kepadaAlamatLines ?? []).join(", ");
-        const svcType = selectedQuo.kategori === "AR" ? "TERMITE_CONTROL" : "GENERAL_PEST_CONTROL";
+        const svcType = isAR ? "TERMITE_CONTROL" : "GENERAL_PEST_CONTROL";
         const warrantyMonths = warrantyToTotalMonths(
             selectedQuo.garansiNilai ?? selectedQuo.garansiTahun ?? 0,
             selectedQuo.garansiUnit ?? "tahun"
         );
+
+        const totalTarget = isAR ? 5 : 12;
 
         try {
             await createSPK({
@@ -144,15 +211,15 @@ export function CreateSPKModal({
                 technicianName: teknisi.name,
                 scheduleDate: new Date(data.scheduleDate),
                 serviceType: svcType,
-                perihal: selectedQuo.perihal,
+                perihal: `${selectedQuo.perihal} — ${customStageLabel}`,
                 lokasi: alamatLengkap,
                 notes: data.notes?.trim() ?? "",
                 companyId,
                 createdBy: user.uid,
                 createdByName: user.name,
-            });
+            } as any);
 
-            // Jembatan otomatis ke sistem Fieldwork Teknisi (tabel projects + work_reports READY)
+            // Buat entri proyek & tiket laporan untuk teknisi lapangan
             try {
                 let initLat = selectedQuo.latitude || 0;
                 let initLng = selectedQuo.longitude || 0;
@@ -164,78 +231,91 @@ export function CreateSPKModal({
                             initLng = geo.lng;
                         }
                     } catch {
-                        // Jika offline / gagal, koordinat 0,0 akan di-anchor otomatis saat teknisi check-in pertama
+                        // Jika offline, koordinat (0,0) di-anchor saat check-in teknisi pertama
                     }
                 }
 
                 await createProject({
-                    projectName: `${selectedQuo.kepadaNama} — ${selectedQuo.noSurat}`,
+                    projectName: `${selectedQuo.kepadaNama} (${customStageLabel})`,
                     clientName: selectedQuo.kepadaNama,
                     address: alamatLengkap || "Lokasi Pelanggan",
                     latitude: initLat,
                     longitude: initLng,
                     radius: 100,
                     workDate: data.scheduleDate,
-                    workType: selectedQuo.perihal,
+                    workType: `${selectedQuo.perihal} — ${customStageLabel}`,
                     serviceType: svcType,
                     warrantyMonths,
-                    contractType: selectedQuo.kategori === "AR" ? "ONE_TIME" : "RECURRING",
-                    notes: data.notes?.trim() || `SPK dari Penawaran ${selectedQuo.noSurat}`,
+                    contractType: isAR ? "ONE_TIME" : "RECURRING",
+                    notes: data.notes?.trim() || `SPK ${customStageLabel} dari ${selectedQuo.noSurat}`,
                 });
             } catch (projErr) {
-                console.warn("[CreateSPKModal] Gagal membuat entri project otomatis:", projErr);
+                console.warn("[CreateSPKModal] Sinkronisasi project pelaksana:", projErr);
             }
 
             onCreated();
         } catch (e) {
-            setServerError(e instanceof Error ? e.message : String(e));
+            setServerError(e instanceof Error ? e.message : "Gagal menerbitkan SPK. Coba lagi.");
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <form onSubmit={handleSubmit(onSubmit)} className="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[92vh] overflow-hidden text-slate-800">
+                {/* Header Bersih & Tenang */}
+                <div className="px-5 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] flex items-center justify-between shrink-0">
                     <div>
-                        <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                            <ClipboardList size={18} className="text-[var(--accent)]" /> Tugaskan Pekerjaan Baru (SPK)
+                        <h3 className="text-base font-bold text-[var(--text-primary)]">
+                            Terbitkan Surat Perintah Kerja (SPK)
                         </h3>
                         <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                            Pilih dokumen penawaran resmi yang sudah disetujui untuk diteruskan ke aplikasi lapangan Teknisi.
+                            Pilih pelanggan berkontrak untuk menjadwalkan kunjungan kerja teknisi lapangan.
                         </p>
                     </div>
-                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
+                        aria-label="Tutup modal"
+                    >
                         <X size={18} />
                     </button>
                 </div>
 
-                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto flex-1 p-5 space-y-4 text-xs">
+                    {serverError && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-medium">
+                            {serverError}
+                        </div>
+                    )}
+
                     {loadingData ? (
-                        <div className="flex items-center justify-center py-12 text-slate-400">
-                            <Loader2 size={20} className="animate-spin mr-2" /> Memuat data...
+                        <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
+                            <Loader2 size={20} className="animate-spin mr-2" /> Memuat data pelanggan...
                         </div>
                     ) : (
                         <>
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">1. Pilih Dokumen Penawaran Resmi *</label>
-                                <div className="relative mb-2">
+                            {/* 1. Pilih Pelanggan (Dari Master Pelanggan Berkontrak) */}
+                            <div className="space-y-1.5">
+                                <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[11px]">
+                                    1. Pilih Pelanggan Berkontrak *
+                                </label>
+                                <div className="relative">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
-                                        className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                        placeholder="Cari nomor surat atau nama klien..."
+                                        type="text"
+                                        className="w-full pl-8 pr-3 py-2 text-xs border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-tertiary)] focus:outline-none focus:border-emerald-600 transition-colors"
+                                        placeholder="Ketik nama pelanggan, nomor kontrak, atau perihal..."
                                         value={quoSearch}
                                         onChange={e => setQuoSearch(e.target.value)}
                                     />
                                 </div>
-                                {filteredQuos.length === 0 ? (
-                                    <div className="text-center py-6 text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
-                                        <FileText size={24} className="mx-auto mb-2 opacity-30" />
-                                        <p className="text-sm">{quotations.length === 0 ? "Saat ini belum ada penawaran disetujui yang menunggu untuk dijadikan SPK." : "Penawaran yang Anda cari tidak ditemukan."}</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                        {filteredQuos.map(q => (
+
+                                <div className="space-y-1 max-h-36 overflow-y-auto pr-1 border border-[var(--border-subtle)] rounded-xl p-1 bg-[var(--bg-primary)]">
+                                    {filteredQuos.map(q => {
+                                        const prevCount = existingSpkCounts[q.id] || existingSpkCounts[q.kepadaNama.trim().toLowerCase()] || 0;
+                                        const isSel = quotationId === q.id;
+                                        return (
                                             <button
                                                 type="button"
                                                 key={q.id}
@@ -243,114 +323,202 @@ export function CreateSPKModal({
                                                     setValue('quotationId', q.id, { shouldValidate: true });
                                                     setValue('lokasi', q.lokasiPekerjaan || (q.kepadaAlamatLines ?? []).join(", "));
                                                 }}
-                                                className={cn("w-full text-left px-4 py-3 rounded-xl border transition-all", quotationId === q.id ? "border-[var(--accent)] bg-[var(--accent-glow)] ring-1 ring-[var(--accent)]" : "border-slate-200 hover:border-emerald-200 hover:bg-slate-50")}
+                                                className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                                    isSel
+                                                        ? 'bg-emerald-800 text-white font-semibold'
+                                                        : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                                                }`}
                                             >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-slate-900 font-mono">{q.noSurat}</p>
-                                                        <p className="text-xs text-slate-600 mt-0.5 truncate">{q.kepadaNama}</p>
-                                                        <p className="text-xs text-slate-400 truncate">{q.perihal}</p>
-                                                    </div>
-                                                    <div className="text-right flex-shrink-0">
-                                                        <p className="text-xs font-semibold text-slate-700">{formatRupiah(q.total)}</p>
-                                                        <p className="text-xs text-slate-400">{fmt(q.tanggal)}</p>
-                                                    </div>
+                                                <div className="min-w-0 pr-2">
+                                                    <p className="font-bold truncate">{q.kepadaNama}</p>
+                                                    <p className={`text-[11px] truncate ${isSel ? 'text-emerald-200' : 'text-[var(--text-muted)]'}`}>
+                                                        {q.noSurat} · {q.perihal}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                                        isSel ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                                                    }`}>
+                                                        {prevCount > 0 ? `${prevCount} SPK` : 'SPK Baru'}
+                                                    </span>
                                                 </div>
                                             </button>
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
+                                    {filteredQuos.length === 0 && (
+                                        <p className="text-center py-4 text-[var(--text-muted)] italic">
+                                            Tidak ditemukan pelanggan yang sesuai kata kunci.
+                                        </p>
+                                    )}
+                                </div>
+                                {errors.quotationId && (
+                                    <p className="text-rose-600 text-[11px] font-medium">{errors.quotationId.message}</p>
                                 )}
-                                {errors.quotationId && <p className="text-red-500 text-xs mt-1">{errors.quotationId.message}</p>}
                             </div>
 
+                            {/* Ringkasan Klien & Indikator Riwayat Kunjungan */}
                             {selectedQuo && (
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                                    <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-emerald-900 font-mono">{selectedQuo.noSurat}</p>
-                                        <p className="text-xs text-emerald-700">{selectedQuo.kepadaNama} · {selectedQuo.perihal}</p>
+                                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-950 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-xs">{selectedQuo.kepadaNama}</span>
+                                        <span className="text-[11px] font-mono font-bold bg-emerald-200/70 text-emerald-900 px-2 py-0.5 rounded">
+                                            {isAR ? 'Anti Rayap' : 'Pest Control'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-emerald-800 leading-snug">
+                                        Alamat: {(selectedQuo.kepadaAlamatLines ?? []).join(", ") || selectedQuo.lokasiPekerjaan || 'Sesuai data master'}
+                                    </p>
+                                    <div className="pt-1 border-t border-emerald-200/80 flex items-center justify-between text-[11px] text-emerald-900 font-medium">
+                                        <span>Riwayat Kunjungan: {previousSpkCount} Kali Selesai</span>
+                                        <span className="font-bold">Akan Diterbitkan: Kunjungan ke-{nextVisitNumber}</span>
                                     </div>
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">2. Tugaskan ke Teknisi Siapa? *</label>
-                                {teknisis.length === 0 ? (
-                                    <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
-                                        <AlertCircle size={14} /> Belum ada akun teknisi yang aktif. Silakan tambahkan teknisi di menu Manajemen User.
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {teknisis.map(t => (
+                            {/* 2. Tahap Kunjungan */}
+                            {selectedQuo && (
+                                <div className="space-y-2">
+                                    <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[11px]">
+                                        2. Penentuan Tahap Kunjungan
+                                    </label>
+
+                                    {isAR ? (
+                                        <div className="space-y-1">
+                                            <p className="text-[11px] text-[var(--text-muted)] mb-1">
+                                                Pilih fase aplikasi atau periode kontrol garansi anti rayap:
+                                            </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                {AR_STAGE_PRESETS.map(p => (
+                                                    <button
+                                                        type="button"
+                                                        key={p.id}
+                                                        onClick={() => setSelectedArStage(p.id)}
+                                                        className={`px-3 py-2 rounded-lg text-left text-xs border transition-colors cursor-pointer ${
+                                                            selectedArStage === p.id
+                                                                ? 'border-emerald-700 bg-emerald-50 text-emerald-950 font-bold'
+                                                                : 'border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-slate-100'
+                                                        }`}
+                                                    >
+                                                        {p.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2">
                                             <button
                                                 type="button"
-                                                key={t.uid}
-                                                onClick={() => setValue('technicianId', t.uid, { shouldValidate: true })}
-                                                className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all", technicianId === t.uid ? "border-[var(--accent)] bg-[var(--accent-glow)] ring-1 ring-[var(--accent)]" : "border-slate-200 hover:border-emerald-200 hover:bg-slate-50")}
+                                                onClick={() => setPcoVisitType("ROUTINE")}
+                                                className={`flex-1 py-2 px-3 rounded-lg border text-xs text-center transition-colors cursor-pointer ${
+                                                    pcoVisitType === "ROUTINE"
+                                                        ? 'border-emerald-700 bg-emerald-50 text-emerald-950 font-bold'
+                                                        : 'border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
+                                                }`}
                                             >
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
-                                                    {t.name[0]?.toUpperCase()}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-900 truncate">{t.name}</p>
-                                                    <p className="text-xs text-slate-400 truncate">{t.jabatan || "Teknisi Lapangan"}</p>
-                                                </div>
+                                                Rutin Bulanan (Kunjungan ke-{nextVisitNumber} dari 12)
                                             </button>
-                                        ))}
-                                    </div>
-                                )}
-                                {errors.technicianId && <p className="text-red-500 text-xs mt-1">{errors.technicianId.message}</p>}
-                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPcoVisitType("EMERGENCY")}
+                                                className={`py-2 px-3 rounded-lg border text-xs text-center transition-colors cursor-pointer ${
+                                                    pcoVisitType === "EMERGENCY"
+                                                        ? 'border-rose-600 bg-rose-50 text-rose-950 font-bold'
+                                                        : 'border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
+                                                }`}
+                                            >
+                                                Panggilan Darurat / Komplain
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* 3. Teknisi & Jadwal Pelaksanaan */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">3. Kapan Jadwal Pekerjaannya? *</label>
+                                    <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[11px] mb-1">
+                                        3. Teknisi Bertugas *
+                                    </label>
+                                    <select
+                                        className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-tertiary)] focus:outline-none focus:border-emerald-600"
+                                        value={technicianId}
+                                        onChange={e => setValue('technicianId', e.target.value, { shouldValidate: true })}
+                                    >
+                                        <option value="">-- Pilih Teknisi Lapangan --</option>
+                                        {teknisis.map(t => (
+                                            <option key={t.uid} value={t.uid}>
+                                                {t.name} ({t.jabatan || 'Teknisi'})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {errors.technicianId && (
+                                        <p className="text-rose-600 text-[11px] font-medium mt-1">{errors.technicianId.message}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[11px] mb-1">
+                                        4. Tanggal Pengerjaan *
+                                    </label>
                                     <input
                                         type="date"
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                        className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-tertiary)] focus:outline-none focus:border-emerald-600"
                                         min={new Date().toISOString().split("T")[0]}
                                         {...register('scheduleDate')}
                                     />
-                                    {errors.scheduleDate && <p className="text-red-500 text-xs mt-1">{errors.scheduleDate.message}</p>}
+                                    {errors.scheduleDate && (
+                                        <p className="text-rose-600 text-[11px] font-medium mt-1">{errors.scheduleDate.message}</p>
+                                    )}
                                 </div>
+                            </div>
+
+                            {/* Lokasi & Catatan Khusus */}
+                            <div className="space-y-2">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Lokasi Detail Pekerjaan</label>
+                                    <label className="block font-semibold text-[var(--text-secondary)] mb-1 text-[11px]">
+                                        Alamat / Lokasi Pelaksanaan Pekerjaan
+                                    </label>
                                     <input
-                                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                        placeholder="Ketik alamat lengkap atau patokan lokasi..."
+                                        type="text"
+                                        className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-tertiary)] focus:outline-none focus:border-emerald-600"
+                                        placeholder="Isi alamat spesifik lokasi pekerjaan..."
                                         {...register('lokasi')}
                                     />
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">Pesan Khusus untuk Teknisi (Opsional)</label>
-                                <textarea
-                                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
-                                    rows={2}
-                                    placeholder="Contoh: Koordinasi dengan PIC sebelum memulai injeksi..."
-                                    {...register('notes')}
-                                />
-                            </div>
-
-                            {serverError && (
-                                <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
-                                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" /> {serverError}
+                                <div>
+                                    <label className="block font-semibold text-[var(--text-secondary)] mb-1 text-[11px]">
+                                        Instruksi / Catatan Tambahan Teknisi (Opsional)
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        className="w-full px-3 py-2 text-xs border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-tertiary)] focus:outline-none focus:border-emerald-600 resize-none"
+                                        placeholder="Contoh: Fokus perlakuan area dapur gizi dan ganti umpan perangkap tikus..."
+                                        {...register('notes')}
+                                    />
                                 </div>
-                            )}
+                            </div>
                         </>
                     )}
-                </div>
 
-                <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
-                    <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors">
-                        Batal
-                    </button>
-                    <button type="submit" disabled={isSubmitting || loadingData} className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-semibold hover:bg-[var(--accent-hover)] disabled:opacity-50 flex items-center justify-center gap-2 transition-colors shadow-sm">
-                        {isSubmitting ? <><Loader2 size={13} className="animate-spin" /> Sedang memproses...</> : <><ClipboardList size={13} /> Terbitkan SPK & Kirim ke Teknisi</>}
-                    </button>
-                </div>
-            </form>
+                    <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2.5">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs cursor-pointer"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || !selectedQuo || !technicianId}
+                            className="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                        >
+                            {isSubmitting ? "Menerbitkan SPK..." : "Terbitkan SPK"}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }
