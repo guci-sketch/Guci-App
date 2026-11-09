@@ -364,8 +364,8 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
     });
     const totalFinal = calc.total + pembulatanRp;
 
-    // Validasi per step
-    const validateStep = useCallback((): boolean => {
+    // Validasi per step (evaluasi nilai state terkini secara dinamis tanpa stale closure)
+    const validateStep = (): boolean => {
         const e: Record<string, string> = {};
         if (step === 0 && !kepada.trim() && !kepadaNama.trim()) {
             e.kepada = "Nama klien / perusahaan wajib diisi.";
@@ -388,7 +388,7 @@ export function QuotationFormPage({ onSavedSuccess, onCancel }: QuotationFormPag
         }
         setErrors(e);
         return Object.keys(e).length === 0;
-    }, [step, kepada, kepadaNama, kepadaAlamat, items]);
+    };
 
     const handleNext = () => {
         if (!validateStep()) return;

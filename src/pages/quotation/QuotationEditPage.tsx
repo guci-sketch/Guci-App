@@ -330,8 +330,12 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
             setError("Nama klien wajib diisi.");
             return;
         }
+        const cleanWa = wa.replace(/\D/g, "");
         if (!wa.trim()) {
             setError("Nomor telepon / WhatsApp wajib diisi.");
+            return;
+        } else if (cleanWa.length < 8 || cleanWa.length > 16) {
+            setError("Nomor telepon / WhatsApp tidak valid (minimal 8 digit).");
             return;
         }
         setSaving(true);
@@ -371,8 +375,12 @@ export function QuotationEditPage({ quotationIdProp, onSavedSuccess, onCancel }:
             setError("Nama klien wajib diisi.");
             return;
         }
+        const cleanWa = wa.replace(/\D/g, "");
         if (!wa.trim()) {
             setError("Nomor telepon / WhatsApp wajib diisi.");
+            return;
+        } else if (cleanWa.length < 8 || cleanWa.length > 16) {
+            setError("Nomor telepon / WhatsApp tidak valid (minimal 8 digit).");
             return;
         }
         setApproving(true);

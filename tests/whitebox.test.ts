@@ -674,7 +674,9 @@ test('WB-20 [Quotation Mandatory Client Phone/WhatsApp Invariant]', async (t) =>
     await t.test('Nomor telepon valid diterima', () => {
         const res1 = validateClientPhone("081234567890");
         const res2 = validateClientPhone("0812-3456-7890");
+        const res3 = validateClientPhone("085813237111");
         assert.equal(res1.isValid, true);
         assert.equal(res2.isValid, true);
+        assert.equal(res3.isValid, true);
     });
 });
