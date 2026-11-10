@@ -118,52 +118,54 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const userInitial = (currentUser.name || 'U').trim().charAt(0).toUpperCase();
+  const userInitials = (currentUser.name || 'U')
+    .split(' ')
+    .map(w => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   return (
     <>
-      <header className="bg-[var(--bg-card)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-3 sm:px-6 py-2 shadow-[var(--shadow-sm)]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          {/* Left: Hamburger Button + Page Title */}
-          <div className="flex items-center gap-2.5 min-w-0">
+      <header className="min-h-[64px] bg-[var(--bg-card)] border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-4 sm:px-7 flex items-center">
+        <div className="w-full max-w-[1510px] mx-auto flex items-center justify-between gap-3">
+          {/* Left: Hamburger + Title + Divider + Group Tag (Gaya Topbar RedesignFieldworkGuciMasLite) */}
+          <div className="flex items-center gap-3 min-w-0">
             {!hideMobileMenu && (
               <button
                 type="button"
                 onClick={onMenuToggle}
                 aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
                 aria-expanded={Boolean(mobileMenuOpen)}
-                className="xl:hidden h-10 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors shrink-0 cursor-pointer btn-tactile"
+                className="xl:hidden w-9 h-9 rounded-[9px] border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)] text-[var(--text-primary)] flex items-center justify-center shrink-0 cursor-pointer"
               >
-                {mobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
-                <span className="text-xs font-semibold hidden sm:inline xl:hidden">Menu</span>
+                {mobileMenuOpen ? <X size={18} /> : <Menu size={19} />}
               </button>
             )}
 
-            <div className="min-w-0">
-              {pageGroup && (
-                <div className="text-xs font-medium text-[var(--text-muted)] leading-none mb-1 truncate">
-                  {pageGroup.replace(/^\d+\.\s*/, '')}
-                </div>
-              )}
-              <h1 className="font-bold text-base sm:text-lg tracking-tight text-[var(--text-primary)] truncate leading-tight">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <strong className="font-bold text-[13.5px] sm:text-[14.5px] text-[var(--text-primary)] truncate">
                 {pageTitle}
-              </h1>
-              {pageSubtitle && !pageGroup && (
-                <p className="text-xs text-[var(--text-muted)] truncate hidden sm:block">
-                  {pageSubtitle}
-                </p>
+              </strong>
+              {(pageGroup || pageSubtitle) && (
+                <>
+                  <span className="hidden sm:block w-px h-5 bg-[var(--border-subtle)] shrink-0" />
+                  <span className="hidden sm:inline-flex items-center h-6 px-2 rounded-md bg-[#f1f4f2] text-[var(--text-secondary)] text-[10.5px] font-semibold whitespace-nowrap">
+                    {pageGroup ? pageGroup.replace(/^\d+\.\s*/, '') : pageSubtitle}
+                  </span>
+                </>
               )}
             </div>
           </div>
 
-          {/* Right: Clean, minimal controls (Search, Theme Toggle, Refresh, Profile Menu with the ONLY Logout button) */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right: Top Actions (Search, Theme, Refresh, Profile Avatar + Name + ChevronDown) */}
+          <div className="flex items-center gap-2 shrink-0 text-[var(--text-secondary)]">
             {pendingCount > 0 && (
               <button
                 type="button"
                 onClick={onSync}
                 disabled={isSyncing}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-[var(--status-draft-bg)] border border-[var(--status-draft-border)] text-[var(--status-draft-text)] px-3 py-1.5 rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-semibold bg-[#fff4df] border border-[#edd5a5] text-[#895b13] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
                 title="Sinkronkan data offline"
               >
                 {isSyncing ? 'Menyinkronkan...' : `${pendingCount} Belum Sinkron`}
@@ -179,32 +181,25 @@ export const Header: React.FC<HeaderProps> = ({
                   setShowQuickJump(true);
                 }}
                 aria-label="Cari halaman atau menu (Ctrl+K)"
-                className="hidden sm:flex items-center gap-2 px-3 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-2 px-3 h-9 rounded-[9px] border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium transition-colors cursor-pointer"
               >
-                <Search size={15} className="text-[var(--text-muted)]" aria-hidden="true" />
+                <Search size={14} className="text-[var(--text-muted)]" aria-hidden="true" />
                 <span>Cari menu...</span>
-                <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[11px] font-mono text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded">
+                <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded">
                   Ctrl K
                 </kbd>
               </button>
             )}
 
-            {/* Theme Quick Toggle (Light / Dark) */}
+            {/* Theme Quick Toggle */}
             <button
               type="button"
               onClick={cycleTheme}
               aria-label={`Ubah tampilan tema (saat ini ${resolvedTheme === 'dark' ? 'Gelap' : 'Terang'})`}
-              title={`Tema: ${resolvedTheme === 'dark' ? 'Gelap' : 'Terang'} (Klik untuk mengganti)`}
-              className="h-10 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center gap-1.5 text-xs sm:text-sm font-medium transition-colors cursor-pointer btn-tactile"
+              title={`Tema: ${resolvedTheme === 'dark' ? 'Gelap' : 'Terang'}`}
+              className="w-9 h-9 rounded-[9px] hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors cursor-pointer"
             >
-              {resolvedTheme === 'dark' ? (
-                <Moon size={16} aria-hidden="true" />
-              ) : (
-                <Sun size={16} aria-hidden="true" />
-              )}
-              <span className="hidden md:inline">
-                {resolvedTheme === 'dark' ? 'Gelap' : 'Terang'}
-              </span>
+              {resolvedTheme === 'dark' ? <Moon size={17} /> : <Sun size={17} />}
             </button>
 
             {/* Refresh Button */}
@@ -213,16 +208,16 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={handleRefreshClick}
               aria-label="Muat ulang data"
               title="Muat ulang data halaman ini"
-              className="w-10 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors cursor-pointer btn-tactile"
+              className="w-9 h-9 rounded-[9px] hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors cursor-pointer border-r border-[var(--border-subtle)] pr-2 mr-1 rounded-r-none"
             >
               <RefreshCw
                 size={16}
-                className={refreshSpin ? 'animate-spin text-[var(--accent-text)]' : ''}
+                className={refreshSpin ? 'animate-spin text-[var(--accent)]' : ''}
                 aria-hidden="true"
               />
             </button>
 
-            {/* Profile Dropdown Menu (Contains the SINGLE Logout button) */}
+            {/* Profile Dropdown Menu (Gaya RedesignFieldworkGuciMasLite: Avatar + Name + ChevronDown) */}
             <div className="relative">
               <button
                 type="button"
@@ -230,15 +225,15 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-expanded={profileMenuOpen}
                 aria-haspopup="menu"
                 aria-label="Menu Akun dan Pengaturan"
-                className="flex items-center gap-2 px-2.5 sm:px-3 h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs sm:text-sm font-semibold transition-colors cursor-pointer btn-tactile"
+                className="flex items-center gap-2.5 px-2 py-1 rounded-[10px] hover:bg-[var(--bg-secondary)] text-[var(--text-primary)] text-[13px] font-medium transition-colors cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-full bg-[var(--accent-glow)] text-[var(--accent-text)] flex items-center justify-center text-xs font-bold shrink-0">
-                  {userInitial}
+                <div className="avatar green">
+                  {userInitials}
                 </div>
-                <span className="max-w-[90px] sm:max-w-[140px] truncate hidden sm:inline-block">
+                <span className="max-w-[110px] sm:max-w-[150px] truncate hidden sm:inline-block text-[var(--text-secondary)] font-medium">
                   {currentUser.name}
                 </span>
-                <ChevronDown size={14} className="text-[var(--text-muted)]" aria-hidden="true" />
+                <ChevronDown size={15} className="text-[var(--text-muted)]" aria-hidden="true" />
               </button>
 
               {profileMenuOpen && (
@@ -253,7 +248,6 @@ export const Header: React.FC<HeaderProps> = ({
                     aria-label="Menu Akun"
                     className="absolute right-0 mt-2 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-xl z-50 p-3 space-y-2 text-[var(--text-primary)]"
                   >
-                    {/* User Identity */}
                     <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-sm text-[var(--text-primary)] truncate">
@@ -270,7 +264,6 @@ export const Header: React.FC<HeaderProps> = ({
                       </p>
                     </div>
 
-                    {/* Theme Selector (Terang / Gelap / Sistem) */}
                     <div className="p-2.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
                       <span className="block text-xs font-semibold text-[var(--text-secondary)]">
                         Mode Tampilan
@@ -351,7 +344,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* Modal Quick Jump / Command Palette (Ctrl+K) */}
       {showQuickJump && onSelectModule && (
         <div
           className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-[2px] flex items-start justify-center pt-14 sm:pt-20 p-4 modal-overlay-in"
@@ -426,7 +418,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Modal Panduan Alur Kerja */}
       <RoleGuidebookModal isOpen={showGuidebook} onClose={() => setShowGuidebook(false)} />
 
       {showChangePassword && (

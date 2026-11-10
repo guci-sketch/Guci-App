@@ -554,6 +554,99 @@ export const OperationsAnalyticsBento: React.FC<OperationsAnalyticsBentoProps> =
          ═══════════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'operationCenter' && (
         <div className="space-y-4">
+          {/* Ringkasan Eksekutif 5 Kartu KPI & Panel Prioritas Bergaya RedesignFieldworkGuciMasLite */}
+          <div className="kpi-grid">
+            {[
+              { label: 'Draft', code: 'DRAFT', count: reports.filter(r => r.status === 'DRAFT').length + (quotationSummary?.draftCount || 0), sub: 'Draft SPK & Penawaran', action: () => onOpenProjectsTab?.() },
+              { label: 'Siap Dikerjakan', code: 'READY', count: reports.filter(r => r.status === 'READY').length, sub: 'Menunggu check-in teknisi', action: () => onOpenProjectsTab?.() },
+              { label: 'Sedang Berlangsung', code: 'WORKING', count: summary.workingJobs || reports.filter(r => r.status === 'WORKING').length, sub: 'Aktif di lapangan', action: () => onOpenReportsTab?.() },
+              { label: 'Selesai', code: 'COMPLETED', count: summary.completedJobs || reports.filter(r => r.status === 'COMPLETED' || r.status === 'REVIEWED').length, sub: 'Laporan selesai tercatat', action: () => onOpenReportsTab?.() },
+              { label: 'Perlu Pemeriksaan', code: 'FLAGGED', count: summary.flaggedJobs || reports.filter(r => r.status === 'FLAGGED').length, sub: 'Perlu ditinjau Admin', action: () => onOpenAnomaliesTab() },
+            ].map(item => (
+              <button
+                key={item.code}
+                type="button"
+                onClick={item.action}
+                className={`kpi-card ${item.code.toLowerCase()}`}
+              >
+                <div>
+                  <span>{item.label}</span>
+                </div>
+                <strong>{formatNumberId(item.count)}</strong>
+                <small>{item.sub}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="dashboard-grid">
+            <section className="panel priority-panel">
+              <div className="section-head">
+                <div>
+                  <h2>Perlu tindakan</h2>
+                  <p>Item prioritas yang membutuhkan perhatian Admin.</p>
+                </div>
+                <button type="button" onClick={() => onOpenReportsTab?.()}>
+                  Lihat semua
+                </button>
+              </div>
+              <div className="action-list">
+                {reports
+                  .filter(r => r.status === 'FLAGGED' || r.status === 'WORKING')
+                  .slice(0, 3)
+                  .map(rep => (
+                    <button key={rep.id} type="button" onClick={() => onOpenReportDetail(rep.id)}>
+                      <div className={`alert-icon ${rep.status === 'FLAGGED' ? 'danger' : 'info'}`}>
+                        <span className="font-bold text-xs">{rep.status === 'FLAGGED' ? '!' : '●'}</span>
+                      </div>
+                      <div>
+                        <div>
+                          <strong>{rep.status === 'FLAGGED' ? 'Laporan perlu diperiksa' : 'Aktivitas lapangan berlangsung'}</strong>
+                          <span className={`badge ${rep.status === 'FLAGGED' ? 'danger' : 'info'}`}>
+                            <span className="badge-dot" />
+                            {rep.status === 'FLAGGED' ? 'Perlu Ditinjau' : 'Sedang Berlangsung'}
+                          </span>
+                        </div>
+                        <p>{rep.project.projectName} · {rep.executor.name}</p>
+                        <small>{rep.project.address}</small>
+                      </div>
+                      <span className="text-[var(--secondary)] font-bold">›</span>
+                    </button>
+                  ))}
+                {reports.filter(r => r.status === 'FLAGGED' || r.status === 'WORKING').length === 0 && (
+                  <div className="py-4 text-xs text-[var(--secondary)]">
+                    Seluruh penugasan berjalan normal tanpa kendala yang memerlukan eskalasi.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="section-head">
+                <div>
+                  <h2>Aktivitas terbaru</h2>
+                  <p>Jejak operasional lapangan terkini.</p>
+                </div>
+              </div>
+              <div className="timeline compact">
+                {reports.slice(0, 4).map(rep => {
+                  const tone = rep.status === 'COMPLETED' || rep.status === 'REVIEWED' ? 'success' : rep.status === 'FLAGGED' ? 'warning' : 'info';
+                  const timeStr = rep.checkInAt ? new Date(rep.checkInAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.') : 'Hari ini';
+                  return (
+                    <div key={rep.id}>
+                      <i className={tone} />
+                      <span>
+                        <strong>
+                          {rep.status === 'COMPLETED' ? 'Pekerjaan selesai dicatat' : rep.status === 'WORKING' ? 'Check-in berhasil dicatat' : rep.status === 'FLAGGED' ? 'Laporan ditandai sistem' : 'Penugasan siap dikerjakan'}
+                        </strong>
+                        <small>{rep.executor.name} · {rep.project.projectName}</small>
+                      </span>
+                      <time>{timeStr}</time>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
           {/* 12-Column Operation Center Grid */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-4 sm:p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-stretch">
