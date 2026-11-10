@@ -101,91 +101,110 @@ input[type="number"] {
 :root {
   color-scheme: light;
 
-  /* Surfaces — Clean Enterprise Light Slate Canvas */
-  --bg-primary: #f4f6f9;
-  --bg-secondary: #edf0f5;
-  --bg-tertiary: #e5e9f0;
-  --bg-card: #ffffff;
-  --bg-elevated: #ffffff;
-  --bg-skeleton: #e2e8f0;
+  /* Redesign Core Palette — Warm Off-White Canvas & Deep Pine Green */
+  --green: #245c45;
+  --green-hover: #1d4b38;
+  --green-soft: #e8f1eb;
+  --canvas: #f6f8f6;
+  --surface: #ffffff;
+  --subtle: #eff3f0;
+  --text: #17231c;
+  --secondary: #66736b;
+  --muted: #87928b;
+
+  /* Sidebar Deep Forest Tokens */
+  --sidebar-bg: #173f30;
+  --sidebar-text: #c9d8cf;
+  --sidebar-text-hover: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.11);
+  --sidebar-indicator: #a9c9b4;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+
+  /* Surfaces — Warm Pine Canvas */
+  --bg-primary: var(--canvas);
+  --bg-secondary: var(--subtle);
+  --bg-tertiary: #e6ece7;
+  --bg-card: var(--surface);
+  --bg-elevated: var(--surface);
+  --bg-skeleton: #dfe6e0;
 
   /* Content & Typography */
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  --text-primary: var(--text);
+  --text-secondary: var(--secondary);
+  --text-muted: var(--muted);
   --text-inverse: #ffffff;
 
-  /* Brand & Jarivis Interactive Accents */
-  --accent: #1a5c38;
-  --accent-hover: #13462a;
-  --accent-glow: rgba(37, 99, 235, 0.10);
-  --accent-muted: rgba(37, 99, 235, 0.08);
-  --accent-text: #1d4ed8;
+  /* Brand & Interactive Accents (Unified Pine Green) */
+  --accent: var(--green);
+  --accent-hover: var(--green-hover);
+  --accent-glow: rgba(36, 92, 69, 0.12);
+  --accent-muted: var(--green-soft);
+  --accent-text: var(--green);
 
-  --accent-blue: #2563eb;
-  --accent-blue-hover: #1d4ed8;
-  --accent-blue-soft: rgba(37, 99, 235, 0.12);
+  --accent-blue: #356c91;
+  --accent-blue-hover: #295b7c;
+  --accent-blue-soft: rgba(53, 108, 145, 0.12);
 
-  /* Jarivis "PERLU PERHATIAN!" Alert Card Tokens */
+  /* Alert Card Tokens */
   --alert-surface-bg: #7f1d1d;
   --alert-surface-border: #991b1b;
   --alert-surface-text: #ffffff;
   --alert-surface-muted: #fecaca;
 
-  --brand-gold: #b45309;
-  --brand-gold-soft: #fef3c7;
+  --brand-gold: #a96b16;
+  --brand-gold-soft: #fff4df;
 
   /* Semantic Status Tokens */
-  --status-draft-bg: #fef3c7;
-  --status-draft-text: #92400e;
+  --status-draft-bg: #fff4df;
+  --status-draft-text: #946015;
   --status-draft-border: #fde68a;
 
-  --status-ready-bg: #f1f5f9;
-  --status-ready-text: #334155;
-  --status-ready-border: #cbd5e1;
+  --status-ready-bg: #eff2f0;
+  --status-ready-text: #435047;
+  --status-ready-border: #d5ded7;
 
-  --status-working-bg: #eff6ff;
-  --status-working-text: #1d4ed8;
+  --status-working-bg: #eaf2f8;
+  --status-working-text: #356c91;
   --status-working-border: #bfdbfe;
 
-  --status-completed-bg: #ecfdf5;
-  --status-completed-text: #065f46;
-  --status-completed-border: #a7f3d0;
+  --status-completed-bg: #e8f4ec;
+  --status-completed-text: #257a4b;
+  --status-completed-border: #b8d8c2;
 
-  --status-reviewed-bg: #f0fdf4;
-  --status-reviewed-text: #166534;
-  --status-reviewed-border: #86efac;
+  --status-reviewed-bg: #e7f3f0;
+  --status-reviewed-text: #287267;
+  --status-reviewed-border: #99cfca;
 
-  --status-flagged-bg: #fef2f2;
-  --status-flagged-text: #b91c1c;
-  --status-flagged-border: #fecaca;
+  --status-flagged-bg: #fcecec;
+  --status-flagged-text: #b54141;
+  --status-flagged-border: #f3c4c4;
 
-  --status-approved-bg: #dcfce7;
-  --status-approved-text: #166534;
+  --status-approved-bg: #e8f4ec;
+  --status-approved-text: #257a4b;
 
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --info: #2563eb;
+  --success: #257a4b;
+  --warning: #a96b16;
+  --danger: #b54141;
+  --info: #356c91;
 
   /* Operational Chart Tokens */
-  --chart-total: #2563eb;
-  --chart-total-fill: rgba(37, 99, 235, 0.12);
-  --chart-completed: #10b981;
-  --chart-flagged: #ef4444;
-  --chart-working: #3b82f6;
-  --chart-ready: #64748b;
-  --chart-draft: #f59e0b;
-  --chart-reviewed: #14b8a6;
-  --chart-grid: #e2e8f0;
+  --chart-total: #245c45;
+  --chart-total-fill: rgba(36, 92, 69, 0.12);
+  --chart-completed: #257a4b;
+  --chart-flagged: #b54141;
+  --chart-working: #356c91;
+  --chart-ready: #66736b;
+  --chart-draft: #a96b16;
+  --chart-reviewed: #287267;
+  --chart-grid: #e1e8e2;
   --tooltip-bg: #ffffff;
-  --tooltip-border: #cbd5e1;
+  --tooltip-border: #d5ded7;
 
   /* Borders, Radius, Shadows */
-  --border: #dde2eb;
-  --border-subtle: #dde2eb;
-  --border-light: #edf0f5;
-  --border-focus: rgba(37, 99, 235, 0.35);
+  --border: #e1e8e2;
+  --border-subtle: #e1e8e2;
+  --border-light: #eff3f0;
+  --border-focus: rgba(36, 92, 69, 0.35);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -193,9 +212,9 @@ input[type="number"] {
   --radius-xl: 14px;
   --radius-2xl: 18px;
 
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.07);
-  --shadow-lg: 0 10px 28px -4px rgba(15, 23, 42, 0.10);
+  --shadow-sm: 0 1px 2px rgba(23, 35, 28, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(23, 35, 28, 0.06);
+  --shadow-lg: 0 10px 28px -4px rgba(23, 35, 28, 0.10);
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -207,6 +226,14 @@ input[type="number"] {
 html.dark,
 [data-theme="dark"] {
   color-scheme: dark;
+
+  /* Sidebar Deep Forest Tokens (Dark Mode) */
+  --sidebar-bg: #121814;
+  --sidebar-text: #a1b5a9;
+  --sidebar-text-hover: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-indicator: #4e8f73;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
 
   --bg-primary: #0f1115;
   --bg-secondary: #16191f;
@@ -334,6 +361,47 @@ html.dark,
   .clean-input:focus {
     border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* Redesign KPI Cards with Functional Top Accent Border (Anti-Clutter) */
+  .kpi-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: 1.15rem;
+    border-top: 2.5px solid #cbd5e1;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .kpi-card.ready,
+  .kpi-card.working {
+    border-top-color: #356c91;
+  }
+  .kpi-card.completed,
+  .kpi-card.approved {
+    border-top-color: #257a4b;
+  }
+  .kpi-card.flagged {
+    border-top-color: #b54141;
+  }
+  .kpi-card.draft,
+  .kpi-card.warning {
+    border-top-color: #a96b16;
+  }
+
+  /* GPS Radar Pulse & Map Pin Animations */
+  .radar {
+    animation: radarPulse 1.8s ease-in-out infinite;
+  }
+  .map-pin {
+    animation: mapPinIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .content-in {
+    animation: contentIn 0.3s cubic-bezier(0.2, 0.75, 0.25, 1) both;
   }
 
   .clean-badge {
@@ -479,12 +547,28 @@ a,
   transition-timing-function: ease-out;
 }
 
+@keyframes contentIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mapPinIn {
+  from { opacity: 0; transform: translateY(10px) rotate(-45deg) scale(0.85); }
+  to { opacity: 1; transform: translateY(0) rotate(-45deg) scale(1); }
+}
+@keyframes radarPulse {
+  0%, 100% { box-shadow: 0 0 0 10px rgba(36, 92, 69, 0.08), 0 0 0 22px rgba(36, 92, 69, 0.04); }
+  50% { box-shadow: 0 0 0 16px rgba(36, 92, 69, 0.04), 0 0 0 32px rgba(36, 92, 69, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .result-enter,
   .row-fade-in,
   .page-fade-in,
   .modal-overlay-in,
-  .modal-card-in {
+  .modal-card-in,
+  .content-in,
+  .map-pin,
+  .radar {
     animation: none !important;
   }
 }

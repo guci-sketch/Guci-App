@@ -239,15 +239,15 @@ export function AppLayout({
                         ease: [0.16, 1, 0.3, 1],
                     }}
                     className={cn(
-                        'fixed inset-y-0 left-0 z-50 bg-[var(--bg-card)] border-r border-[var(--border-subtle)] flex flex-col select-none overflow-hidden',
+                        'fixed inset-y-0 left-0 z-50 bg-[#173f30] dark:bg-[#121814] text-[#c9d8cf] border-r border-[#1f4e3c] dark:border-[#1e2821] flex flex-col select-none overflow-hidden',
                         'transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
                         isSidebarOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0',
                         isExpanded && !isPinnedDesktop
-                            ? 'shadow-[8px_0_30px_rgba(0,0,0,0.16)]'
+                            ? 'shadow-[8px_0_30px_rgba(0,0,0,0.25)]'
                             : 'shadow-none'
                     )}
                 >
-                    <div className="h-12 px-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
+                    <div className="h-12 px-2.5 border-b border-white/10 flex items-center justify-between shrink-0">
                         <div className="flex items-center min-w-0">
                             <button
                                 type="button"
@@ -255,13 +255,15 @@ export function AppLayout({
                                 aria-label={isSidebarOpen ? 'Tutup navigasi sidebar' : 'Buka navigasi sidebar'}
                                 aria-expanded={isSidebarOpen}
                                 title="Buka / Tutup Detail Menu Sidebar"
-                                className="w-9 h-9 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs tracking-tighter cursor-pointer"
+                                className="w-8 h-8 rounded-lg bg-white flex items-end justify-center gap-0.5 p-1.5 shadow-2xs shrink-0 cursor-pointer transition-transform hover:scale-105 active:scale-95"
                             >
-                                FW
+                                <span className="w-1 h-2 bg-[#245c45] rounded-t-xs" />
+                                <span className="w-1 h-3.5 bg-[#245c45] rounded-t-xs" />
+                                <span className="w-1 h-2.5 bg-[#245c45] rounded-t-xs" />
                             </button>
                             <div
                                 className={cn(
-                                    'ml-2.5 overflow-hidden whitespace-nowrap transition-all duration-150 ease-out',
+                                    'ml-2.5 overflow-hidden whitespace-nowrap transition-all duration-150 ease-out text-white [--text-primary:#ffffff] [--text-muted:#8fa899] [--accent-text:#a9c9b4]',
                                     isExpanded
                                         ? 'opacity-100 translate-x-0 w-[166px]'
                                         : 'opacity-0 -translate-x-1.5 w-0 pointer-events-none'
@@ -278,7 +280,7 @@ export function AppLayout({
                                     setSidebarOpen(false);
                                     setIsHovered(false);
                                 }}
-                                className="xl:hidden w-8 h-8 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] shrink-0"
+                                className="xl:hidden w-7 h-7 rounded-lg border border-white/15 flex items-center justify-center text-white/80 hover:bg-white/10 shrink-0 cursor-pointer"
                                 aria-label="Tutup Menu"
                             >
                                 <X size={14} />
@@ -291,13 +293,13 @@ export function AppLayout({
                             <div key={group.name} className="space-y-0.5">
                                 <div className="h-5 flex items-center px-1.5 overflow-hidden">
                                     {isExpanded ? (
-                                        <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#8fa899] whitespace-nowrap">
                                             {group.name}
                                         </span>
                                     ) : groupIdx > 0 ? (
-                                        <div className="w-full h-px bg-[var(--border-subtle)]" />
+                                        <div className="w-full h-px bg-white/10" />
                                     ) : (
-                                        <div className="w-2 h-1 rounded-full bg-[var(--border-subtle)] mx-auto" />
+                                        <div className="w-2 h-1 rounded-full bg-white/20 mx-auto" />
                                     )}
                                 </div>
 
@@ -313,12 +315,12 @@ export function AppLayout({
                                             aria-label={item.label}
                                             title={!isExpanded ? item.label : undefined}
                                             className={cn(
-                                                'w-full h-10 flex items-center rounded-xl text-[13px] transition-colors duration-200 relative group/item cursor-pointer select-none',
+                                                'w-full h-10 flex items-center rounded-xl text-[13px] transition-colors duration-180 relative group/item cursor-pointer select-none',
                                                 active
                                                     ? danger
-                                                        ? 'bg-[var(--status-flagged-bg)] text-[var(--status-flagged-text)] font-semibold shadow-2xs'
-                                                        : 'bg-[var(--accent-glow)] text-[var(--accent-text)] font-semibold shadow-2xs'
-                                                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] font-medium'
+                                                        ? 'bg-rose-500/20 text-rose-200 font-semibold'
+                                                        : 'bg-white/12 text-white font-semibold shadow-2xs'
+                                                    : 'text-[#c9d8cf] hover:bg-white/7 hover:text-white font-medium'
                                             )}
                                         >
                                             {active && (
@@ -328,14 +330,14 @@ export function AppLayout({
                                                         transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                                                         className={cn(
                                                             'absolute inset-0 rounded-xl pointer-events-none -z-10',
-                                                            danger ? 'bg-[var(--status-flagged-bg)]' : 'bg-[var(--accent-glow)]'
+                                                            danger ? 'bg-rose-500/20' : 'bg-white/12'
                                                         )}
                                                     />
                                                     <span
                                                         aria-hidden="true"
                                                         className={cn(
-                                                            'absolute left-0 top-2 bottom-2 w-1 rounded-r-full',
-                                                            danger ? 'bg-rose-500' : 'bg-[var(--accent)]'
+                                                            'absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full',
+                                                            danger ? 'bg-rose-400' : 'bg-[#a9c9b4]'
                                                         )}
                                                     />
                                                 </>
@@ -346,9 +348,9 @@ export function AppLayout({
                                                     'w-9 h-9 flex items-center justify-center shrink-0 [&_svg]:w-[16px] [&_svg]:h-[16px] transition-transform duration-150 group-hover/item:scale-105',
                                                     active
                                                         ? danger
-                                                            ? 'text-[var(--status-flagged-text)]'
-                                                            : 'text-[var(--accent-text)]'
-                                                        : 'text-[var(--text-muted)] group-hover/item:text-[var(--text-primary)]'
+                                                            ? 'text-rose-300'
+                                                            : 'text-white'
+                                                        : 'text-[#8fa899] group-hover/item:text-white'
                                                 )}
                                             >
                                                 {item.icon}
@@ -367,14 +369,14 @@ export function AppLayout({
                                                 {item.badge !== undefined && item.badge !== 0 && item.badge !== '0' && (
                                                     <span
                                                         className={cn(
-                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 leading-none tabular-nums',
+                                                            'ml-1.5 px-1.5 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 leading-none tabular-nums',
                                                             active
                                                                 ? danger
-                                                                    ? 'bg-rose-500/20 text-[var(--status-flagged-text)]'
-                                                                    : 'bg-emerald-500/20 text-[var(--accent-text)]'
+                                                                    ? 'bg-rose-500/30 text-rose-200'
+                                                                    : 'bg-white/20 text-white'
                                                                 : danger
-                                                                ? 'bg-rose-500/15 text-rose-600 border border-rose-500/30'
-                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
+                                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                                : 'bg-white/10 text-[#c9d8cf]'
                                                         )}
                                                     >
                                                         {item.badge}
@@ -388,7 +390,7 @@ export function AppLayout({
                         ))}
                     </nav>
 
-                    <div className="flex h-10 px-2 border-t border-[var(--border-subtle)] items-center bg-[var(--bg-primary)] shrink-0">
+                    <div className="flex h-10 px-2 border-t border-white/10 items-center bg-black/15 shrink-0">
                         <button
                             type="button"
                             onClick={() => {
@@ -400,9 +402,9 @@ export function AppLayout({
                             }}
                             aria-label={!isDesktopLayout ? 'Tutup menu navigasi' : isPinnedDesktop ? 'Ubah ke Mode Ringkas' : 'Kunci Sidebar Agar Tetap Terbuka'}
                             title={!isDesktopLayout ? 'Tutup menu navigasi' : isPinnedDesktop ? 'Ubah ke Mode Ringkas / Hover' : 'Kunci Sidebar Agar Tetap Terbuka (Stay Open)'}
-                            className="w-full h-7 flex items-center rounded-md text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer overflow-hidden"
+                            className="w-full h-7 flex items-center rounded-md text-xs text-[#c9d8cf] hover:text-white hover:bg-white/10 transition-colors cursor-pointer overflow-hidden"
                         >
-                            <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[var(--text-muted)]">
+                            <div className="w-9 h-7 flex items-center justify-center shrink-0 text-[#8fa899]">
                                 {isPinnedDesktop || isSidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
                             </div>
                             <span

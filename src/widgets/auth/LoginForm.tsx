@@ -170,137 +170,194 @@ export function LoginPage() {
     };
 
     return (
-        <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-[var(--accent-glow)]">
-            <div className="w-full max-w-[400px] mx-auto space-y-4">
-                {/* Fieldwork Brand Wordmark */}
-                <div className="text-center space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[var(--accent)] text-[11px] font-bold">
-                        <ShieldCheck size={13} /> Sistem Operasional &amp; Penawaran Terpadu
+        <div className="min-h-[100dvh] grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] bg-[#fbfcfb] selection:bg-[var(--accent-glow)]">
+            {/* Left Column: Editorial Brand Hero (Desktop) */}
+            <aside className="hidden lg:flex flex-col justify-between p-10 xl:p-14 bg-[#245c45] text-white relative overflow-hidden select-none">
+                {/* Subtle Geometric Background Rings */}
+                <div className="absolute -right-36 -bottom-36 w-[440px] h-[440px] rounded-full border border-white/10 pointer-events-none" />
+                <div className="absolute -right-20 -bottom-20 w-[300px] h-[300px] rounded-full border border-white/10 pointer-events-none" />
+                <div className="absolute right-0 bottom-0 w-[180px] h-[180px] rounded-full border border-white/10 pointer-events-none" />
+
+                {/* Brand Lockup */}
+                <div className="flex items-center gap-3 relative z-10">
+                    <div className="w-9 h-9 rounded-xl bg-white flex items-end justify-center gap-0.5 p-2 shadow-xs shrink-0">
+                        <span className="w-1 h-2.5 bg-[#245c45] rounded-t-xs" />
+                        <span className="w-1 h-4 bg-[#245c45] rounded-t-xs" />
+                        <span className="w-1 h-3 bg-[#245c45] rounded-t-xs" />
                     </div>
-                    <h1 className="font-sans text-2xl sm:text-3xl font-black tracking-tight text-[#2d2a26] select-none pt-1">
-                        Field<span className="text-[var(--accent)]">work</span>
+                    <div>
+                        <strong className="block text-base font-bold leading-tight">Fieldwork</strong>
+                        <small className="block text-[11px] text-[#cfe0d5] font-medium">PT Guci Emas Pratama</small>
+                    </div>
+                </div>
+
+                {/* Hero Editorial Copy */}
+                <div className="max-w-md relative z-10 space-y-4 my-auto py-12">
+                    <span className="text-xs font-bold tracking-[0.14em] uppercase text-[#cfe0d5] block">
+                        OPERASIONAL LAPANGAN &amp; PENAWARAN
+                    </span>
+                    <h1 className="text-3xl xl:text-4xl font-extrabold leading-[1.2] tracking-[-0.03em] text-white">
+                        Pekerjaan lapangan yang lebih jelas, dari penugasan hingga laporan.
                     </h1>
-                    <p className="text-xs text-[#5a554f]">
-                        Penawaran Harga, Garansi Rayap, Stok Gudang &amp; Laporan Teknisi
+                    <p className="text-sm xl:text-base leading-relaxed text-[#dbe8df]">
+                        Satu ruang kerja terpadu yang menghubungkan pembuatan penawaran harga, validasi kehadiran GPS Haversine, hingga rekapitulasi standar Permenkes No. 2 Tahun 2023.
                     </p>
                 </div>
 
-                {/* Main Login Card */}
-                <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgba(45,42,38,0.06)] border border-[#e8e5e0] p-5 sm:p-6 space-y-4">
-                    <form onSubmit={handleLogin} className="space-y-3.5">
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-[#2d2a26]">Email Akun</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail size={15} className="text-[#8a8580]" />
-                                </div>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    placeholder="nama@perusahaan.com"
-                                    required
-                                    className="w-full pl-9 pr-3.5 py-2 bg-[#faf9f7] border border-[#e8e5e0] text-[#2d2a26] text-xs sm:text-sm rounded-xl focus:outline-none focus:bg-white focus:border-[var(--accent)] transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-[#2d2a26]">Password</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock size={15} className="text-[#8a8580]" />
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                    placeholder="Masukkan password"
-                                    required
-                                    className="w-full pl-9 pr-9 py-2 bg-[#faf9f7] border border-[#e8e5e0] text-[#2d2a26] text-xs sm:text-sm rounded-xl focus:outline-none focus:bg-white focus:border-[var(--accent)] transition-all"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#8a8580] hover:text-[#2d2a26] transition-colors"
-                                    tabIndex={-1}
-                                    title={showPassword ? "Sembunyikan password" : "Lihat password"}
-                                >
-                                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-xs font-medium leading-relaxed">
-                                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 size={15} className="animate-spin" /> Memeriksa Akun...
-                                </>
-                            ) : (
-                                <>
-                                    Masuk ke Fieldwork <ArrowRight size={15} />
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Tautan Registrasi via Token Undangan */}
-                    <div className="pt-2 border-t border-[#e8e5e0] flex items-center justify-between text-xs">
-                        <span className="text-[#5a554f]">Punya Token Undangan?</span>
-                        <Link
-                            to="/signup"
-                            className="inline-flex items-center gap-1 font-bold text-[var(--accent)] hover:underline"
-                        >
-                            <KeyRound size={12} /> Aktivasi via Token
-                        </Link>
+                {/* Trust Note */}
+                <div className="flex items-center gap-3 text-xs text-[#dbe8df] relative z-10 pt-6 border-t border-white/15">
+                    <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                        <ShieldCheck size={20} className="text-[#a9c9b4]" />
                     </div>
-
-                    {/* 1-Click Demo Staff Accounts */}
-                    <div className="pt-3 border-t border-[#e8e5e0] space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-[#5a554f] flex items-center gap-1">
-                                <Sparkles size={12} className="text-amber-600" /> Akun Demo Perusahaan (1-Klik)
-                            </span>
-                            <span className="text-[10px] text-[#8a8580]">5 Peran Perusahaan</span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-1.5">
-                            {QUICK_DEMO_ACCOUNTS.map(acc => (
-                                <button
-                                    key={acc.email}
-                                    type="button"
-                                    disabled={loading}
-                                    onClick={() => handleQuickLogin(acc.email, acc.pw)}
-                                    className="flex flex-col items-start justify-between p-2 rounded-xl border border-[#e8e5e0] bg-[#faf9f7] hover:bg-[#f5f3ef] text-left transition-all cursor-pointer"
-                                >
-                                    <div className="flex items-center justify-between w-full gap-1 mb-0.5">
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white border border-[#e8e5e0] text-[var(--accent)]">
-                                            {acc.roleBadge}
-                                        </span>
-                                        <UserCheck size={11} className="text-[#8a8580]" />
-                                    </div>
-                                    <div className="font-bold text-[11px] text-[#2d2a26] truncate w-full">{acc.label}</div>
-                                </button>
-                            ))}
-                        </div>
+                    <div>
+                        <strong className="block text-white font-bold">Integritas Terverifikasi</strong>
+                        <span>Geofencing satelit, watermark foto otomatis, dan audit trail operasional.</span>
                     </div>
                 </div>
+            </aside>
 
-                <p className="text-center text-[11px] text-[#8a8580]">
-                    &copy; {new Date().getFullYear()} Fieldwork App. All rights reserved.
-                </p>
-            </div>
+            {/* Right Column: Clean Login Form & 1-Click Demo Accounts */}
+            <main className="flex items-center justify-center p-5 sm:p-10 overflow-y-auto">
+                <div className="w-full max-w-[420px] mx-auto space-y-4 content-in">
+                    {/* Mobile Brand Lockup (Hidden on Desktop) */}
+                    <div className="lg:hidden text-center space-y-1 mb-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#245c45] text-[11px] font-bold">
+                            <ShieldCheck size={13} /> Sistem Operasional &amp; Penawaran Terpadu
+                        </div>
+                        <h1 className="font-sans text-2xl font-black tracking-tight text-[#17231c] select-none pt-1">
+                            Field<span className="text-[#245c45]">work</span>
+                        </h1>
+                        <p className="text-xs text-[#66736b]">
+                            PT Guci Emas Pratama · Pest &amp; Termite Control
+                        </p>
+                    </div>
+
+                    {/* Main Login Card */}
+                    <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(23,35,28,0.06)] border border-[#e1e8e2] p-6 sm:p-7 space-y-4">
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#17231c]">
+                                Selamat datang
+                            </h2>
+                            <p className="text-xs text-[#66736b] mt-1">
+                                Masuk untuk melanjutkan ke ruang kerja Anda.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-3.5 pt-1">
+                            <div className="space-y-1">
+                                <label className="block text-xs font-bold text-[#17231c]">Email Akun</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Mail size={15} className="text-[#87928b]" />
+                                    </div>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        placeholder="nama@perusahaan.com"
+                                        required
+                                        className="w-full pl-9 pr-3.5 py-2.5 bg-[#f6f8f6] border border-[#e1e8e2] text-[#17231c] text-xs sm:text-sm rounded-xl focus:outline-none focus:bg-white focus:border-[#245c45] transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-xs font-bold text-[#17231c]">Password</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Lock size={15} className="text-[#87928b]" />
+                                    </div>
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        placeholder="Masukkan password"
+                                        required
+                                        className="w-full pl-9 pr-9 py-2.5 bg-[#f6f8f6] border border-[#e1e8e2] text-[#17231c] text-xs sm:text-sm rounded-xl focus:outline-none focus:bg-white focus:border-[#245c45] transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#87928b] hover:text-[#17231c] transition-colors cursor-pointer"
+                                        tabIndex={-1}
+                                        title={showPassword ? "Sembunyikan password" : "Lihat password"}
+                                    >
+                                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {error && (
+                                <div className="flex items-start gap-2 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-xs font-medium leading-relaxed">
+                                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-2.5 px-4 bg-[#245c45] hover:bg-[#1d4b38] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all btn-tactile disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 size={15} className="animate-spin" /> Memeriksa Akun...
+                                    </>
+                                ) : (
+                                    <>
+                                        Masuk ke Fieldwork <ArrowRight size={15} />
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        {/* Tautan Registrasi via Token Undangan */}
+                        <div className="pt-2 border-t border-[#e1e8e2] flex items-center justify-between text-xs">
+                            <span className="text-[#66736b]">Punya Token Undangan?</span>
+                            <Link
+                                to="/signup"
+                                className="inline-flex items-center gap-1 font-bold text-[#245c45] hover:underline"
+                            >
+                                <KeyRound size={12} /> Aktivasi via Token
+                            </Link>
+                        </div>
+
+                        {/* 1-Click Demo Staff Accounts */}
+                        <div className="pt-3 border-t border-[#e1e8e2] space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-[#66736b] flex items-center gap-1">
+                                    <Sparkles size={12} className="text-amber-600" /> Akun Demo Perusahaan (1-Klik)
+                                </span>
+                                <span className="text-[10px] text-[#87928b]">5 Peran Perusahaan</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {QUICK_DEMO_ACCOUNTS.map(acc => (
+                                    <button
+                                        key={acc.email}
+                                        type="button"
+                                        disabled={loading}
+                                        onClick={() => handleQuickLogin(acc.email, acc.pw)}
+                                        className="flex flex-col items-start justify-between p-2 rounded-xl border border-[#e1e8e2] bg-[#f6f8f6] hover:bg-[#eef3ef] text-left transition-all btn-tactile cursor-pointer"
+                                    >
+                                        <div className="flex items-center justify-between w-full gap-1 mb-0.5">
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white border border-[#e1e8e2] text-[#245c45]">
+                                                {acc.roleBadge}
+                                            </span>
+                                            <UserCheck size={11} className="text-[#87928b]" />
+                                        </div>
+                                        <div className="font-bold text-[11px] text-[#17231c] truncate w-full">{acc.label}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="text-center text-[11px] text-[#87928b]">
+                        &copy; {new Date().getFullYear()} Fieldwork — PT Guci Emas Pratama. All rights reserved.
+                    </p>
+                </div>
+            </main>
         </div>
     );
 }
