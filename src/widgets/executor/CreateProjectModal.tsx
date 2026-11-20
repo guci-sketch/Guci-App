@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Calendar, Building, CheckCircle2, Crosshair, Clock, Loader2, ShieldCheck, Search, Lock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Calendar, Building, CheckCircle2, Crosshair, Clock, Loader2, ShieldCheck, Search, Lock, Plus, ChevronDown, UserPlus } from 'lucide-react';
 import { PRIMARY_SERVICE_TYPES, SERVICE_TYPE_META } from '@/shared/utils/serviceMeta';
 import { ServiceType } from '@/entities/types';
 import { MapPicker } from '../common/MapPicker';
@@ -7,15 +7,25 @@ import { CreateProjectInput } from '@/shared/api/projects';
 import { geocodeAddress, reverseGeocode } from '@/shared/utils/geocoding';
 import { useVisualViewportMetrics, scrollInputIntoView } from '@/shared/hooks/useVirtualKeyboard';
 import { PEST_CATALOG_26, TERMITE_CATALOG_AR } from '@/shared/lib/permenkesRecapEngine';
+import { supabase } from '@/shared/lib/supabase';
+import { ConfirmActionModal, useConfirmAction } from './ConfirmActionModal';
+import { useAuthStore } from '@/app/store/authStore';
 
 interface CreateProjectModalProps {
   onClose: () => void;
   onSubmit: (data: CreateProjectInput) => Promise<void>;
 }
 
-/**
- * Pilihan Tipe Tugas ala Jarivis di bawah 2 Layanan Utama (Pest Control vs Anti Rayap)
- */
+interface DatabaseCustomerOption {
+  name: string;
+  address: string;
+  pic?: string;
+  wa?: string;
+  latitude?: number;
+  longitude?: number;
+  source: 'database';
+}
+
 const JARIVIS_TASK_SUBTYPES: Record<'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL', { id: string; label: string; defaultFocus: string[] }[]> = {
   GENERAL_PEST_CONTROL: [
     { id: 'WORK REPORT PEST CONTROL', label: 'Work Report Pest Control (Treatment Rutin)', defaultFocus: ['Kecoa', 'Lalat', 'Nyamuk', 'Semut', 'Tikus'] },
@@ -43,6 +53,9 @@ const TARGET_FOCUS_QUICK_CHIPS: Record<'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL
 };
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onSubmit }) => {
+  const user = useAuthStore(s => s.user);
+  const activeCompanyId = useAuthStore(s => s.activeCompanyId) || user?.companyId || '';
+
   const [serviceType, setServiceType] = useState<'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL'>('GENERAL_PEST_CONTROL');
   const [taskSubtype, setTaskSubtype] = useState<string>(JARIVIS_TASK_SUBTYPES.GENERAL_PEST_CONTROL[0].id);
   const [projectName, setProjectName] = useState('Pest Control');
@@ -51,6 +64,95 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [locationLat, setLocationLat] = useState<number>(-6.200000);
   const [locationLng, setLocationLng] = useState<number>(106.816666);
   const [isLocationPicked, setIsLocationPicked] = useState(false);
+
+  // Database Pelanggan state (Ambil dari Master Pelanggan / Quotations & Projects)
+  const [dbCustomers, setDbCustomers] = useState<DatabaseCustomerOption[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    let mounted = true;
+    const fetchCustomersFromDb = async () => {
+      const map = new Map<string, DatabaseCustomerOption>();
+      try {
+        const { data: quoRows } = await supabase
+          .from('quotations_light')
+          .select('payload')
+          .eq('company_id', activeCompanyId)
+          .limit(300);
+        if (quoRows) {
+          for (const row of quoRows) {
+            const p = (row as any).payload || {};
+            const name = String(p.kepadaNama || '').trim();
+            if (!name) continue;
+            const key = name.toLowerCase();
+            const addr = p.lokasiPekerjaan || p.kepadaAlamat || (Array.isArray(p.kepadaAlamatLines) ? p.kepadaAlamatLines[0] : '') || '';
+            if (!map.has(key)) {
+              map.set(key, {
+                name,
+                address: String(addr || '').trim(),
+                pic: p.kepadaUp ? String(p.kepadaUp) : undefined,
+                wa: p.kepadaWa || p.kepadaKontak ? String(p.kepadaWa || p.kepadaKontak) : undefined,
+                latitude: typeof p.latitude === 'number' ? p.latitude : undefined,
+                longitude: typeof p.longitude === 'number' ? p.longitude : undefined,
+                source: 'database',
+              });
+            }
+          }
+        }
+      } catch {
+        // ignore if offline
+      }
+
+      try {
+        const { data: projRows } = await supabase
+          .from('projects')
+          .select('client_name, address, latitude, longitude')
+          .eq('company_id', activeCompanyId)
+          .limit(300);
+        if (projRows) {
+          for (const row of projRows) {
+            const name = String((row as any).client_name || '').trim();
+            if (!name) continue;
+            const key = name.toLowerCase();
+            if (!map.has(key)) {
+              map.set(key, {
+                name,
+                address: String((row as any).address || '').trim(),
+                latitude: typeof (row as any).latitude === 'number' ? (row as any).latitude : undefined,
+                longitude: typeof (row as any).longitude === 'number' ? (row as any).longitude : undefined,
+                source: 'database',
+              });
+            }
+          }
+        }
+      } catch {
+        // ignore if offline
+      }
+
+      if (mounted) {
+        setDbCustomers(Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    };
+    void fetchCustomersFromDb();
+    return () => {
+      mounted = false;
+    };
+  }, [activeCompanyId]);
+
+  const filteredCustomerOptions = useMemo(() => {
+    const q = clientName.trim().toLowerCase();
+    if (!q) return dbCustomers.slice(0, 15);
+    return dbCustomers.filter(
+      c => c.name.toLowerCase().includes(q) || c.address.toLowerCase().includes(q)
+    );
+  }, [dbCustomers, clientName]);
+
+  const isExistingDbCustomer = useMemo(() => {
+    const q = clientName.trim().toLowerCase();
+    if (!q) return false;
+    return dbCustomers.some(c => c.name.toLowerCase() === q);
+  }, [dbCustomers, clientName]);
 
   React.useEffect(() => {
     if (navigator.geolocation && !isLocationPicked) {
@@ -66,18 +168,26 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     }
   }, []);
 
-  const [workDate, setWorkDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalOffsetYmd = (offsetDays: number) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + offsetDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [workDate, setWorkDate] = useState(() => getLocalOffsetYmd(0));
   const [scheduledStartTime, setScheduledStartTime] = useState('08:00');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMapLocked, setIsMapLocked] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const { confirmRequest, confirmAction, closeConfirm } = useConfirmAction();
 
   const handleSearchAddressCoords = async () => {
     if (!address || address.trim().length < 3) {
-      alert('Ketik alamat terlebih dahulu pada kolom Alamat Lengkap Lokasi.');
+      setSubmitError('Ketik alamat terlebih dahulu pada kolom Alamat Lengkap Lokasi.');
       return;
     }
+    setSubmitError(null);
     setIsGeocoding(true);
     try {
       const coords = await geocodeAddress(address);
@@ -86,7 +196,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
         setLocationLng(coords.lng);
         setIsLocationPicked(true);
       } else {
-        alert('Titik koordinat tidak ditemukan untuk teks alamat tersebut. Silakan geser pin peta secara manual.');
+        setSubmitError('Titik koordinat tidak ditemukan untuk alamat tersebut. Silakan geser pin peta secara manual.');
       }
     } finally {
       setIsGeocoding(false);
@@ -95,9 +205,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
 
   const handleUseCurrentGps = () => {
     if (!navigator.geolocation) {
-      alert('Perangkat ini tidak mendukung sensor GPS.');
+      setSubmitError('Perangkat ini tidak mendukung sensor GPS.');
       return;
     }
+    setSubmitError(null);
     setIsGeocoding(true);
     navigator.geolocation.getCurrentPosition(
       async pos => {
@@ -119,7 +230,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       },
       err => {
         setIsGeocoding(false);
-        alert(err.code === err.PERMISSION_DENIED ? 'Izin GPS ditolak oleh peramban HP.' : 'Sinyal GPS lemah atau tidak tersedia. Pastikan fitur Lokasi HP menyala.');
+        setSubmitError(
+          err.code === err.PERMISSION_DENIED
+            ? 'Izin GPS ditolak oleh peramban HP.'
+            : 'Sinyal GPS lemah atau tidak tersedia. Pastikan fitur Lokasi HP menyala.'
+        );
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -140,14 +255,37 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const [targetFocus, setTargetFocus] = useState<string[]>(['Kecoa', 'Lalat', 'Nyamuk', 'Semut', 'Tikus']);
+  // Menyimpan opsi tambahan yang dipilih dari dropdown "Pilih hama lainnya" atau diketik manual agar langsung tampil sebagai checkbox aktif
+  const [extraFocusOptions, setExtraFocusOptions] = useState<string[]>([]);
   const [dropdownFocusPick, setDropdownFocusPick] = useState<string>('');
   const [otherFocus, setOtherFocus] = useState('');
+
+  // Gabungan opsi checkbox yang tampil di grid: quick chips bawaan + opsi yang dipilih dari dropdown/ketik manual + isi targetFocus aktif
+  const visibleFocusCheckboxes = useMemo(() => {
+    const base = TARGET_FOCUS_QUICK_CHIPS[serviceType];
+    const combined = [...base];
+    for (const item of extraFocusOptions) {
+      if (!combined.includes(item)) combined.push(item);
+    }
+    for (const item of targetFocus) {
+      if (!combined.includes(item)) combined.push(item);
+    }
+    return combined;
+  }, [serviceType, extraFocusOptions, targetFocus]);
+
+  const handleAddFocusToCheckboxes = (rawItem: string) => {
+    const item = rawItem.trim();
+    if (!item) return;
+    setExtraFocusOptions(prev => (prev.includes(item) ? prev : [...prev, item]));
+    setTargetFocus(prev => (prev.includes(item) ? prev : [...prev, item]));
+  };
 
   const handleSelectServiceType = (type: 'GENERAL_PEST_CONTROL' | 'TERMITE_CONTROL') => {
     setServiceType(type);
     const firstSubtype = JARIVIS_TASK_SUBTYPES[type][0];
     setTaskSubtype(firstSubtype.id);
     setTargetFocus(firstSubtype.defaultFocus);
+    setExtraFocusOptions([]);
     setOtherFocus('');
     setDropdownFocusPick('');
 
@@ -159,17 +297,102 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     }
   };
 
-  const handleClientNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newClientName = e.target.value;
+  const applyClientNameAndProject = (newClientName: string) => {
     setClientName(newClientName);
-
     const serviceName = SERVICE_TYPE_META[serviceType]?.label || (serviceType === 'TERMITE_CONTROL' ? 'Anti Rayap' : 'Pest Control');
-    if (!projectName.trim() || projectName === 'Pest Control' || projectName === 'Anti Rayap' || projectName.startsWith(`${serviceName} -`) || projectName.startsWith('Pest Control -') || projectName.startsWith('Anti Rayap -')) {
+    if (
+      !projectName.trim() ||
+      projectName === 'Pest Control' ||
+      projectName === 'Anti Rayap' ||
+      projectName.startsWith(`${serviceName} -`) ||
+      projectName.startsWith('Pest Control -') ||
+      projectName.startsWith('Anti Rayap -')
+    ) {
       if (newClientName.trim()) {
         setProjectName(`${serviceName} - ${newClientName.trim()}`);
       } else {
         setProjectName(serviceName);
       }
+    }
+  };
+
+  const handleSelectDatabaseCustomer = (cust: DatabaseCustomerOption) => {
+    applyClientNameAndProject(cust.name);
+    if (cust.address) {
+      setAddress(cust.address);
+      if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+    }
+    if (cust.latitude && cust.longitude) {
+      setLocationLat(cust.latitude);
+      setLocationLng(cust.longitude);
+      setIsLocationPicked(true);
+    }
+    setShowCustomerDropdown(false);
+  };
+
+  const executeCreateProject = async (finalFocus: string[]) => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const effectiveServiceType: ServiceType =
+        serviceType === 'GENERAL_PEST_CONTROL' && taskSubtype === 'DEFAULT PEST FUMIGASI'
+          ? 'FUMIGATION'
+          : serviceType;
+
+      const finalClientName = clientName.trim() || 'Klien Layanan Lapangan';
+
+      // Jika pelanggan belum ada di database Master Pelanggan, otomatis daftarkan sebagai entri pelanggan baru
+      // agar Admin bisa melengkapi detailnya (PIC, No. WA, Wilayah, Garansi, dll.) setelah pekerjaan selesai.
+      if (clientName.trim() && !isExistingDbCustomer && activeCompanyId && user) {
+        try {
+          await supabase.from('quotations').insert({
+            company_id: activeCompanyId,
+            marketing_uid: user.uid,
+            status: 'draft',
+            payload: {
+              noSurat: `CUST-FIELD/${Date.now().toString().slice(-5)}`,
+              kepadaNama: finalClientName,
+              kepadaAlamat: address.trim(),
+              kepadaAlamatLines: address.trim() ? [address.trim()] : [],
+              lokasiPekerjaan: address.trim(),
+              latitude: locationLat,
+              longitude: locationLng,
+              perihal: 'Pelanggan Baru dari Penugasan Teknisi (Detail Dilengkapi Admin)',
+              kategori: serviceType === 'TERMITE_CONTROL' ? 'AR' : 'PCO',
+              jenisLayanan: serviceType === 'TERMITE_CONTROL' ? 'anti_rayap_injeksi' : 'pest_umum',
+              tipeKontrak: 'U',
+              tanggal: new Date().toISOString(),
+              companyId: activeCompanyId,
+              marketingUid: user.uid,
+              marketingNama: user.name,
+              status: 'draft',
+              needsAdminDetails: true,
+            },
+          });
+        } catch {
+          // Jangan blokir pembuatan proyek jika gagal insert profil awal
+        }
+      }
+
+      await onSubmit({
+        projectName,
+        clientName: finalClientName,
+        address,
+        latitude: locationLat,
+        longitude: locationLng,
+        radius: 100,
+        workDate,
+        workType: taskSubtype,
+        serviceType: effectiveServiceType,
+        targetFocus: finalFocus,
+        contractType: serviceType === 'TERMITE_CONTROL' ? 'ONE_TIME' : 'RECURRING',
+        warrantyMonths: serviceType === 'TERMITE_CONTROL' ? 36 : 0,
+        scheduledStartTime,
+        notes,
+      });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Gagal membuat proyek. Coba lagi.');
+      setIsSubmitting(false);
     }
   };
 
@@ -191,35 +414,46 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
       return;
     }
 
-    setSubmitError(null);
-    setIsSubmitting(true);
-    try {
-      const effectiveServiceType: ServiceType =
-        serviceType === 'GENERAL_PEST_CONTROL' && taskSubtype === 'DEFAULT PEST FUMIGASI'
-          ? 'FUMIGATION'
-          : serviceType;
-
-      await onSubmit({
-        projectName,
-        clientName: clientName || 'Klien Layanan Lapangan',
-        address,
-        latitude: locationLat,
-        longitude: locationLng,
-        radius: 100,
-        workDate,
-        workType: taskSubtype,
-        serviceType: effectiveServiceType,
-        targetFocus: finalFocus,
-        contractType: serviceType === 'TERMITE_CONTROL' ? 'ONE_TIME' : 'RECURRING',
-        warrantyMonths: serviceType === 'TERMITE_CONTROL' ? 36 : 0,
-        scheduledStartTime,
-        notes,
-      });
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Gagal membuat proyek. Coba lagi.');
-      setIsSubmitting(false);
-    }
+    confirmAction({
+      tone: 'primary',
+      title: 'Simpan & Tugaskan Lokasi Baru?',
+      description: 'Pastikan nama proyek, alamat, dan titik koordinat GPS sudah benar sebelum menyimpan.',
+      details: [
+        { label: 'Proyek', value: projectName.trim() },
+        { label: 'Klien', value: clientName.trim() || 'Klien Layanan Lapangan' },
+        { label: 'Layanan', value: serviceType === 'TERMITE_CONTROL' ? 'Anti Rayap' : 'Pest Control' },
+        { label: 'Jadwal', value: `${workDate} · ${scheduledStartTime} WIB` },
+      ],
+      confirmLabel: 'Ya, Simpan Tugas',
+      onConfirm: () => executeCreateProject(finalFocus),
+    });
   };
+
+  const handleRequestClose = () => {
+    if (isSubmitting) return;
+    if (clientName.trim() || address.trim()) {
+      confirmAction({
+        tone: 'warning',
+        title: 'Batalkan Pembuatan Tugas?',
+        description: 'Isian lokasi dan jadwal tugas baru yang belum disimpan akan hilang.',
+        confirmLabel: 'Ya, Batalkan',
+        cancelLabel: 'Lanjut Isi',
+        onConfirm: () => onClose(),
+      });
+      return;
+    }
+    onClose();
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !confirmRequest) {
+        handleRequestClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [confirmRequest, isSubmitting, clientName, address]);
 
   const isTermite = serviceType === 'TERMITE_CONTROL';
   const catalogForDropdown = isTermite ? TERMITE_CATALOG_AR : PEST_CATALOG_26;
@@ -229,7 +463,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
     <div
       id="create-project-modal-backdrop"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/55"
-      onClick={onClose}
+      onClick={handleRequestClose}
     >
       <div
         id="create-project-modal-card"
@@ -249,8 +483,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           </div>
           <button
             id="btn-close-create-project"
-            onClick={onClose}
-            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            type="button"
+            onClick={handleRequestClose}
+            aria-label="Tutup form buat tugas"
+            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -325,7 +561,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             </div>
           )}
 
-          {/* Project & Client Grid */}
+          {/* Project & Client Grid (Pemilik / Pelanggan Terhubung ke Database Pelanggan + Bisa Input Baru) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
@@ -346,84 +582,209 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
                 <p className="text-xs text-red-600 mt-1 font-medium">{errors.projectName}</p>
               )}
             </div>
-            <div>
+
+            <div className="relative">
               <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-                Pemilik / Pelanggan
+                Pemilik / Pelanggan (Pilih / Ketik Baru)
               </label>
               <div className="relative">
-                <Building size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)]" />
+                <Building size={16} className="absolute left-3 top-2.5 text-[var(--text-muted)] pointer-events-none" />
                 <input
                   id="input-client-name"
                   type="text"
-                  placeholder="PT Medika Lestari"
+                  autoComplete="off"
+                  placeholder="Pilih dari Pelanggan atau ketik baru..."
                   value={clientName}
-                  onChange={handleClientNameChange}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs bg-white scroll-mt-24 scroll-mb-48"
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  onChange={e => {
+                    applyClientNameAndProject(e.target.value);
+                    setShowCustomerDropdown(true);
+                  }}
+                  className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-base sm:text-xs bg-white scroll-mt-24 scroll-mb-48"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerDropdown(v => !v)}
+                  aria-label="Buka daftar pelanggan"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <ChevronDown size={14} />
+                </button>
               </div>
+
+              {/* Dropdown Daftar Pelanggan dari Database + Opsi Input Pelanggan Baru oleh Teknisi */}
+              {showCustomerDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-[120] max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl divide-y divide-slate-100">
+                  {filteredCustomerOptions.length > 0 ? (
+                    filteredCustomerOptions.map(cust => (
+                      <button
+                        key={cust.name}
+                        type="button"
+                        onClick={() => handleSelectDatabaseCustomer(cust)}
+                        className="w-full px-3 py-2 text-left hover:bg-emerald-50/70 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-900 truncate">{cust.name}</span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
+                            Terdaftar
+                          </span>
+                        </div>
+                        {cust.address && (
+                          <span className="text-[10.5px] text-slate-500 truncate">{cust.address}</span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-[11px] text-slate-500">
+                      Belum ada pelanggan dengan nama tersebut di database.
+                    </div>
+                  )}
+
+                  {clientName.trim() && !isExistingDbCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerDropdown(false)}
+                      className="w-full px-3 py-2.5 text-left bg-blue-50/70 hover:bg-blue-100/70 text-blue-800 flex items-start gap-2 cursor-pointer"
+                    >
+                      <UserPlus size={14} className="shrink-0 mt-0.5 text-blue-600" />
+                      <div className="text-[11px] leading-snug">
+                        <span className="font-bold block">Gunakan Pelanggan Baru: &quot;{clientName.trim()}&quot;</span>
+                        <span className="text-blue-600">
+                          Detail lengkap pelanggan akan dilengkapi oleh Admin setelah pekerjaan selesai.
+                        </span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {clientName.trim() && !isExistingDbCustomer && !showCustomerDropdown && (
+                <p className="text-[10.5px] text-blue-600 font-medium mt-1">
+                  Pelanggan baru — detail lengkap akan dilengkapi oleh Admin setelah pekerjaan selesai.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Target Focus (Menyesuaikan Pest Control vs Anti Rayap + Dropdown Katalog) */}
+          {/* Target Focus (Langsung Masuk ke Checklist Checkbox Saat Dipilih dari Dropdown / Ketik Manual) */}
           <div>
             <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
               {isTermite ? 'Jenis Fokus Target Anti Rayap' : 'Jenis Fokus Target Hama (Pest Control)'}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {TARGET_FOCUS_QUICK_CHIPS[serviceType].map(focus => (
-                <label key={focus} className="flex items-center gap-2 p-2 border border-[var(--border-subtle)] rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={targetFocus.includes(focus)}
-                    onChange={e => {
-                      if (e.target.checked) setTargetFocus(prev => [...prev, focus]);
-                      else setTargetFocus(prev => prev.filter(f => f !== focus));
-                    }}
-                    className="rounded border-slate-300 text-emerald-600 focus:ring-[var(--accent)]"
-                  />
-                  <span className="text-xs text-[var(--text-secondary)]">{focus}</span>
-                </label>
-              ))}
+              {visibleFocusCheckboxes.map(focus => {
+                const isChecked = targetFocus.includes(focus);
+                return (
+                  <label
+                    key={focus}
+                    className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-colors ${
+                      isChecked
+                        ? 'border-emerald-500 bg-emerald-50/40 text-slate-900 font-semibold'
+                        : 'border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={e => {
+                        if (e.target.checked) setTargetFocus(prev => (prev.includes(focus) ? prev : [...prev, focus]));
+                        else setTargetFocus(prev => prev.filter(f => f !== focus));
+                      }}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-[var(--accent)]"
+                    />
+                    <span className="text-xs">{focus}</span>
+                  </label>
+                );
+              })}
             </div>
 
-            {/* Tambah Target dari Dropdown Katalog Lengkap atau Ketik Manual */}
+            {/* Pilih dari Dropdown 26 Hama / Parameter Rayap -> Langsung Masuk & Ter-Checklist di Grid Checkbox */}
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <select
                 value={dropdownFocusPick}
                 onChange={e => {
                   const v = e.target.value;
                   setDropdownFocusPick('');
-                  if (v && !targetFocus.includes(v)) {
-                    setTargetFocus(prev => [...prev, v]);
+                  if (v) {
+                    handleAddFocusToCheckboxes(v);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs"
+                aria-label="Pilih target tambahan dari daftar"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-medium"
               >
                 <option value="">
                   {isTermite ? '+ Pilih target rayap lainnya dari daftar...' : '+ Pilih hama lainnya (26 hama)...'}
                 </option>
-                {catalogForDropdown.map(item => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+                {catalogForDropdown
+                  .filter(item => !visibleFocusCheckboxes.includes(item))
+                  .map(item => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
               </select>
-              <input
-                type="text"
-                placeholder="Atau ketik target fokus lain..."
-                value={otherFocus}
-                onChange={e => setOtherFocus(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
-              />
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Atau ketik target fokus lain..."
+                  value={otherFocus}
+                  onChange={e => setOtherFocus(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && otherFocus.trim()) {
+                      e.preventDefault();
+                      handleAddFocusToCheckboxes(otherFocus);
+                      setOtherFocus('');
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
+                />
+                {otherFocus.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAddFocusToCheckboxes(otherFocus);
+                      setOtherFocus('');
+                    }}
+                    className="px-2.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold shrink-0 cursor-pointer"
+                    title="Tambahkan ke daftar checkbox"
+                  >
+                    <Plus size={13} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Work Date & Scheduled Start Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-                Tanggal Pelaksanaan *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                  Tanggal Pelaksanaan *
+                </label>
+                <div className="flex items-center gap-1">
+                  {[
+                    { lbl: 'Kemarin', off: -1 },
+                    { lbl: 'Hari Ini', off: 0 },
+                    { lbl: 'Besok', off: 1 },
+                  ].map(b => {
+                    const ymd = getLocalOffsetYmd(b.off);
+                    return (
+                      <button
+                        key={b.lbl}
+                        type="button"
+                        onClick={() => setWorkDate(ymd)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer ${
+                          workDate === ymd ? 'bg-[#1B4332] text-white border-[#1B4332]' : 'bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {b.lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="relative">
                 <Calendar size={16} className="absolute left-3 top-3 text-[var(--text-muted)]" />
                 <input
@@ -586,7 +947,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
             <button
               id="btn-cancel-create-project"
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               disabled={isSubmitting}
               className="px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold transition-colors text-[var(--text-secondary)] disabled:opacity-50"
             >
@@ -604,6 +965,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
           </div>
         </form>
       </div>
+      <ConfirmActionModal request={confirmRequest} onClose={closeConfirm} />
     </div>
   );
 };

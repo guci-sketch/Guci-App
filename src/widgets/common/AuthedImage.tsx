@@ -47,9 +47,17 @@ export const AuthedImage: React.FC<AuthedImageProps> = ({ path, alt, className, 
 
   if (purged) {
     return (
-      <div className={`flex flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400 text-center p-1 ${className}`} title="Foto sudah dihapus sesuai kebijakan retensi penyimpanan">
-        <Trash2 size={16} />
-        <span className="text-[9px] leading-tight px-1">Foto dihapus (retensi)</span>
+      <div
+        className={`flex flex-col items-center justify-center gap-1.5 bg-slate-900/90 text-slate-300 text-center p-2 ${className}`}
+        title="Foto raw telah diunduh ke arsip & dihapus dari database. Salinan dokumen PDF tetap tersimpan."
+      >
+        <Trash2 size={16} className="text-emerald-400" />
+        <span className="text-[10px] font-semibold leading-tight px-1 text-emerald-300">
+          Foto Raw Diarsipkan
+        </span>
+        <span className="text-[9px] leading-tight px-1 text-slate-400">
+          Dihapus dari DB • Tetap ada di PDF
+        </span>
       </div>
     );
   }

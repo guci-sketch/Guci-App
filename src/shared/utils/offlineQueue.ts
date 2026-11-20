@@ -233,3 +233,53 @@ export async function getDeadLetters(): Promise<Array<{ id: string; action: Queu
     return [];
   }
 }
+
+/** Ringkasan item antrean offline aktif untuk Pusat Notifikasi & Profil Teknisi. */
+export async function getPendingQueueSummary(): Promise<Array<{ id: string; action: QueuedAction; reportId: string; queuedAt: string }>> {
+  try {
+    const db = await openDb();
+    return (await idbGetAll(db))
+      .filter(i => !i.deadReason)
+      .sort((a, b) => new Date(b.queuedAt).getTime() - new Date(a.queuedAt).getTime())
+      .map(i => ({ id: i.id, action: i.action, reportId: i.reportId, queuedAt: i.queuedAt }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Bersihkan cache sementara & item dead-letter secara aman tanpa menghapus antrean offline aktif.
+ * Mengembalikan jumlah item / draft sementara yang dibersihkan.
+ */
+export async function clearSafeTechnicianCache(): Promise<number> {
+  let cleared = 0;
+  try {
+    const db = await openDb();
+    const all = await idbGetAll(db);
+    for (const item of all) {
+      if (item.deadReason) {
+        await idbDelete(db, item.id);
+        cleared++;
+      }
+    }
+  } catch {
+    // ignore IDB errors
+  }
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('fw_photo_cache_') || key.startsWith('fw_tech_draft_completed_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => {
+      localStorage.removeItem(k);
+      cleared++;
+    });
+  } catch {
+    // ignore storage errors
+  }
+  return cleared;
+}
+

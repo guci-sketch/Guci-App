@@ -7,8 +7,8 @@ import { useAuthStore } from '@/app/store/authStore';
 interface AuthContextValue {
   user: AppUser | null;
   status: 'checking' | 'authenticated' | 'unauthenticated';
-  login: (email: string, pass: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -17,12 +17,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUserState] = useState<AppUser | null>(null);
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
 
-  /**
-   * Satu pintu untuk mengubah state auth. Mengisi context DAN store zustand sekaligus.
-   * Sebelumnya hanya form login yang mengisi zustand, sementara ±20 halaman membaca zustand:
-   * setelah refresh browser (sesi dipulihkan oleh context ini) `useAuthStore().user` tetap null
-   * dan halaman-halaman itu kosong/menolak sampai pengguna login ulang.
-   */
   const applyUser = useCallback((u: AppUser | null) => {
     setUserState(u);
     setStatus(u ? 'authenticated' : 'unauthenticated');
@@ -44,44 +38,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [applyUser]);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) void hydrate(session?.user.id ?? null);
+      if (!active) return;
+      hydrate(session?.user?.id ?? null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Jangan memanggil API Supabase lain langsung di dalam callback ini (bisa deadlock) — tunda satu tick.
-      // INITIAL_SESSION sudah ditangani getSession(); TOKEN_REFRESHED tidak mengubah profil.
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
-      setTimeout(() => { if (!cancelled) void hydrate(event === 'SIGNED_OUT' ? null : session?.user.id ?? null); }, 0);
+      if (!active) return;
+      if (event === 'SIGNED_OUT') {
+        applyUser(null);
+      } else if (session?.user?.id) {
+        hydrate(session.user.id);
+      }
     });
 
     return () => {
-      cancelled = true;
+      active = false;
       subscription.unsubscribe();
     };
-  }, [hydrate]);
+  }, [hydrate, applyUser]);
 
-  const login = useCallback(async (email: string, pass: string) => {
-    const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (authErr) throw authErr;
-    const res = await fetchAppUser(authData.user.id);
-    if (!res.user) {
-      await supabase.auth.signOut();
-      throw new Error((res.message ?? 'Akun tidak dapat digunakan.'));
-    }
-    applyUser(res.user);
-  }, [applyUser]);
+  const refreshUser = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    await hydrate(session?.user?.id ?? null);
+  }, [hydrate]);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     applyUser(null);
   }, [applyUser]);
 
-  return <AuthContext.Provider value={{ user, status, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, status, logout, refreshUser }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;

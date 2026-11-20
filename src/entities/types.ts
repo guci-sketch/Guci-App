@@ -445,6 +445,8 @@ export interface WorkReport {
   projectLatitude: number;
   projectLongitude: number;
   projectRadius: number;
+  workDate?: string | null;
+  workNotes?: string | null;
   scheduledStartTime: string;
   serviceType: ServiceType;
   focusTarget?: string | null;

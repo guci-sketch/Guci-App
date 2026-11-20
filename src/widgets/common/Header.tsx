@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="min-h-[64px] bg-[var(--bg-card)] border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-4 sm:px-7 flex items-center">
+      <header className="min-h-[60px] bg-[var(--bg-card)] border-b border-[var(--border-subtle)] text-[var(--text-primary)] sticky top-0 z-40 px-4 sm:px-7 flex items-center">
         <div className="w-full max-w-[1510px] mx-auto flex items-center justify-between gap-3">
           {/* Left: Hamburger + Title + Divider + Group Tag (Gaya Topbar RedesignFieldworkGuciMasLite) */}
           <div className="flex items-center gap-3 min-w-0">
@@ -143,19 +143,9 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <div className="flex items-center gap-2.5 min-w-0">
-              <strong className="font-bold text-[13.5px] sm:text-[14.5px] text-[var(--text-primary)] truncate">
-                {pageTitle}
-              </strong>
-              {(pageGroup || pageSubtitle) && (
-                <>
-                  <span className="hidden sm:block w-px h-5 bg-[var(--border-subtle)] shrink-0" />
-                  <span className="hidden sm:inline-flex items-center h-6 px-2 rounded-md bg-[#f1f4f2] text-[var(--text-secondary)] text-[10.5px] font-semibold whitespace-nowrap">
-                    {pageGroup ? pageGroup.replace(/^\d+\.\s*/, '') : pageSubtitle}
-                  </span>
-                </>
-              )}
-            </div>
+            <strong className="font-bold text-[15px] sm:text-base tracking-[-0.015em] text-[var(--text-primary)] truncate">
+              {pageTitle}
+            </strong>
           </div>
 
           {/* Right: Top Actions (Search, Theme, Refresh, Profile Avatar + Name + ChevronDown) */}

@@ -1,6 +1,7 @@
+import { resetAccountPasswordToDefault } from './auth';
 import { supabase, createIsolatedSupabaseClient } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
-import { mapDbProject } from './projects';
+import { mapDbProject, syncCompanyProjectsAndReports } from './projects';
 import { fetchWorkReport } from './workReports';
 import { ApiError } from './client';
 import {
@@ -69,12 +70,14 @@ function toHumanReadableApiError(err: { message?: string; code?: string; status?
 }
 
 export async function fetchAdminReports(filters: Partial<ReportFilters>): Promise<{
+  // Sync real DB projects/SPK before listing
   reports: WorkReportListItem[];
   count: number;
   totalCount: number;
   page: number;
   totalPages: number;
 }> {
+  await syncCompanyProjectsAndReports();
   const companyId = getTargetCompanyId();
   const page = Math.max(1, filters.page ?? 1);
   const limit = Math.max(1, filters.limit ?? 20);
@@ -290,6 +293,7 @@ export async function fetchAdminProjects(filters?: ProjectFilters): Promise<{
   page: number;
   totalPages: number;
 }> {
+  await syncCompanyProjectsAndReports();
   const companyId = getTargetCompanyId();
   const page = Math.max(1, filters?.page ?? 1);
   const limit = Math.max(1, filters?.limit ?? 8);
@@ -566,4 +570,8 @@ export async function purgeOldPhotos(olderThanMonths = 2): Promise<PhotoPurgeRes
     purgedCount: data?.length ?? 0,
     failedCount: 0,
   };
+}
+
+export async function resetUserPassword(id: string, email: string): Promise<string> {
+  return resetAccountPasswordToDefault(email, id);
 }

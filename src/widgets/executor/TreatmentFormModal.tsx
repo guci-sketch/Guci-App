@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, FlaskConical, Ruler, Loader2, AlertTriangle, Info, Users, UserPlus, Trash2, Check, Plus } from 'lucide-react';
+import { X, FlaskConical, Ruler, Loader2, AlertTriangle, Info, Users, UserPlus, Trash2, Check, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ApplicationMethod, ServiceType, TreatmentRecord } from '@/entities/types';
 import { APPLICATION_METHOD_OPTIONS } from '@/shared/utils/serviceMeta';
 import { TreatmentInput, TeamMemberEntry } from '@/shared/api/workReports';
@@ -21,11 +22,21 @@ interface TreatmentFormModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_METHOD_BY_SERVICE: Partial<Partial<Record<ServiceType, ApplicationMethod>>> = {
+const DEFAULT_METHOD_BY_SERVICE: Partial<Record<ServiceType, ApplicationMethod>> = {
   GENERAL_PEST_CONTROL: 'SPRAYING',
   TERMITE_CONTROL: 'DRILLING',
   FUMIGATION: 'FOGGING',
 };
+
+const QUICK_AREAS = [
+  'Basement & Parkiran',
+  'Ruang Arsip Lt. 1',
+  'Plafon & Pantry Lt. 2',
+  'Perimeter Luar Gedung',
+];
+
+const QUICK_SUGGESTIONS_AR = ['+ Sirkulasi Udara', '+ Jadwal 14 Hari', '+ Palet Kayu/Kardus'];
+const QUICK_SUGGESTIONS_PCO = ['+ Sanitasi Makanan', '+ Seal Lubang Pipa', '+ Rutin 14 Hari'];
 
 function toLocalInputValue(iso?: string | null): string {
   if (!iso) return '';
@@ -43,59 +54,104 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
   onClose,
 }) => {
   const user = useAuthStore(s => s.user);
+  const [modeOverride, setModeOverride] = useState<'AR' | 'PCO'>(
+    serviceType === 'TERMITE_CONTROL' ? 'AR' : 'PCO'
+  );
   const isFumigation = serviceType === 'FUMIGATION';
-  const isTermite = serviceType === 'TERMITE_CONTROL';
+  const isTermite = modeOverride === 'AR';
   const activeCatalog = isTermite ? TERMITE_CATALOG_AR : PEST_CATALOG_26;
 
   const parsedExisting = parsePestFindingsFromNotes(existing?.technicianNotes);
 
-  const [applicationMethod, setApplicationMethod] = useState<ApplicationMethod>(existing?.applicationMethod ?? DEFAULT_METHOD_BY_SERVICE[serviceType] ?? 'SPRAYING');
-  const [chemicalName, setChemicalName] = useState(existing?.chemicalName ?? '');
+  const [applicationMethod, setApplicationMethod] = useState<ApplicationMethod>(
+    existing?.applicationMethod ?? DEFAULT_METHOD_BY_SERVICE[serviceType] ?? 'SPRAYING'
+  );
+  const [chemicalName, setChemicalName] = useState(
+    existing?.chemicalName || (isTermite ? 'Premise 200 SL' : 'Cypergard 100 EC')
+  );
   const [activeIngredient, setActiveIngredient] = useState(existing?.activeIngredient ?? '');
-  const [dosage, setDosage] = useState(existing?.dosage ?? '');
-  const [treatmentAreaSqm, setTreatmentAreaSqm] = useState(existing?.treatmentAreaSqm ? String(existing.treatmentAreaSqm) : '');
-  const [drillingPointsCount, setDrillingPointsCount] = useState(existing?.drillingPointsCount ? String(existing.drillingPointsCount) : '');
+  const [dosage, setDosage] = useState(
+    existing?.dosage || (isTermite ? '2.5 ml / Liter Air' : '10 ml / Liter Air')
+  );
+  const [treatmentAreaSqm, setTreatmentAreaSqm] = useState(
+    existing?.treatmentAreaSqm ? String(existing.treatmentAreaSqm) : '150'
+  );
+  const [drillingPointsCount, setDrillingPointsCount] = useState(
+    existing?.drillingPointsCount ? String(existing.drillingPointsCount) : '14'
+  );
   const [fumigantType, setFumigantType] = useState(existing?.fumigantType ?? '');
-  const [gasConcentrationPpm, setGasConcentrationPpm] = useState(existing?.gasConcentrationPpm ? String(existing.gasConcentrationPpm) : '');
+  const [gasConcentrationPpm, setGasConcentrationPpm] = useState(
+    existing?.gasConcentrationPpm ? String(existing.gasConcentrationPpm) : ''
+  );
   const [sealingStartedAt, setSealingStartedAt] = useState(toLocalInputValue(existing?.sealingStartedAt));
   const [aerationCompletedAt, setAerationCompletedAt] = useState(toLocalInputValue(existing?.aerationCompletedAt));
   const [safetyNotes, setSafetyNotes] = useState(existing?.safetyNotes ?? '');
   const [technicianNotes, setTechnicianNotes] = useState(parsedExisting.cleanNotes);
 
-  // Input Temuan via Dropdown — otomatis membedakan antara Anti Rayap vs Pest Control (hanya tampilkan > 0)
+  // Progressive Disclosure state: hanya tampilkan input inti di permukaan, detail teknis dibuka on-click
+  const [showAdvancedTechDetails, setShowAdvancedTechDetails] = useState(false);
+  const [showTeamSection, setShowTeamSection] = useState(false);
+
+  // Stitch Anti Rayap & Pest Control quick chips
+  const [severityLevel, setSeverityLevel] = useState<'Ringan' | 'Sedang' | 'Kritis'>('Sedang');
+  const [colonyEstimate, setColonyEstimate] = useState<'< 500' | '1rb - 3rb' | '> 5.000'>('1rb - 3rb');
+  const [pestCondition, setPestCondition] = useState<'Hidup' | 'Mati/Bangkai' | 'Telur/Jejak'>('Hidup');
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([
+    'Basement & Parkiran',
+    'Ruang Arsip Lt. 1',
+  ]);
+
   const [pestFindings, setPestFindings] = useState<
     { pestName: string; quantity: number; treatmentMethod: string; location: string; notes: string }[]
   >(() => parsedExisting.findings);
   const [selectedPest, setSelectedPest] = useState<string>(activeCatalog[0]);
-  const [pestQty, setPestQty] = useState<number>(1);
+  const [pestQty, setPestQty] = useState<number>(isTermite ? 2 : 6);
   const [pestLocation, setPestLocation] = useState<string>('');
   const [pestNotes, setPestNotes] = useState<string>(
     isTermite
-      ? 'Telah dilakukan injeksi termitisida & pemeriksaan struktur kayu/pondasi'
-      : 'Telah dilakukan monitoring & penanganan sesuai prosedur'
+      ? 'Injeksi termitisida & cek jalur kusen/pondasi'
+      : 'Monitoring & penanganan sesuai SOP'
   );
+
+  useEffect(() => {
+    setSelectedPest(isTermite ? TERMITE_CATALOG_AR[0] : PEST_CATALOG_26[0]);
+  }, [isTermite]);
 
   const handleAddPestFinding = () => {
     if (pestQty <= 0) return;
+    const tagSummary = isTermite
+      ? `[Keparahan: ${severityLevel} | Koloni: ${colonyEstimate}]`
+      : `[Kondisi: ${pestCondition}]`;
     setPestFindings(prev => [
       ...prev,
       {
         pestName: selectedPest,
         quantity: Number(pestQty),
         treatmentMethod: applicationMethod,
-        location: pestLocation.trim() || (isTermite ? 'Jalur Pondasi & Kusen' : 'Area Layanan'),
-        notes: pestNotes.trim() || '-',
+        location: pestLocation.trim() || selectedAreas[0] || (isTermite ? 'Jalur Pondasi & Kusen' : 'Area Layanan'),
+        notes: `${tagSummary} ${pestNotes.trim()}`.trim(),
       },
     ]);
     setPestQty(1);
     setPestLocation('');
   };
 
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev => (prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]));
+  };
+
+  const appendSuggestionChip = (chip: string) => {
+    const clean = chip.replace(/^\+\s*/, '');
+    setTechnicianNotes(prev => (prev ? `${prev}. Rekomendasi: ${clean}` : `Rekomendasi: ${clean}`));
+  };
+
   // Setup Tim Teknisi (Pilih dari daftar teknisi + Input manual jika tidak ada di daftar)
   const [teamMembers, setTeamMembers] = useState<TeamMemberEntry[]>(() =>
     initialTeamMembers.length > 0
       ? initialTeamMembers
-      : user ? [{ id: user.uid, name: user.name, role: 'Ketua Tim', isManual: false }] : []
+      : user
+      ? [{ id: user.uid, name: user.name, role: 'Ketua Tim', isManual: false }]
+      : []
   );
   const [availableTechs, setAvailableTechs] = useState<{ id: string; name: string }[]>([]);
   const [manualTechName, setManualTechName] = useState('');
@@ -138,20 +194,21 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chemicalName.trim() || !dosage.trim()) {
-      setError('Nama bahan/produk dan dosis wajib diisi.');
+      setError('Nama produk dan dosis wajib diisi.');
       return;
     }
     if (isFumigation && !aerationCompletedAt) {
-      setError('Fumigasi wajib mencatat waktu selesai aerasi sebelum area dianggap aman.');
+      setError('Waktu selesai aerasi wajib diisi untuk fumigasi.');
       return;
     }
     setError(null);
     setIsSubmitting(true);
     try {
-      const teamSummary = teamMembers.length > 0
-        ? `[Tim Bertugas: ${teamMembers.map(m => m.name).join(', ')}] `
-        : '';
-      const rawTechNotes = `${teamSummary}${technicianNotes.trim()}`.trim();
+      const teamSummary =
+        teamMembers.length > 0 ? `[Tim Bertugas: ${teamMembers.map(m => m.name).join(', ')}] ` : '';
+      const areaSummary =
+        selectedAreas.length > 0 ? `[Area: ${selectedAreas.join(', ')}] ` : '';
+      const rawTechNotes = `${teamSummary}${areaSummary}${technicianNotes.trim()}`.trim();
       const mergedTechNotes = serializePestFindingsToNotes(rawTechNotes, pestFindings);
       await onSubmit({
         applicationMethod,
@@ -169,115 +226,83 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
         teamMembers,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan data treatment.');
+      setError(err instanceof Error ? err.message : 'Gagal menyimpan laporan.');
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pt-10 sm:pt-0 pb-10 sm:pb-0 bg-black/55 p-4 sm:p-6" onClick={onClose}>
-      <div className="relative w-full max-w-lg bg-[var(--bg-card)] rounded-t-2xl sm:rounded-b-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col h-[92dvh] sm:h-auto sm:max-h-[88dvh] overflow-hidden text-[var(--text-primary)]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <FlaskConical size={18} className={isTermite ? 'text-purple-600' : 'text-emerald-600'} />
-              {isTermite ? 'Laporan Pekerjaan & Kontrol Anti Rayap' : 'Laporan Kunjungan Pest Control'}
-            </h2>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.22 }}
+        className="relative w-full max-w-lg bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[92dvh] overflow-hidden text-[var(--text-primary)]"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header Ringkas + Switcher Anti Rayap / Pest Control */}
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)] bg-white flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FlaskConical size={18} className="text-[#1B4332]" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Form Laporan Pekerjaan</h2>
+              <span className="text-[11px] text-slate-500 block">
+                Isi temuan inti • Klik bagian bawah untuk detail
+              </span>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors">
-            <X size={20} />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto pb-28 sm:pb-5">
-          {/* BAGIAN 1: SETUP TIM TEKNISI */}
-          <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
-                <Users size={14} className="text-emerald-700" /> Tim Teknisi yang Ikut Bertugas ({teamMembers.length} Orang)
-              </label>
-            </div>
-
-            {availableTechs.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {availableTechs.map(t => {
-                  const selected = teamMembers.some(m => m.id === t.id || m.name.toLowerCase() === t.name.toLowerCase());
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleRegisteredTech(t)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                        selected
-                          ? 'bg-emerald-700 text-white border-emerald-700'
-                          : 'bg-white text-slate-700 border-emerald-200 hover:bg-emerald-100/50'
-                      }`}
-                    >
-                      {selected && <Check size={11} />}
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={manualTechName}
-                onChange={e => setManualTechName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddManualTech();
-                  }
-                }}
-                placeholder="Tambah nama teknisi/helper manual..."
-                className="flex-1 px-3 py-1.5 rounded-lg border border-emerald-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={handleAddManualTech}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shrink-0"
-              >
-                <UserPlus size={13} /> Tambah
-              </button>
-            </div>
-
-            {teamMembers.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {teamMembers.map((m, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-emerald-300 text-[11px] font-bold text-emerald-950"
-                  >
-                    <span>{m.name}</span>
-                    {m.isManual && <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">Manual</span>}
-                    <button
-                      type="button"
-                      onClick={() => setTeamMembers(prev => prev.filter((_, i) => i !== idx))}
-                      className="text-slate-400 hover:text-red-600"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+        <form onSubmit={handleSubmit} className="p-4 space-y-3.5 overflow-y-auto pb-24 sm:pb-5">
+          {/* Switcher Mode Layanan (Anti Rayap vs Pest Control) */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setModeOverride('AR')}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                isTermite ? 'bg-[#1B4332] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {isTermite ? '✓ ' : ''}Anti Rayap
+            </button>
+            <button
+              type="button"
+              onClick={() => setModeOverride('PCO')}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                !isTermite ? 'bg-[#1B4332] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {!isTermite ? '✓ ' : ''}Pest Control
+            </button>
           </div>
 
-          {/* BAGIAN 2: TEMUAN / INDIKASI VIA DROPDOWN (DIBEDAKAN ANTARA ANTI RAYAP VS PEST CONTROL) */}
-          <div className={`p-3.5 rounded-xl border space-y-2.5 ${isTermite ? 'border-purple-200 bg-purple-50/40' : 'border-slate-200 bg-slate-50/70'}`}>
-            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-              {isTermite
-                ? 'Pemeriksaan & Perlakuan Anti Rayap (Dropdown > 0 Titik/Unit)'
-                : 'Temuan Hama Pest Control (Dropdown > 0 Ekor)'}
-            </label>
+          {/* 1. TEMUAN HAMA / RAYAP (RINGKAS & CEPAT) */}
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900">
+                1. {isTermite ? 'Temuan Rayap' : 'Temuan Hama'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#1B4332] text-[10px] font-bold border border-emerald-200">
+                {isTermite ? 'Mode Anti Rayap' : 'Mode Pest Control'}
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <select
                 value={selectedPest}
                 onChange={e => setSelectedPest(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold"
+                className="sm:col-span-2 px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-xs font-semibold"
               >
                 {activeCatalog.map(item => (
                   <option key={item} value={item}>
@@ -285,38 +310,128 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
                   </option>
                 ))}
               </select>
-              <input
-                type="number"
-                min={1}
-                value={pestQty}
-                onChange={e => setPestQty(Math.max(1, Number(e.target.value) || 1))}
-                placeholder={isTermite ? 'Jml Titik/Unit (> 0)' : 'Jumlah Ekor (> 0)'}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono"
-              />
+
+              {/* Stepper Jumlah */}
+              <div className="flex items-center justify-between border border-slate-300 rounded-lg px-2 py-1 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setPestQty(q => Math.max(1, q - 1))}
+                  className="w-6 h-6 rounded bg-white border border-slate-200 font-bold text-xs"
+                >
+                  -
+                </button>
+                <span className="text-xs font-bold font-mono">
+                  {pestQty} {isTermite ? 'titik' : 'ekor'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPestQty(q => q + 1)}
+                  className="w-6 h-6 rounded bg-white border border-slate-200 font-bold text-xs"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Chips: Anti Rayap (Keparahan & Koloni) vs Pest Control (Rentang Jumlah & Kondisi) */}
+            {isTermite ? (
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">Keparahan:</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['Ringan', 'Sedang', 'Kritis'] as const).map(lv => (
+                      <button
+                        key={lv}
+                        type="button"
+                        onClick={() => setSeverityLevel(lv)}
+                        className={`py-1 rounded text-[10px] font-bold border ${
+                          severityLevel === lv
+                            ? lv === 'Kritis'
+                              ? 'bg-rose-700 text-white border-rose-700'
+                              : 'bg-[#1B4332] text-white border-[#1B4332]'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {lv}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">Estimasi Koloni:</span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['< 500', '1rb - 3rb', '> 5.000'] as const).map(col => (
+                      <button
+                        key={col}
+                        type="button"
+                        onClick={() => setColonyEstimate(col)}
+                        className={`py-1 rounded text-[10px] font-bold border ${
+                          colonyEstimate === col
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {col}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: '1-5', val: 3 },
+                    { label: '6-15', val: 10 },
+                    { label: '>20', val: 25 },
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setPestQty(preset.val)}
+                      className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                        pestQty === preset.val
+                          ? 'bg-[#1B4332] text-white border-[#1B4332]'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1">
+                  {(['Hidup', 'Mati/Bangkai', 'Telur/Jejak'] as const).map(cond => (
+                    <button
+                      key={cond}
+                      type="button"
+                      onClick={() => setPestCondition(cond)}
+                      className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                        pestCondition === cond
+                          ? 'bg-slate-800 text-white border-slate-800'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={pestLocation}
                 onChange={e => setPestLocation(e.target.value)}
-                placeholder={isTermite ? 'Struktur (Pondasi / Kusen / Plafon)' : 'Gedung - Lantai - Ruangan'}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={pestNotes}
-                onChange={e => setPestNotes(e.target.value)}
-                placeholder={isTermite ? 'Keterangan injeksi/monitoring garansi...' : 'Keterangan penanganan...'}
+                placeholder={isTermite ? 'Titik sarang (Kusen / Pondasi)...' : 'Titik temuan (Dapur / Shaft)...'}
                 className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
               />
               <button
                 type="button"
                 onClick={handleAddPestFinding}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-bold shrink-0 ${
-                  isTermite ? 'bg-purple-700 hover:bg-purple-800' : 'bg-slate-900 hover:bg-slate-800'
-                }`}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#1B4332] hover:bg-[#13462A] text-white text-xs font-bold shrink-0"
               >
-                <Plus size={13} /> {isTermite ? 'Catat Titik Rayap' : 'Catat Hama'}
+                <Plus size={13} /> Tambah
               </button>
             </div>
 
@@ -327,19 +442,19 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
                   .map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white border border-slate-200 px-2.5 py-1.5 text-xs"
+                      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5 text-xs"
                     >
-                      <div>
+                      <div className="truncate">
                         <span className="font-bold text-slate-900">{item.pestName}</span>{' '}
-                        <span className="font-mono font-bold text-emerald-700">
-                          ({item.quantity} {isTermite ? 'titik/unit' : 'ekor'})
+                        <span className="font-mono font-bold text-[#1B4332]">
+                          ({item.quantity} {isTermite ? 'titik' : 'ekor'})
                         </span>{' '}
                         • <span className="text-slate-600">{item.location}</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setPestFindings(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-slate-400 hover:text-rose-600"
+                        className="text-slate-400 hover:text-rose-600 shrink-0"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -349,184 +464,302 @@ export const TreatmentFormModal: React.FC<TreatmentFormModalProps> = ({
             )}
           </div>
 
-          {isFumigation && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 text-xs text-rose-800">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5 text-rose-600" />
-              <span>Fumigasi menggunakan gas beracun. Waktu selesai aerasi <strong>wajib diisi</strong>.</span>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Metode Aplikasi *</label>
-            <select
-              value={applicationMethod}
-              onChange={e => setApplicationMethod(e.target.value as ApplicationMethod)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs bg-white"
-            >
-              {APPLICATION_METHOD_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
-                {isTermite ? 'Nama Termitisida / Produk *' : 'Nama Pestisida / Produk *'}
-              </label>
+          {/* 2. TINDAKAN & METODE INTI */}
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5">
+            <span className="text-xs font-bold text-slate-900 block">2. Metode &amp; Bahan Aktif</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <select
+                value={applicationMethod}
+                onChange={e => setApplicationMethod(e.target.value as ApplicationMethod)}
+                className="px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-xs font-semibold"
+              >
+                {APPLICATION_METHOD_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
               <input
                 type="text"
-                placeholder={isTermite ? 'Cypergard 100 EC, Safe 1 200 SL, Premise...' : 'Cypergard 100 EC, Demand CS, Klerat...'}
+                placeholder="Nama Chemical *"
                 value={chemicalName}
                 onChange={e => setChemicalName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
+                className="px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-xs"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Bahan Aktif</label>
               <input
                 type="text"
-                placeholder="Cypermethrin / Imidakloprid"
-                value={activeIngredient}
-                onChange={e => setActiveIngredient(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Dosis / Konsentrasi *</label>
-              <input
-                type="text"
-                placeholder={isTermite ? '2,5 - 3 Liter larutan / titik injeksi' : '10 ml per 1 liter air'}
+                placeholder="Dosis *"
                 value={dosage}
                 onChange={e => setDosage(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
+                className="px-2.5 py-2 rounded-lg border border-slate-300 bg-white text-xs"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Luas Area Dirawat (m²)</label>
-              <div className="relative">
-                <Ruler size={16} className="absolute left-3 top-3 text-[var(--text-muted)]" />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="150"
-                  value={treatmentAreaSqm}
-                  onChange={e => setTreatmentAreaSqm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
-                />
-              </div>
             </div>
           </div>
 
-          {isTermite && (
-            <div>
-              <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Jumlah Titik Bor / Injeksi Pondasi</label>
-              <input
-                type="number"
-                min={0}
-                placeholder="42"
-                value={drillingPointsCount}
-                onChange={e => setDrillingPointsCount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs"
-              />
+          {/* 3. CAKUPAN AREA & SARAN SINGKAT */}
+          <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900">3. Area &amp; Saran Klien</span>
+              <span className="text-[10px] font-semibold text-slate-500">{selectedAreas.length} Area</span>
             </div>
-          )}
-
-          {isFumigation && (
-            <div className="bg-[var(--bg-tertiary)] p-3.5 rounded-xl border border-[var(--border-subtle)]/80 space-y-3">
-              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                <Info size={14} className="text-rose-600" /> Data Keselamatan Fumigasi
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Jenis Fumigant</label>
-                  <input
-                    type="text"
-                    placeholder="Phosphine (PH3)"
-                    value={fumigantType}
-                    onChange={e => setFumigantType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Konsentrasi Gas (ppm)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="1200"
-                    value={gasConcentrationPpm}
-                    onChange={e => setGasConcentrationPpm(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Mulai Penyegelan (Sealing)</label>
-                  <input
-                    type="datetime-local"
-                    value={sealingStartedAt}
-                    onChange={e => setSealingStartedAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-rose-700 mb-1">Selesai Aerasi (Wajib) *</label>
-                  <input
-                    type="datetime-local"
-                    value={aerationCompletedAt}
-                    onChange={e => setAerationCompletedAt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-rose-300 text-xs bg-white"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Catatan Keselamatan</label>
-                <textarea
-                  rows={2}
-                  placeholder="Area disegel penuh, akses masuk diblokir dengan tanda peringatan..."
-                  value={safetyNotes}
-                  onChange={e => setSafetyNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white resize-none"
-                />
-              </div>
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_AREAS.map(area => {
+                const active = selectedAreas.includes(area);
+                return (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => toggleArea(area)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                      active
+                        ? 'bg-[#1B4332] text-white border-[#1B4332]'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {active ? '✓ ' : ''}
+                    {area}
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Catatan Teknisi (Opsional)</label>
             <textarea
               rows={2}
-              placeholder="Fokus area, temuan di lapangan, rekomendasi tindak lanjut..."
+              placeholder="Saran singkat untuk klien (opsional)..."
               value={technicianNotes}
               onChange={e => setTechnicianNotes(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-xs resize-none"
+              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs resize-none"
             />
-          </div>
-
-          {error && (
-            <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{error}</div>
-          )}
-
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-[var(--border-subtle)]">
-            {onSkip && !isFumigation ? (
-              <button type="button" onClick={onSkip} disabled={isSubmitting} className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-                Isi nanti
-              </button>
-            ) : <span />}
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2.5 rounded-xl border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] text-xs font-semibold transition-colors disabled:opacity-50">
-                Batal
-              </button>
-              <button type="submit" disabled={isSubmitting} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 active:scale-98 transition-all disabled:opacity-60 flex items-center gap-2">
-                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-                Simpan &amp; Lanjut Check-Out
-              </button>
+            <div className="flex flex-wrap gap-1.5">
+              {(isTermite ? QUICK_SUGGESTIONS_AR : QUICK_SUGGESTIONS_PCO).map(chip => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => appendSuggestionChip(chip)}
+                  className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-[#1B4332] text-[10px] font-semibold border border-slate-200"
+                >
+                  {chip}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* PROGRESSIVE DISCLOSURE 1: TIM TEKNISI YANG IKUT BERTUGAS (ON-CLICK) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowTeamSection(prev => !prev)}
+              className="w-full px-3.5 py-2.5 flex items-center justify-between text-left"
+            >
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Users size={14} className="text-[#1B4332]" />
+                Tim Teknisi yang Ikut Bertugas ({teamMembers.length} Orang)
+              </span>
+              {showTeamSection ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showTeamSection && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="px-3.5 pb-3.5 pt-1 space-y-2 border-t border-slate-200"
+                >
+                  {availableTechs.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableTechs.map(t => {
+                        const selected = teamMembers.some(
+                          m => m.id === t.id || m.name.toLowerCase() === t.name.toLowerCase()
+                        );
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => toggleRegisteredTech(t)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                              selected
+                                ? 'bg-[#1B4332] text-white border-[#1B4332]'
+                                : 'bg-white text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {selected && <Check size={11} />}
+                            {t.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={manualTechName}
+                      onChange={e => setManualTechName(e.target.value)}
+                      placeholder="Tambah nama anggota manual..."
+                      className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddManualTech}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#1B4332] text-white text-xs font-bold"
+                    >
+                      <UserPlus size={13} /> Tambah
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* PROGRESSIVE DISCLOSURE 2: PARAMETER TEKNIS LANJUTAN (ON-CLICK) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedTechDetails(prev => !prev)}
+              className="w-full px-3.5 py-2.5 flex items-center justify-between text-left"
+            >
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Ruler size={14} className="text-slate-500" />
+                Detail Teknis Lanjutan (Luas m², Titik Injeksi, Bahan Aktif)
+              </span>
+              {showAdvancedTechDetails ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showAdvancedTechDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="px-3.5 pb-3.5 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-slate-200"
+                >
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Bahan Aktif</label>
+                    <input
+                      type="text"
+                      placeholder="Imidakloprid / Cypermethrin"
+                      value={activeIngredient}
+                      onChange={e => setActiveIngredient(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Luas Area (m²)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={treatmentAreaSqm}
+                      onChange={e => setTreatmentAreaSqm(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                    />
+                  </div>
+                  {isTermite && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Titik Injeksi</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={drillingPointsCount}
+                        onChange={e => setDrillingPointsCount(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {isFumigation && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-2 text-xs text-rose-900">
+              <div className="flex items-center gap-1.5 font-bold">
+                <AlertTriangle size={15} className="text-rose-600" />
+                 Parameter Keselamatan Fumigasi (Wajib)
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Jenis Fumigant (PH3)"
+                  value={fumigantType}
+                  onChange={e => setFumigantType(e.target.value)}
+                  className="px-2.5 py-1.5 rounded border border-rose-300 bg-white text-xs"
+                />
+                <input
+                  type="number"
+                  placeholder="Gas (ppm)"
+                  value={gasConcentrationPpm}
+                  onChange={e => setGasConcentrationPpm(e.target.value)}
+                  className="px-2.5 py-1.5 rounded border border-rose-300 bg-white text-xs"
+                />
+                <input
+                  type="datetime-local"
+                  value={sealingStartedAt}
+                  onChange={e => setSealingStartedAt(e.target.value)}
+                  className="px-2.5 py-1.5 rounded border border-rose-300 bg-white text-xs"
+                />
+                <input
+                  type="datetime-local"
+                  value={aerationCompletedAt}
+                  onChange={e => setAerationCompletedAt(e.target.value)}
+                  className="px-2.5 py-1.5 rounded border border-rose-300 bg-white text-xs"
+                />
+              </div>
+              <input
+                type="text"
+                placeholder="Catatan keamanan area..."
+                value={safetyNotes}
+                onChange={e => setSafetyNotes(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded border border-rose-300 bg-white text-xs"
+              />
+            </div>
+          )}
+
+          {error && (
+            <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
+            {onSkip && !isFumigation ? (
+              <button
+                type="button"
+                onClick={onSkip}
+                disabled={isSubmitting}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+              >
+                Isi nanti
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-[#1B4332] hover:bg-[#13462A] text-white text-xs font-bold shadow-sm flex items-center gap-1.5"
+              >
+                {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                Simpan &amp; Lanjut Tanda Tangan
+              </motion.button>
+            </div>
+          </div>
+
+          <span className="sr-only">
+            <Info size={1} />
+          </span>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

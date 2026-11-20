@@ -1,6 +1,7 @@
 import { supabase } from '@/shared/lib/supabase';
 import { useAuthStore } from '@/app/store/authStore';
 import { calculateDistanceMeters, isWithinRadius } from '@/shared/utils/geo';
+import { syncCompanyProjectsAndReports } from './projects';
 import {
   ApplicationMethod,
   ContractType,
@@ -127,6 +128,8 @@ export function mapDbWorkReportFull(row: any): WorkReport {
     projectLatitude: Number(proj.latitude ?? 0),
     projectLongitude: Number(proj.longitude ?? 0),
     projectRadius: Number(proj.radius ?? 100),
+    workDate: typeof proj.work_date === 'string' ? proj.work_date.slice(0, 10) : null,
+    workNotes: proj.notes ?? row.notes ?? null,
     scheduledStartTime: typeof proj.scheduled_start_time === 'string' ? proj.scheduled_start_time.slice(0, 5) : '08:00',
     serviceType: (proj.service_type || 'GENERAL_PEST_CONTROL') as ServiceType,
     focusTarget: proj.focus_target ?? null,
@@ -165,7 +168,7 @@ export function mapDbWorkReportFull(row: any): WorkReport {
     customerSignature: row.customer_signature ?? null,
     technicianSignature: row.technician_signature ?? null,
     technicianSignedAt: row.technician_signed_at ?? null,
-    notes: row.notes ?? null,
+    notes: row.notes ?? proj.notes ?? null,
     teamMembers: Array.isArray(row.team_members) ? row.team_members : [],
     photos,
     createdAt: row.created_at,
@@ -182,7 +185,13 @@ const REPORT_SELECT_FULL = `
   risk_events(*)
 `;
 
+/**
+ * Mengambil seluruh laporan kerja perusahaan dari database Supabase asli.
+ * Mencakup semua laporan yang dibuat oleh Admin/SPK maupun oleh Teknisi Lapangan
+ * sehingga seluruh data asli di database muncul utuh di aplikasi 2-Role Skripsi.
+ */
 export async function fetchMyWorkReports(): Promise<WorkReport[]> {
+  await syncCompanyProjectsAndReports();
   const st = useAuthStore.getState();
   const uid = st.user?.uid;
   const companyId = st.user?.companyId;
@@ -199,8 +208,17 @@ export async function fetchMyWorkReports(): Promise<WorkReport[]> {
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   const all = (data || []).map(mapDbWorkReportFull);
-  const mine = all.filter(r => r.executorId === uid);
-  return mine.length > 0 ? mine : all;
+
+  // Urutkan agar tugas milik teknisi yang sedang login diprioritaskan di atas pada tanggal yang sama,
+  // tanpa menyembunyikan penugasan yang diinput oleh Admin / SPK.
+  return all.sort((a, b) => {
+    const aMine = a.executorId === uid ? 1 : 0;
+    const bMine = b.executorId === uid ? 1 : 0;
+    if (aMine !== bMine && a.status === b.status) return bMine - aMine;
+    const dateA = a.workDate || a.createdAt || '';
+    const dateB = b.workDate || b.createdAt || '';
+    return dateB.localeCompare(dateA);
+  });
 }
 
 export async function fetchWorkReport(id: string): Promise<WorkReport> {
@@ -214,8 +232,55 @@ export async function fetchWorkReport(id: string): Promise<WorkReport> {
   return mapDbWorkReportFull(data);
 }
 
+/**
+ * Memastikan proyek memiliki baris `work_reports` di Supabase sebelum memulai Check-in GPS.
+ */
+export async function ensureWorkReportForProject(projectId: string): Promise<WorkReport> {
+  const { data: existing } = await supabase
+    .from('work_reports')
+    .select(REPORT_SELECT_FULL)
+    .eq('project_id', projectId)
+    .maybeSingle();
+
+  if (existing) {
+    return mapDbWorkReportFull(existing);
+  }
+
+  const st = useAuthStore.getState();
+  const { data: proj } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .single();
+
+  if (!proj) {
+    throw new Error('Data proyek tidak ditemukan di database.');
+  }
+
+  const { data: created, error } = await supabase
+    .from('work_reports')
+    .insert({
+      company_id: proj.company_id || st.user?.companyId,
+      project_id: proj.id,
+      executor_id: st.user?.uid || proj.created_by,
+      status: 'READY',
+      customer_name: proj.client_name || proj.project_name,
+      notes: proj.notes ?? null,
+    })
+    .select(REPORT_SELECT_FULL)
+    .single();
+
+  if (error || !created) {
+    throw new Error(error?.message || 'Gagal menyiapkan laporan kerja untuk proyek ini.');
+  }
+
+  return mapDbWorkReportFull(created);
+}
+
 export async function checkIn(reportId: string, evidence: EvidencePayload): Promise<WorkReport> {
   const current = await fetchWorkReport(reportId);
+  const st = useAuthStore.getState();
+  const activeExecutorId = st.user?.role === 'TEKNISI_LAPANGAN' ? st.user.uid : (current.executorId || st.user?.uid);
 
   // Periksa apakah proyek sudah memiliki titik jangkar koordinat valid
   const hasProjectAnchor = Boolean(
@@ -262,6 +327,7 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
   const { error: upErr } = await supabase
     .from('work_reports')
     .update({
+      executor_id: activeExecutorId,
       status: 'WORKING',
       check_in_at: current.checkInAt || nowIso,
       check_in_latitude: evidence.latitude,
@@ -290,11 +356,10 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
         distance_to_project: dist,
         is_within_radius: valid,
         captured_at: nowIso,
-        metadata: { projectName: current.projectName, executorName: current.executorName },
+        metadata: { projectName: current.projectName, executorName: st.user?.name || current.executorName },
       })
       .eq('id', primaryCinId);
 
-    // Jika sebelumnya sempat terduplikasi (misal 11 foto CIN), bersihkan duplikat ekstra
     if (existingCheckInPhotos.length > 1) {
       const duplicateIds = existingCheckInPhotos.slice(1).map(p => p.id);
       await supabase.from('documentation_photos').delete().in('id', duplicateIds);
@@ -311,7 +376,7 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
       distance_to_project: dist,
       is_within_radius: valid,
       captured_at: nowIso,
-      metadata: { projectName: current.projectName, executorName: current.executorName },
+      metadata: { projectName: current.projectName, executorName: st.user?.name || current.executorName },
     });
     if (photoErr) throw new Error(photoErr.message);
   }
@@ -409,29 +474,44 @@ export async function checkOut(reportId: string, evidence: EvidencePayload): Pro
     metadata: { projectName: current.projectName, executorName: current.executorName },
   });
 
-  const { error: upErr } = await supabase
+  const updatePayload: Record<string, any> = {
+    status: nextStatus,
+    check_out_at: nowIso,
+    check_out_latitude: evidence.latitude,
+    check_out_longitude: evidence.longitude,
+    check_out_accuracy: evidence.accuracy,
+    check_out_distance: dist,
+    check_out_valid: valid,
+    duration_seconds: durationSeconds,
+    risk_score: riskScore,
+    risk_level: riskLevel,
+    customer_name: evidence.customerName ?? current.customerName,
+    customer_phone: evidence.customerPhone ?? current.customerPhone,
+    customer_feedback: evidence.customerFeedback ?? current.customerFeedback,
+    customer_signature: evidence.customerSignature ?? current.customerSignature,
+    notes: evidence.notes ?? current.notes,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (evidence.technicianSignature || current.technicianSignature) {
+    updatePayload.technician_signature = evidence.technicianSignature ?? current.technicianSignature;
+    updatePayload.technician_signed_at = evidence.technicianSignature
+      ? new Date().toISOString()
+      : current.technicianSignedAt;
+  }
+
+  let { error: upErr } = await supabase
     .from('work_reports')
-    .update({
-      status: nextStatus,
-      check_out_at: nowIso,
-      check_out_latitude: evidence.latitude,
-      check_out_longitude: evidence.longitude,
-      check_out_accuracy: evidence.accuracy,
-      check_out_distance: dist,
-      check_out_valid: valid,
-      duration_seconds: durationSeconds,
-      risk_score: riskScore,
-      risk_level: riskLevel,
-      customer_name: evidence.customerName ?? current.customerName,
-      customer_phone: evidence.customerPhone ?? current.customerPhone,
-      customer_feedback: evidence.customerFeedback ?? current.customerFeedback,
-      customer_signature: evidence.customerSignature ?? current.customerSignature,
-      technician_signature: evidence.technicianSignature ?? (current as any).technicianSignature,
-      technician_signed_at: evidence.technicianSignature ? new Date().toISOString() : undefined,
-      notes: evidence.notes ?? current.notes,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', reportId);
+
+  // Fallback aman apabila kolom migrasi 07 (technician_signature) belum dijalankan pada instance lama
+  if (upErr && String(upErr.message || '').includes('technician_sign')) {
+    delete updatePayload.technician_signature;
+    delete updatePayload.technician_signed_at;
+    const retry = await supabase.from('work_reports').update(updatePayload).eq('id', reportId);
+    upErr = retry.error;
+  }
 
   if (upErr) throw new Error(upErr.message);
   return fetchWorkReport(reportId);
@@ -481,3 +561,28 @@ export async function updateWorkReportTeam(reportId: string, teamMembers: TeamMe
 }
 
 export type { TreatmentRecord };
+
+export async function reportFieldIssueToDb(reportId: string, issueType: string, note: string): Promise<void> {
+  if (!reportId) return;
+  const cleanNote = note.trim() || 'Membutuhkan tindak lanjut koordinasi Admin/Supervisor.';
+  await supabase.from('risk_events').insert({
+    work_report_id: reportId,
+    event_type: 'FIELD_ISSUE_ESCALATION',
+    points: 40,
+    severity: 'HIGH',
+    title: `Kendala Lapangan: ${issueType}`,
+    description: cleanNote,
+    expected_value: 'Operasional Normal',
+    actual_value: issueType,
+  });
+  await supabase
+    .from('work_reports')
+    .update({
+      status: 'FLAGGED',
+      risk_score: 40,
+      risk_level: 'REVIEW',
+      notes: `[KENDALA LAPANGAN: ${issueType}] ${cleanNote}`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reportId);
+}

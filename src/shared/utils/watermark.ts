@@ -55,18 +55,18 @@ export function applyWatermarkToCanvas(
     width = imageSource.width;
     height = imageSource.height;
   }
-  const MAX_DIM = 1024;
+  const MAX_DIM = 800;
   if (width > MAX_DIM || height > MAX_DIM) {
     const ratio = width / height;
-    if (ratio > 1) { width = MAX_DIM; height = MAX_DIM / ratio; }
-    else { height = MAX_DIM; width = MAX_DIM * ratio; }
+    if (ratio > 1) { width = Math.round(MAX_DIM); height = Math.round(MAX_DIM / ratio); }
+    else { height = Math.round(MAX_DIM); width = Math.round(MAX_DIM * ratio); }
   }
   canvas.width = width;
   canvas.height = height;
 
   ctx.drawImage(imageSource, 0, 0, width, height);
 
-  const scale = Math.max(width / 1000, 0.75);
+  const scale = Math.max(width / 1000, 0.72);
 
   // Top type tag banner
   const tagHeight = 36 * scale;
@@ -157,9 +157,24 @@ export function applyWatermarkToCanvas(
   return canvas;
 }
 
-/** Converts a canvas to a JPEG Blob for multipart upload (avoids base64 inflation over the wire). */
-export function canvasToJpegBlob(canvas: HTMLCanvasElement, quality = 0.8): Promise<Blob> {
+function encodeJpegBlob(canvas: HTMLCanvasElement, q: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Gagal memproses foto.'))), 'image/jpeg', quality);
+    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Gagal memproses foto.'))), 'image/jpeg', q);
   });
+}
+
+/**
+ * Konversi canvas ke JPEG Blob dengan kompresi adaptif otomatis (target 40–60 KB per foto)
+ * untuk menghemat kuota database hingga ~80% tanpa mengorbankan keterbacaan watermark.
+ */
+export async function canvasToJpegBlob(canvas: HTMLCanvasElement, initialQuality = 0.68): Promise<Blob> {
+  const TARGET_MAX_BYTES = 62_000; // ~60 KB
+  const qualitySteps = [initialQuality, 0.58, 0.48, 0.42];
+  let resultBlob = await encodeJpegBlob(canvas, qualitySteps[0]);
+
+  for (let i = 1; i < qualitySteps.length; i++) {
+    if (resultBlob.size <= TARGET_MAX_BYTES) break;
+    resultBlob = await encodeJpegBlob(canvas, qualitySteps[i]);
+  }
+  return resultBlob;
 }
