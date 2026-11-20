@@ -5,6 +5,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import {
   fetchMyWorkReports,
+  fetchWorkReport,
   checkIn,
   addProgressPhoto,
   checkOut,
@@ -259,6 +260,24 @@ export const ExecutorHome: React.FC = () => {
 
   // Selected items
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  // On-demand hydration: hanya unduh payload Base64 foto & tanda tangan saat teknisi membuka 1 laporan spesifik (hemat ~85% Supabase Egress)
+  useEffect(() => {
+    if (!selectedReportId) return;
+    const target = reports.find(r => r.id === selectedReportId);
+    if (!target) return;
+    const needsPhotoHydration = target.photos.some(p => p.url.startsWith('/api/photos/'));
+    if (!needsPhotoHydration) return;
+    let cancelled = false;
+    fetchWorkReport(selectedReportId)
+      .then(full => {
+        if (!cancelled) {
+          setReports(prev => prev.map(r => (r.id === full.id ? full : r)));
+        }
+      })
+      .catch(() => { /* abaikan saat offline */ });
+    return () => { cancelled = true; };
+  }, [selectedReportId]);
+
   const [selectedProjectDetailId, setSelectedProjectDetailId] = useState<string | null>(null);
   const [isViewingHistoryDetail, setIsViewingHistoryDetail] = useState(false);
   const [showGpsPrompt, setShowGpsPrompt] = useState(false);

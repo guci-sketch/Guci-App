@@ -3,20 +3,24 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
 
-// Catatan: Self-destroying Service Worker (selfDestroying: true) dan manifest.webmanifest
-// kini disajikan langsung melalui public/sw.js & public/manifest.webmanifest agar kompatibel penuh
-// dengan Vite 6 di Vercel tanpa error ENOENT dist/sw.js dari vite-plugin-pwa@0.21.1.
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
   ],
   build: {
-    chunkSizeWarningLimit: 3500,
+    sourcemap: false,
+    target: 'es2020',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
+            if (id.includes('@supabase')) return 'vendor-supabase';
+            if (id.includes('framer-motion')) return 'vendor-motion';
+            if (id.includes('lucide-react')) return 'vendor-icons';
             if (id.includes('three')) return 'vendor-three';
             if (id.includes('jspdf')) return 'vendor-pdf';
             if (id.includes('xlsx')) return 'vendor-xlsx';

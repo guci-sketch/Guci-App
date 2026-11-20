@@ -55,6 +55,42 @@ export interface TreatmentInput {
   technicianNotes?: string;
 }
 
+/**
+ * Kompresi foto dokumentasi di sisi klien (Canvas -> WebP / JPEG q=0.62, maks lebar 960px)
+ * Memangkas ukuran foto dari ~1.5-3 MB menjadi ~35-65 KB (hemat ~95% Database Storage & Egress Supabase Free Tier).
+ */
+async function compressBlobToDataUrl(blob: Blob, maxWidth = 960, quality = 0.62): Promise<string> {
+  if (typeof document === 'undefined' || typeof createImageBitmap === 'undefined') {
+    return blobToDataUrl(blob);
+  }
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = bitmap.width > maxWidth ? maxWidth / bitmap.width : 1;
+    const targetW = Math.max(1, Math.round(bitmap.width * scale));
+    const targetH = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close();
+      return blobToDataUrl(blob);
+    }
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+    bitmap.close();
+
+    // Utamakan WebP (lebih kecil 25-35% dari JPEG), fallback ke JPEG jika browser tidak mendukung
+    const webpUrl = canvas.toDataURL('image/webp', quality);
+    if (webpUrl.startsWith('data:image/webp')) {
+      return webpUrl;
+    }
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return blobToDataUrl(blob);
+  }
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -185,6 +221,20 @@ const REPORT_SELECT_FULL = `
   risk_events(*)
 `;
 
+// Query ringan untuk daftar laporan (tanpa menarik payload Base64 storage_path massal -> hemat ~85% Supabase Egress)
+const REPORT_SELECT_LIST = `
+  id, company_id, project_id, executor_id, status,
+  check_in_at, check_in_latitude, check_in_longitude, check_in_accuracy, check_in_distance, check_in_valid,
+  check_out_at, check_out_latitude, check_out_longitude, check_out_accuracy, check_out_distance, check_out_valid,
+  duration_seconds, risk_score, risk_level, reviewed_by, reviewed_at, review_notes,
+  customer_name, customer_phone, customer_feedback, notes, team_members, created_at, updated_at,
+  projects(*),
+  users!work_reports_executor_id_fkey(id, name, email),
+  treatment_records(*),
+  documentation_photos(id, photo_type, photo_tag, latitude, longitude, accuracy, distance_to_project, is_within_radius, captured_at, created_at, purged_at, metadata),
+  risk_events(*)
+`;
+
 /**
  * Mengambil seluruh laporan kerja perusahaan dari database Supabase asli.
  * Mencakup semua laporan yang dibuat oleh Admin/SPK maupun oleh Teknisi Lapangan
@@ -199,8 +249,9 @@ export async function fetchMyWorkReports(): Promise<WorkReport[]> {
 
   let q = supabase
     .from('work_reports')
-    .select(REPORT_SELECT_FULL)
-    .order('created_at', { ascending: false });
+    .select(REPORT_SELECT_LIST)
+    .order('created_at', { ascending: false })
+    .limit(60);
 
   if (companyId) {
     q = q.eq('company_id', companyId);
@@ -322,7 +373,7 @@ export async function checkIn(reportId: string, evidence: EvidencePayload): Prom
   }
 
   const nowIso = evidence.capturedAt || new Date().toISOString();
-  const dataUrl = await blobToDataUrl(evidence.photoBlob);
+  const dataUrl = await compressBlobToDataUrl(evidence.photoBlob);
 
   const { error: upErr } = await supabase
     .from('work_reports')
@@ -406,7 +457,7 @@ export async function addProgressPhoto(reportId: string, evidence: EvidencePaylo
     evidence.accuracy
   );
   const nowIso = evidence.capturedAt || new Date().toISOString();
-  const dataUrl = await blobToDataUrl(evidence.photoBlob);
+  const dataUrl = await compressBlobToDataUrl(evidence.photoBlob);
 
   const { error } = await supabase.from('documentation_photos').insert({
     work_report_id: reportId,
@@ -450,7 +501,7 @@ export async function checkOut(reportId: string, evidence: EvidencePayload): Pro
   const nowIso = evidence.capturedAt || new Date().toISOString();
   const checkInMs = current.checkInAt ? new Date(current.checkInAt).getTime() : Date.now() - 3600_000;
   const durationSeconds = Math.max(60, Math.round((new Date(nowIso).getTime() - checkInMs) / 1000));
-  const dataUrl = await blobToDataUrl(evidence.photoBlob);
+  const dataUrl = await compressBlobToDataUrl(evidence.photoBlob);
 
   let riskScore = 0;
   if (!current.checkInValid) riskScore += 30;

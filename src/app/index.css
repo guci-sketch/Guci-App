@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -989,5 +988,16 @@ html.dark .tech-lite-shell {
 
 details > summary::-webkit-details-marker {
   display: none;
+}
+
+
+/* Modern Web Guidance: Defer off-screen rendering for long tables & task lists */
+.cv-auto-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+.cv-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
 }
 

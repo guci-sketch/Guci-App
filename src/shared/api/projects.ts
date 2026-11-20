@@ -90,7 +90,7 @@ export function mapDbProject(row: any): Project {
 let lastSyncTimestamp = 0;
 export async function syncCompanyProjectsAndReports(force = false): Promise<void> {
   const now = Date.now();
-  if (!force && now - lastSyncTimestamp < 8000) return;
+  if (!force && now - lastSyncTimestamp < 300000) return;
   lastSyncTimestamp = now;
 
   const st = useAuthStore.getState();
@@ -258,7 +258,7 @@ export async function fetchMyProjects(): Promise<Project[]> {
     .select('*')
     .order('work_date', { ascending: false })
     .order('created_at', { ascending: false })
-    .limit(200);
+    .limit(120);
   if (companyId) q = q.eq('company_id', companyId);
   const { data, error } = await q;
   if (error) throw new Error(error.message);

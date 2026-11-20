@@ -1,18 +1,19 @@
 /**
- * TanStack Query Configuration with Offline-First Persistence in IndexedDB
+ * TanStack Query Configuration — Free-Tier Supabase Egress & Offline-First Optimized
  */
-
 import { QueryClient, dehydrate, hydrate, type DehydratedState } from "@tanstack/react-query";
 import { idbKeyVal } from "./indexedDB";
 
 export const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 1000 * 60 * 5, // 5 menit
-            gcTime: 1000 * 60 * 60 * 24 * 7, // 7 hari tersimpan
-            networkMode: "offlineFirst", // Prioritaskan offline & cache lokal
+            staleTime: 1000 * 60 * 10, // 10 menit: mencegah refetch berulang ke Supabase
+            gcTime: 1000 * 60 * 60 * 24 * 7, // 7 hari tersimpan di cache lokal
+            networkMode: "offlineFirst",
             retry: 1,
             refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            refetchOnMount: false,
         },
         mutations: {
             networkMode: "offlineFirst",
@@ -22,11 +23,10 @@ export const queryClient = new QueryClient({
 });
 
 const PERSISTENCE_KEY = "tanstack_query_cache_v1";
-let saveTimeout: any = null;
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export async function initQueryClientPersistence(client: QueryClient): Promise<void> {
     try {
-        // 1. Restore dehydrated cache from IndexedDB
         const savedCache = await idbKeyVal.get<DehydratedState>(PERSISTENCE_KEY);
         if (savedCache) {
             hydrate(client, savedCache);
@@ -35,23 +35,18 @@ export async function initQueryClientPersistence(client: QueryClient): Promise<v
         // Abaikan error restorasi cache
     }
 
-    // 2. Subscribe to query cache changes and debounce write to IndexedDB
     client.getQueryCache().subscribe((event) => {
         if (!event) return;
-
         if (saveTimeout) clearTimeout(saveTimeout);
         saveTimeout = setTimeout(async () => {
             try {
                 const dehydrated = dehydrate(client, {
-                    shouldDehydrateQuery: (query) => {
-                        // Jangan simpan query yang sedang error fatal atau belum berhasil
-                        return query.state.status === "success";
-                    },
+                    shouldDehydrateQuery: (query) => query.state.status === "success",
                 });
                 await idbKeyVal.set(PERSISTENCE_KEY, dehydrated);
             } catch {
                 // Abaikan jika ada data non-serializable
             }
-        }, 1200);
+        }, 1500);
     });
 }
