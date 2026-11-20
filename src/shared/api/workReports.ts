@@ -16,6 +16,9 @@ import {
   WorkReportStatus,
 } from '@/entities/types';
 
+export const MAX_PHOTOS_PER_REPORT = 10;
+export const MAX_PROGRESS_PHOTOS_PER_REPORT = 8;
+
 export interface EvidencePayload {
   photoBlob: Blob;
   capturedAt?: string;
