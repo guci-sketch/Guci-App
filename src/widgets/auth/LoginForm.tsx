@@ -19,6 +19,39 @@ import { fetchAppUser } from '@/shared/api/authProfile';
 import { readPendingInvite, repairPendingInviteUser } from '@/shared/api/inviteService';
 import { sendPasswordResetEmail } from '@/shared/api/auth';
 
+const QUICK_LOGIN_ACCOUNTS = [
+    {
+        label: "Direktur",
+        roleBadge: "DIREKTUR",
+        email: "direktur@gucimaspratama.co.id",
+        pw: "GuciEmas123!",
+    },
+    {
+        label: "Admin Operasional",
+        roleBadge: "ADMIN",
+        email: "admin@gucimaspratama.co.id",
+        pw: "GuciEmas123!",
+    },
+    {
+        label: "Marketing / Surveyor",
+        roleBadge: "MARKETING",
+        email: "surveyor@gucimaspratama.co.id",
+        pw: "GuciEmas123!",
+    },
+    {
+        label: "Teknisi Lapangan",
+        roleBadge: "TEKNISI",
+        email: "teknisi@gucimaspratama.co.id",
+        pw: "GuciEmas123!",
+    },
+    {
+        label: "Gudang & Kimia",
+        roleBadge: "GUDANG",
+        email: "gudang@gucimaspratama.co.id",
+        pw: "GuciEmas123!",
+    },
+];
+
 export function LoginPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -146,6 +179,12 @@ export function LoginPage() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         await performSignIn(email, password);
+    };
+
+    const handleQuickLogin = async (accEmail: string, accPw: string) => {
+        setEmail(accEmail);
+        setPassword(accPw);
+        await performSignIn(accEmail, accPw);
     };
 
     const handleOpenForgotModal = () => {
@@ -308,6 +347,39 @@ export function LoginPage() {
                             )}
                         </button>
                     </form>
+
+                    {/* Shortcut Akses Cepat (1-Klik langsung ke Supabase Auth) */}
+                    <div className="mt-5 pt-4 border-t border-[var(--border-subtle)] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                                Shortcut Login (1-Klik)
+                            </span>
+                            <span className="text-[10px] text-[var(--text-muted)]">5 Peran Staf</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            {QUICK_LOGIN_ACCOUNTS.map(acc => (
+                                <button
+                                    key={acc.email}
+                                    type="button"
+                                    disabled={loading}
+                                    onClick={() => handleQuickLogin(acc.email, acc.pw)}
+                                    className={`flex flex-col items-start justify-between p-2.5 rounded-[10px] border text-left transition-all cursor-pointer disabled:opacity-60 ${
+                                        email.trim().toLowerCase() === acc.email
+                                            ? "border-[#1A5C38] dark:border-[#4B9B70] bg-[#EAF3EE]/70 dark:bg-emerald-950/50"
+                                            : "border-[var(--border-subtle)] bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)]"
+                                    }`}
+                                >
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--bg-tertiary)] text-[#1A5C38] dark:text-[#4B9B70] mb-1">
+                                        {acc.roleBadge}
+                                    </span>
+                                    <div className="font-semibold text-xs text-[var(--text-primary)] truncate w-full">
+                                        {acc.label}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </section>
 
